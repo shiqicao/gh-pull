@@ -69,6 +69,7 @@ li { padding: 12px 14px; border-top: 1px solid light-dark(#e8ecf0, #262c36); }
 .closed, .failure, .error, .changes_requested { background: light-dark(#ffebe9, #481d22); color: light-dark(#a40e26, #ffa198); }
 .pending, .expected, .review_required { background: light-dark(#fff8c5, #3c3010); color: light-dark(#7d4e00, #eac54f); }
 .additions { color: light-dark(#116329, #7ee787); }
+.diff-counts { white-space: nowrap; }
 .deletions { color: light-dark(#a40e26, #ffa198); }
 #error { padding: 12px; border: 1px solid light-dark(#a40e26, #ffa198); }
 .empty { padding: 24px 0; }

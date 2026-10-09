@@ -421,7 +421,11 @@ function render() {
       hands.setAttribute('d', 'M8 4v4l2.5 1.5');
       clock.append(face, hands);
       time.append(clock, document.createTextNode(age));
-      meta.append(time, element('span', `+${pr.additions}`, 'additions'), element('span', `−${pr.deletions}`, 'deletions'));
+      const diffCounts = element('span', undefined, 'diff-counts');
+      diffCounts.title = `${pr.additions} additions, ${pr.deletions} deletions`;
+      diffCounts.setAttribute('aria-label', diffCounts.title);
+      diffCounts.append(element('span', String(pr.additions), 'additions'), document.createTextNode('/'), element('span', String(pr.deletions), 'deletions'));
+      meta.append(time, diffCounts);
       for (const label of pr.labels) meta.append(badge(label, 'label'));
       const content = element('div', undefined, 'pr-content');
       content.append(line);
