@@ -29,8 +29,9 @@ button { background: light-dark(#f6f8fa, #21262d); }
 button:hover:not(:disabled) { border-color: light-dark(#afb8c1, #656c76); }
 button:disabled { cursor: default; opacity: 0.6; }
 #more { font-size: 13px; font-weight: 500; }
-#refresh { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; padding: 7px; }
-#refresh svg { width: 18px; height: 18px; }
+#refresh { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; padding: 2px; border-radius: 50%; }
+#refresh svg { width: 34px; height: 34px; }
+#refresh-countdown { position: absolute; inset: 0; display: grid; place-items: center; font-size: 10px; font-weight: 500; font-variant-numeric: tabular-nums; }
 #refresh[aria-busy="true"] { cursor: progress; }
 #refresh[aria-busy="true"] svg { animation: refresh-spin 1s linear infinite; }
 @keyframes refresh-spin { to { transform: rotate(360deg); } }

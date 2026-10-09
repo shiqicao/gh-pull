@@ -57,7 +57,9 @@ async function apiFetch(url, options) {
 
 function updateRefreshButton() {
   $('refresh').disabled = loading;
-  const label = loading ? 'Refreshing…' : `Refresh (auto refresh in ${Math.max(0, Math.ceil((nextRefreshAt - Date.now()) / 1000))}s)`;
+  const seconds = Math.max(0, Math.ceil((nextRefreshAt - Date.now()) / 1000));
+  $('refresh-countdown').textContent = loading ? '…' : String(seconds);
+  const label = loading ? 'Refreshing…' : `Refresh (auto refresh in ${seconds}s)`;
   $('refresh').title = label;
   $('refresh').setAttribute('aria-label', label);
   $('refresh').setAttribute('aria-busy', String(loading));
