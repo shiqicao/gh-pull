@@ -8,6 +8,13 @@ for (const id of controls) {
   if (value !== null && (id === 'search' || [...input.options].some(option => option.value === value))) input.value = value;
 }
 let items = [], total = 0, cursor = null, more = false, limited = false, loading = false, controller, generation = 0;
+const refreshInterval = 60_000;
+let nextRefreshAt = Date.now() + refreshInterval;
+
+function updateRefreshButton() {
+  $('refresh').disabled = loading;
+  $('refresh').textContent = loading ? 'Refreshing…' : `Refresh (${Math.max(0, Math.ceil((nextRefreshAt - Date.now()) / 1000))}s)`;
+}
 const collapsed = new Set();
 const titleEdits = new Map();
 const draftChanges = new Map();
@@ -319,6 +326,11 @@ function render() {
       }
       const meta = element('div', undefined, 'meta');
       let checks = badge(labels[pr.checks] ?? pr.checks, pr.checks);
+      if (pr.checks === 'PENDING' && pr.checkCounts?.total > 0) {
+        checks.textContent += ` · ${pr.checkCounts.passed}/${pr.checkCounts.total}`;
+        checks.title = `${pr.checkCounts.passed} passed of ${pr.checkCounts.total} checks`;
+        checks.setAttribute('aria-label', `Checks pending: ${checks.title}`);
+      }
       if (pr.checks === 'FAILURE' && title.hasAttribute('href')) {
         checks = element('a', labels[pr.checks], 'badge failure');
         const url = new URL(title.href);
@@ -436,14 +448,21 @@ function render() {
   $('results').replaceChildren(fragment);
   $('results').setAttribute('aria-busy', String(loading));
   $('more').hidden = !more; $('more').disabled = loading;
-  $('refresh').disabled = loading;
+  updateRefreshButton();
 }
 
 async function load({ append = false, refresh = false } = {}) {
   controller?.abort(); controller = new AbortController();
   const current = ++generation;
-  if (!append) { items = []; total = 0; cursor = null; more = false; limited = false; }
-  loading = true; $('error').hidden = true; render();
+  if (!append && !refresh) { items = []; total = 0; cursor = null; more = false; limited = false; }
+  loading = true; $('error').hidden = true;
+  if (refresh) {
+    // Keep the current rows mounted until fresh data is ready.
+    updateSummary();
+    updateRefreshButton();
+    $('results').setAttribute('aria-busy', 'true');
+    $('more').disabled = true;
+  } else render();
   const query = new URLSearchParams({ scope: $('scope').value, state: $('state').value });
   if (append && cursor) query.set('cursor', cursor);
   if (refresh) query.set('refresh', '1');
@@ -462,7 +481,7 @@ async function load({ append = false, refresh = false } = {}) {
     }
     viewerLogin = data.viewer;
     viewedUpdates = { ...viewedUpdates, ...readViewedUpdates() };
-    items = [...new Map([...items, ...data.items].map(pr => [pr.id, pr])).values()];
+    items = [...new Map([...(append ? items : []), ...data.items].map(pr => [pr.id, pr])).values()];
     nameColors = assignNameColors(items.flatMap(pr => [pr.author, ...(pr.reviewers ?? []).map(reviewer => reviewer.name)]), nameColors);
     try { localStorage.setItem(nameColorKey, JSON.stringify(nameColors)); } catch { /* Keep assignments stable for this session. */ }
     total = data.total; cursor = data.pageInfo.endCursor; more = data.pageInfo.hasNextPage;
@@ -475,7 +494,13 @@ async function load({ append = false, refresh = false } = {}) {
     const retry = element('button', 'Retry'); retry.type = 'button';
     retry.addEventListener('click', () => load({ append, refresh: true }));
     $('error').append(retry); $('error').hidden = false;
-  } finally { if (current === generation) { loading = false; render(); } }
+  } finally {
+    if (current === generation) {
+      loading = false;
+      nextRefreshAt = Date.now() + refreshInterval;
+      render();
+    }
+  }
 }
 
 function saveFilters() {
@@ -489,4 +514,8 @@ for (const id of controls) $(id).addEventListener(id === 'search' ? 'input' : 'c
 });
 $('refresh').addEventListener('click', () => load({ refresh: true }));
 $('more').addEventListener('click', () => load({ append: true }));
+setInterval(() => {
+  if (!loading && Date.now() >= nextRefreshAt) load({ refresh: true });
+  else updateRefreshButton();
+}, 1000);
 load();

@@ -24,6 +24,7 @@ Set `PORT` to change the port. Both `npm start` and `npm run dev` automatically 
 - Created by me, involving me, and review-requested views.
 - Open (including drafts), merged, closed without merging, or all PRs.
 - Repository, author, status, check summary, review decision, labels, changed-line counts, and update time.
+- Pending checks show a passed/total count, such as “Checks pending · 1/8”, including check runs and commit statuses. Skipped and neutral checks are not counted as passed.
 - Reviewers on the right of each PR, with the same username-based colors as authors and a small colored status icon beside each name. Empty reviewer sections are hidden. Includes teams and deduplicates re-requested reviewers. Up to 100 review requests and 100 latest reviews per PR; a GitHub link appears if there are more.
 - Name colors use 12 evenly spaced OKLCH hues. Initial names are sorted and distributed across the palette; new people receive the most separated unused color without changing existing assignments. Assignments persist in this browser. Beyond 12 people, colors are reused evenly; names remain visible to identify people. Clearing browser storage resets assignments; with storage disabled, assignments last for the session.
 - Group by repository, author, status, or checks; collapse groups.
@@ -38,7 +39,7 @@ Set `PORT` to change the port. Both `npm start` and `npm run dev` automatically 
 - PRs with new updates have brighter, bolder titles; viewed titles are muted. Opening the title, diff, or checks from this dashboard marks the displayed update as viewed (including Ctrl/Cmd-click and middle-click); copying and repository links do not. Newer GitHub `updatedAt` timestamps brighten the title again when data refreshes. Unopened PRs start highlighted. Viewed state is saved per GitHub account in this browser and synchronized across dashboard tabs; reading directly on GitHub or in another browser is not tracked.
 - Click the file-diff icon (a document with plus/minus marks) next to a title to open the code diff directly in a new tab.
 - Shareable filter URLs, responsive layout, keyboard-accessible controls, and light/dark system colors.
-- Pages of 50 PRs, loaded on demand; a 30-second server memory cache. Refresh bypasses the current page's cache and resets pagination.
+- Pages of 50 PRs, loaded on demand; a 30-second server memory cache. Auto-refresh runs 60 seconds after each load finishes. The Refresh button counts down between loads and is disabled with “Refreshing…” while loading. Manual and automatic refresh keep existing PRs visible until fresh data arrives, bypass the current page's cache, and reset pagination on success. Failed refreshes keep the existing data.
 
 Created-by-me pagination covers the full authored history without GitHub's search ceiling. Involving-me and review-requested views use GitHub search, which exposes at most 1,000 matches; the dashboard shows a notice when this applies. Search and grouping operate on loaded pages. Labels show the first ten per PR. Check status is the aggregate for the latest commit, not an individual job listing. Only the username-to-color mapping and account-specific viewed PR IDs/timestamps are saved in browser storage; PR contents and credentials are not stored there. With browser storage disabled, viewed state lasts only for the current page session.
 

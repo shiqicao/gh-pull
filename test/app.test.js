@@ -137,6 +137,23 @@ test('authored history uses an unlimited connection, cursor, states and normaliz
   assert.equal(result.pageInfo.endCursor, 'next');
 });
 
+test('pending check counts include runs and commit statuses, counting only successful checks as passed', async () => {
+  const list = createGitHub({ getToken: async () => 'test-token', fetchImpl: async () => Response.json({ data: {
+    viewer: { login: 'alice', pullRequests: {
+      totalCount: 1, pageInfo: { hasNextPage: false, endCursor: null }, nodes: [node({
+        commits: { nodes: [{ commit: { statusCheckRollup: { state: 'PENDING', contexts: {
+          totalCount: 8,
+          checkRunCountsByState: [{ state: 'SUCCESS', count: 1 }, { state: 'IN_PROGRESS', count: 3 }, { state: 'SKIPPED', count: 1 }, { state: 'NEUTRAL', count: 1 }],
+          statusContextCountsByState: [{ state: 'PENDING', count: 1 }, { state: 'FAILURE', count: 1 }],
+        } } } }] },
+      })],
+    } },
+  } }) });
+  const result = await list();
+  assert.equal(result.items[0].checks, 'PENDING');
+  assert.deepEqual(result.items[0].checkCounts, { passed: 1, total: 8 });
+});
+
 test('search scopes are explicit and disclose GitHub search limits', async () => {
   let query;
   const list = createGitHub({ getToken: async () => 'test-token', fetchImpl: async (url, options) => {

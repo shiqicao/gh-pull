@@ -43,7 +43,24 @@ const fields = `id number title url state isDraft createdAt updatedAt headRefNam
     nodes { author { login } state }
   }
   labels(first: 10) { nodes { name } }
-  commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }`;
+  commits(last: 1) { nodes { commit { statusCheckRollup {
+    state
+    contexts {
+      totalCount
+      checkRunCountsByState { state count }
+      statusContextCountsByState { state count }
+    }
+  } } } }`;
+
+function checkCountsFor(pr) {
+  const contexts = pr.commits?.nodes[0]?.commit.statusCheckRollup?.contexts;
+  if (!contexts) return null;
+  const counts = [...(contexts.checkRunCountsByState ?? []), ...(contexts.statusContextCountsByState ?? [])];
+  return {
+    passed: counts.filter(count => count.state === 'SUCCESS').reduce((sum, count) => sum + count.count, 0),
+    total: contexts.totalCount,
+  };
+}
 
 export class ApiError extends Error {
   constructor(message, status = 502) { super(message); this.status = status; }
@@ -146,6 +163,7 @@ export function createGitHub({ fetchImpl = fetch, getToken = defaultToken } = {}
         reviewers: reviewersFor(pr),
         reviewersTruncated: Boolean(pr.reviewRequests?.pageInfo.hasNextPage || pr.latestReviews?.pageInfo.hasNextPage),
         checks: pr.commits.nodes[0]?.commit.statusCheckRollup?.state ?? 'NONE',
+        checkCounts: checkCountsFor(pr),
         labels: pr.labels.nodes.map(label => label.name),
       })),
     };
