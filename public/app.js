@@ -11,6 +11,37 @@ let items = [], total = 0, cursor = null, more = false, limited = false, loading
 const refreshInterval = 60_000;
 let nextRefreshAt = Date.now() + refreshInterval;
 let authMode = 'local', authenticated = false;
+let readinessTimer, readinessController;
+
+function scheduleMergeReadiness(attempt = 0) {
+  clearTimeout(readinessTimer);
+  readinessController?.abort();
+  if (!authenticated || attempt >= 5 || !items.some(pr => pr.mergePending && pr.status === 'OPEN')) return;
+  const version = generation;
+  readinessTimer = setTimeout(async () => {
+    if (loading || titleEdits.size || [...draftChanges.values(), ...merges.values()].some(change => change.saving)) {
+      scheduleMergeReadiness(attempt);
+      return;
+    }
+    const pending = items.filter(pr => pr.mergePending && pr.status === 'OPEN').slice(0, 50);
+    const query = new URLSearchParams(pending.map(pr => ['id', pr.id]));
+    const requestController = new AbortController();
+    readinessController = requestController;
+    try {
+      const response = await apiFetch(`/api/pulls/readiness?${query}`, { signal: requestController.signal });
+      if (!response.ok) throw new Error('Could not check merge readiness.');
+      const data = await response.json();
+      if (version !== generation || requestController.signal.aborted || !authenticated) return;
+      for (const update of data.items) {
+        const pr = items.find(item => item.id === update.id);
+        // Never offer a merge against a commit that is not the displayed version.
+        if (pr?.status === 'OPEN' && pr.headOid === update.headOid) Object.assign(pr, update);
+      }
+      if (!titleEdits.size) render();
+    } catch { /* Normal refresh remains available if this short retry fails. */ }
+    if (version === generation && !requestController.signal.aborted) scheduleMergeReadiness(attempt + 1);
+  }, 2000);
+}
 
 async function apiFetch(url, options) {
   const response = await fetch(url, options);
@@ -153,8 +184,9 @@ async function changeDraftStatus(pr) {
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || 'Could not change the PR status. Please retry.');
     const current = items.find(item => item.id === pr.id);
-    if (current) { current.status = data.status; current.updatedAt = data.updatedAt; current.review = data.review; current.canMerge = false; }
+    if (current) { current.status = data.status; current.updatedAt = data.updatedAt; current.review = data.review; current.canMerge = false; current.mergePending = !toDraft; }
     draftChanges.delete(pr.id); render();
+    scheduleMergeReadiness();
     $('summary').append(document.createTextNode(toDraft ? ' · PR converted to draft' : ' · PR ready for review'));
   } catch (error) {
     change.saving = false;
@@ -261,7 +293,9 @@ function render() {
         const pending = draftChanges.get(pr.id)?.saving ?? false;
         const status = element('button', pending ? 'Updating…' : labels[pr.status], `badge ${pr.status.toLowerCase()} draft-action`);
         status.type = 'button'; status.disabled = pending || Boolean(merges.get(pr.id)?.saving);
-        status.title = pr.status === 'OPEN' ? 'Convert to draft' : 'Mark ready for review';
+        status.dataset.tooltip = pr.status === 'OPEN' ? 'Convert to draft' : 'Mark ready for review';
+        status.addEventListener('keydown', event => { if (event.key === 'Escape') status.dataset.tooltipDismissed = 'true'; });
+        for (const event of ['mouseleave', 'blur']) status.addEventListener(event, () => { delete status.dataset.tooltipDismissed; });
         status.setAttribute('aria-label', pr.status === 'OPEN' ? `Convert ${pr.title} to draft` : `Mark ${pr.title} ready for review`);
         status.addEventListener('click', () => changeDraftStatus(pr));
         line.append(status);
@@ -481,6 +515,7 @@ function render() {
 
 async function load({ append = false, refresh = false } = {}) {
   if (!authenticated) return;
+  clearTimeout(readinessTimer); readinessController?.abort();
   controller?.abort(); controller = new AbortController();
   const current = ++generation;
   if (!append && !refresh) { items = []; total = 0; cursor = null; more = false; limited = false; }
@@ -528,6 +563,7 @@ async function load({ append = false, refresh = false } = {}) {
       loading = false;
       nextRefreshAt = Date.now() + refreshInterval;
       render();
+      scheduleMergeReadiness();
     }
   }
 }

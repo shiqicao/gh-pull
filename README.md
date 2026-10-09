@@ -84,8 +84,10 @@ Install the app on the repositories it should access. Private repositories must 
 Actions apply to your own PRs and require GitHub write permissions:
 
 - **Edit a title:** Select the pencil icon. Save or Enter submits; Cancel or Escape discards. Titles must be 1–256 characters on one line. Failed saves retain the draft, and the server checks whether the title changed on GitHub before updating it.
-- **Change draft status:** Select **Open** to convert a PR to draft, or **Draft** to mark it ready for review. The badge changes after GitHub confirms. Refresh to update merge readiness afterward.
+- **Change draft status:** Select **Open** to convert a PR to draft, or **Draft** to mark it ready for review. An immediate tooltip explains the action on hover or keyboard focus. The badge changes after GitHub confirms, and merge readiness is rechecked automatically.
 - **Merge:** Eligible PRs show a button with the repository's preferred merge method. The server rechecks permissions and readiness and pins the merge to the displayed commit. Drafts, blocked PRs, merge queues, and stacked PRs do not show this action.
+
+If GitHub is still calculating mergeability, the dashboard rechecks in the background every two seconds, up to five times, without resetting loaded pages. The regular one-minute refresh continues afterward.
 
 ## Data and sessions
 

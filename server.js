@@ -61,6 +61,11 @@ export function createApp({ list = createGitHub(), updateTitle = list.updateTitl
         return send(200, result);
       }
       if (req.method !== 'GET') return send(405, { error: 'Method not allowed.' });
+      if (url.pathname === '/api/pulls/readiness') {
+        const ids = url.searchParams.getAll('id');
+        if (!ids.length || ids.length > 50 || ids.some(id => !id.trim() || id.length > 200)) return send(400, { error: 'Provide 1–50 valid PR IDs.' });
+        return send(200, await activeList.mergeReadiness(ids));
+      }
       if (url.pathname === '/api/pulls') {
         const scope = url.searchParams.get('scope') ?? 'authored';
         const state = url.searchParams.get('state') ?? 'open';

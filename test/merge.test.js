@@ -84,3 +84,59 @@ test('merge is limited to the authenticated author, including missing authors', 
   }
   assert.equal(mergeOptions(ready).canMerge, false);
 });
+
+test('unknown mergeability is flagged for retry only for the viewer’s eligible open PRs', () => {
+  const unknown = { ...ready, mergeable: 'UNKNOWN' };
+  assert.equal(mergeOptions(unknown, 'alice').mergePending, true);
+  assert.equal(mergeOptions(unknown, 'alice').canMerge, false);
+  assert.equal(mergeOptions({ ...ready, mergeStateStatus: 'UNKNOWN' }, 'alice').mergePending, true);
+  assert.equal(mergeOptions(ready, 'alice').mergePending, false);
+  for (const overrides of [
+    { isDraft: true }, { state: 'CLOSED' }, { author: { login: 'bob' } },
+    { mergeQueue: { id: 'queue' } }, { stackEntry: { id: 'stack' } },
+    { repository: { ...ready.repository, viewerPermission: 'READ' } },
+  ]) assert.equal(mergeOptions({ ...unknown, ...overrides }, 'alice').mergePending, false);
+});
+
+test('merge readiness reads current GitHub state and keeps commit pinning and ownership restrictions', async () => {
+  let count = 0;
+  const list = createGitHub({ getToken: async () => 'mock', fetchImpl: async (url, options) => {
+    const { query, variables } = JSON.parse(options.body);
+    assert.deepEqual(variables.ids, ['PR_1', 'PR_2']);
+    assert.match(query, /nodes\(ids: \$ids\)/);
+    count++;
+    return Response.json({ data: { viewer: { login: 'alice' }, nodes: [
+      { ...ready, mergeable: count === 1 ? 'UNKNOWN' : 'MERGEABLE' },
+      { ...ready, id: 'PR_2', author: { login: 'bob' } }, null,
+    ] } });
+  } });
+  const first = await list.mergeReadiness(['PR_1', 'PR_2']);
+  assert.equal(first.items[0].mergePending, true);
+  assert.equal(first.items[0].canMerge, false);
+  const second = await list.mergeReadiness(['PR_1', 'PR_2']);
+  assert.equal(second.items[0].canMerge, true);
+  assert.equal(second.items[0].headOid, headOid);
+  assert.equal(second.items[1].canMerge, false);
+  assert.equal(second.items.length, 2);
+});
+
+test('readiness endpoint validates IDs and bypasses the PR list cache', async t => {
+  let calls = 0;
+  const list = async () => ({ items: [] });
+  list.mergeReadiness = async ids => { calls++; return { items: ids.map(id => ({ id, ...mergeOptions(ready, 'alice') })) }; };
+  const app = createApp({ list });
+  await new Promise(resolve => app.listen(0, '127.0.0.1', resolve));
+  t.after(() => new Promise(resolve => { app.close(resolve); app.closeAllConnections(); }));
+  const base = `http://127.0.0.1:${app.address().port}/api/pulls/readiness`;
+  for (const query of ['', '?id=', '?id=' + 'x'.repeat(201), '?' + Array(51).fill('id=PR_1').join('&')]) {
+    assert.equal((await fetch(base + query)).status, 400);
+  }
+  assert.equal(calls, 0);
+  for (let n = 0; n < 2; n++) {
+    const result = await fetch(base + '?id=PR_1');
+    assert.equal(result.status, 200);
+    assert.equal((await result.json()).items[0].canMerge, true);
+  }
+  assert.equal(calls, 2);
+  assert.equal((await fetch(base + '?id=PR_1', { headers: { Origin: 'https://evil.example' } })).status, 403);
+});

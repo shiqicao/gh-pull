@@ -25,6 +25,7 @@ async function fixture(t, { secure = false } = {}) {
     const data = JSON.parse(options.body);
     calls.push({ user, ...data, authorization: options.headers.Authorization });
     if (revoked) return new Response('', { status: 401 });
+    if (data.query.includes('nodes(ids:')) return Response.json({ data: { viewer: { login: user }, nodes: [] } });
     if (data.query.includes('updatePullRequest(')) return Response.json({ data: { updatePullRequest: { pullRequest: { id: 'PR_one', title: 'New title', updatedAt: '2026-10-09' } } } });
     if (data.query.includes('node(id:')) return Response.json({ data: { viewer: { login: user }, node: { __typename: 'PullRequest', id: 'PR_one', title: 'Old title', author: { login: user } } } });
     const connection = { totalCount: 0, issueCount: 0, pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] };
@@ -187,4 +188,14 @@ test('revoked GitHub access invalidates a session and never falls back to local 
   assert.match(response.text, /sign in again/);
   assert.doesNotMatch(response.text, /gh auth login|Local credentials/);
   assert.equal((await f.call('/api/session', { headers: { cookie } })).json().authenticated, false);
+});
+
+test('merge readiness uses each hosted session and rejects anonymous requests', async t => {
+  const f = await fixture(t);
+  assert.equal((await f.call('/api/pulls/readiness?id=PR_1')).status, 401);
+  const alice = await f.login('alice'), bob = await f.login('bob');
+  for (const { cookie } of [alice, bob]) {
+    assert.equal((await f.call('/api/pulls/readiness?id=PR_1', { headers: { cookie } })).status, 200);
+  }
+  assert.deepEqual(f.calls.map(call => call.user), ['alice', 'bob']);
 });
