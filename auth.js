@@ -19,7 +19,7 @@ export function authConfig(env = process.env) {
     throw new Error('PUBLIC_URL must be an HTTPS origin (HTTP localhost is allowed for development).');
   }
   if (env.GITHUB_APP_SLUG && !/^[a-z0-9-]+$/.test(env.GITHUB_APP_SLUG)) throw new Error('Invalid GITHUB_APP_SLUG.');
-  return { mode, origin: url.origin, clientId: env.GITHUB_APP_CLIENT_ID, clientSecret: env.GITHUB_APP_CLIENT_SECRET, slug: env.GITHUB_APP_SLUG };
+  return { mode, origin: url.origin, clientId: env.GITHUB_APP_CLIENT_ID, clientSecret: env.GITHUB_APP_CLIENT_SECRET, slug: env.GITHUB_APP_SLUG, marketplaceWebhookSecret: env.GITHUB_MARKETPLACE_WEBHOOK_SECRET };
 }
 
 export function createAuth(config, { fetchImpl = fetch, now = Date.now, githubFactory = createGitHub } = {}) {
@@ -34,22 +34,29 @@ export function createAuth(config, { fetchImpl = fetch, now = Date.now, githubFa
   const installUrl = config.slug ? `https://github.com/apps/${config.slug}/installations/new` : null;
 
   function invalidate(req, res) {
-    sessions.delete(cookieValue(req, sessionName));
+    forgetSession(req);
     res.setHeader('Set-Cookie', cookie(sessionName, '', 0));
+  }
+
+  function forgetSession(req) {
+    const id = cookieValue(req, sessionName);
+    // Keep failed cancellation credentials inaccessible but available for redelivery.
+    if (!sessions.get(id)?.cancelled) sessions.delete(id);
   }
 
   function session(req) {
     prune(sessions);
-    return sessions.get(cookieValue(req, sessionName));
+    const entry = sessions.get(cookieValue(req, sessionName));
+    return entry?.cancelled ? undefined : entry;
   }
 
-  async function exchange(parameters) {
+  async function exchange(parameters, timeoutMs = 30_000) {
     let response, data;
     try {
       response = await fetchImpl('https://github.com/login/oauth/access_token', {
         method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({ client_id: config.clientId, client_secret: config.clientSecret, ...parameters }).toString(),
-        signal: AbortSignal.timeout(30_000),
+        signal: AbortSignal.timeout(timeoutMs),
       });
       data = await response.json();
     } catch { throw new ApiError('Could not reach GitHub authentication. Please try again.', 502); }
@@ -64,17 +71,58 @@ export function createAuth(config, { fetchImpl = fetch, now = Date.now, githubFa
   }
 
   async function tokenFor(entry) {
+    if (entry.cancelled) throw new ApiError('This session has ended. Please sign in again.', 401);
     if (entry.tokenExpires > now() + 60_000) return entry.accessToken;
     if (!entry.refreshToken || entry.refreshExpires <= now()) throw new ApiError('Your session expired. Please sign in again.', 401);
     // GitHub rotates refresh tokens: concurrent requests must share one exchange.
     entry.refreshing ??= exchange({ grant_type: 'refresh_token', refresh_token: entry.refreshToken })
       .then(tokens => Object.assign(entry, tokens)).finally(() => { entry.refreshing = null; });
     await entry.refreshing;
+    if (entry.cancelled) throw new ApiError('This session has ended. Please sign in again.', 401);
     return entry.accessToken;
   }
 
+  async function marketplaceIdentity(accessToken) {
+    const response = await fetchImpl('https://api.github.com/user', {
+      headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/vnd.github+json', 'User-Agent': 'gh-pull' },
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (!response.ok) throw new ApiError('Could not verify GitHub identity. Please sign in again.', 401);
+    const user = await response.json();
+    if (!Number.isSafeInteger(user.id) || typeof user.login !== 'string') throw new ApiError('Invalid GitHub identity.', 502);
+    return { id: user.id, login: user.login };
+  }
+
+  async function cancelMarketplace(account) {
+    const owner = account.login.toLowerCase();
+    const affected = [...sessions].filter(([, entry]) => account.type === 'User'
+      ? entry.identity?.id === account.id || entry.owners?.has(owner)
+      : entry.owners?.has(owner));
+    // End affected sessions before contacting GitHub. Failed revocations remain
+    // inaccessible in memory so a redelivery can retry them.
+    for (const [, entry] of affected) { entry.cancelled = true; entry.cache.clear(); }
+    const results = await Promise.allSettled(affected.map(async ([id, entry]) => {
+      // A normal refresh can take 30 seconds. Retry after rotation instead of
+      // exceeding GitHub's webhook response timeout.
+      if (entry.refreshing) throw new Error('Token refresh in progress.');
+      if (entry.tokenExpires <= now() && entry.refreshToken && entry.refreshExpires > now()) {
+        try { Object.assign(entry, await exchange({ grant_type: 'refresh_token', refresh_token: entry.refreshToken }, 4000)); }
+        catch (error) { if (error.status !== 401) throw error; sessions.delete(id); return; }
+      }
+      if (entry.tokenExpires > now()) {
+        const response = await fetchImpl(`https://api.github.com/applications/${encodeURIComponent(config.clientId)}/token`, {
+          method: 'DELETE', headers: { Authorization: `Basic ${Buffer.from(`${config.clientId}:${config.clientSecret}`).toString('base64')}`, Accept: 'application/vnd.github+json', 'Content-Type': 'application/json', 'User-Agent': 'gh-pull' },
+          body: JSON.stringify({ access_token: entry.accessToken }), signal: AbortSignal.timeout(4000),
+        });
+        if (response.status !== 204 && response.status !== 404) throw new Error('Token revocation failed.');
+      }
+      sessions.delete(id);
+    }));
+    if (results.some(result => result.status === 'rejected')) throw new ApiError('Cancellation cleanup incomplete. Redeliver this webhook to retry.', 502);
+  }
+
   return {
-    session, invalidate,
+    session, invalidate, cancelMarketplace,
     async handle(req, res, url, send) {
       if (req.method === 'GET' && url.pathname === '/api/session') {
         send(200, { mode: 'github-app', authenticated: Boolean(session(req)), installUrl });
@@ -109,12 +157,23 @@ export function createAuth(config, { fetchImpl = fetch, now = Date.now, githubFa
           const tokens = await exchange({ code: url.searchParams.get('code'), redirect_uri: `${config.origin}/auth/callback`, code_verifier: attempt.verifier });
           prune(sessions);
           if (sessions.size >= 10000) throw new ApiError('Too many sessions.', 503);
-          sessions.delete(cookieValue(req, sessionName));
+          forgetSession(req);
           const id = random();
-          const entry = { ...tokens, expires: now() + sessionLifetime, cache: new Map() };
-          entry.list = githubFactory({ getToken: () => tokenFor(entry), cacheToken: false,
-            getMergeAccess: createMergeAccess({ getToken: () => tokenFor(entry), fetchImpl, installUrl }),
+          const identity = config.marketplaceWebhookSecret ? await marketplaceIdentity(tokens.accessToken) : undefined;
+          const entry = { ...tokens, identity, owners: new Set(), expires: now() + sessionLifetime, cache: new Map() };
+          const checkAccess = createMergeAccess({ getToken: () => tokenFor(entry), fetchImpl, installUrl });
+          const github = githubFactory({ getToken: () => tokenFor(entry), cacheToken: false,
+            getMergeAccess: repos => {
+              for (const repo of repos) entry.owners.add(repo.split('/')[0].toLowerCase());
+              return checkAccess(repos);
+            },
             authError: 'GitHub authorization expired or was revoked. Please sign in again.' });
+          entry.list = Object.assign(async options => {
+            const result = await github(options);
+            for (const pr of result.items ?? []) entry.owners.add(pr.repo.split('/')[0].toLowerCase());
+            if (entry.cancelled) throw new ApiError('This session has ended. Please sign in again.', 401);
+            return result;
+          }, github);
           sessions.set(id, entry);
           res.setHeader('Set-Cookie', [cookie(stateName, '', 0), cookie(sessionName, id, sessionLifetime / 1000)]);
           redirect(res, '/');

@@ -20,6 +20,8 @@ GitHub and Railway may use their own service providers. Their policies describe 
 
 Provider retention and processing locations depend on their policies and service settings. gh-pull does not claim a specific data-residency region or a fixed retention period for provider-managed logs.
 
+When Marketplace webhook handling is enabled, GitHub also sends signed purchase/cancellation events to the hosted service. The server verifies signatures, acknowledges free purchases, and sends token-revocation requests to GitHub when cleaning up affected sessions. This adds no service provider; see the [Privacy Policy](PRIVACY.md) for event data and retention.
+
 ## What the application does not require
 
 The current application uses no third-party analytics, advertising, AI inference, payment-processing, external font, or session-replay service. It has no external database or application-managed object storage for PR data. Users are not required to create an account with any service other than GitHub.
