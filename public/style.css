@@ -5,6 +5,9 @@ header { display: flex; align-items: center; gap: 16px; margin-bottom: 24px; }
 h1 { font-size: 24px; font-weight: 650; letter-spacing: -0.6px; margin: 0; }
 .subtitle { margin: 4px 0 0; font-size: 13px; color: light-dark(#59636e, #a7b1bd); }
 header button { margin-left: auto; }
+.account-controls { margin-left: auto; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
+.account-controls a { font-size: 12px; }
+[hidden] { display: none !important; }
 form { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; }
 label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 500; color: light-dark(#59636e, #a7b1bd); }
 input, select, button { font: inherit; padding: 6px 10px; border: 1px solid light-dark(#d1d9e0, #3d444d); border-radius: 6px; color: inherit; }

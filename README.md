@@ -2,48 +2,97 @@
 
 much better github pr dashboard
 
-A fast local dashboard for your GitHub pull requests. Plain JavaScript, native browser controls, minimal CSS, and a Node server. No runtime dependencies, installation, or build step.
+A fast GitHub pull request dashboard with two authentication modes: use your existing GitHub CLI login locally, or sign in through a GitHub App. Both modes share the same UI and PR actions.
+
+Plain JavaScript, native browser controls, and a Node server. No runtime dependencies or build step. Requires **Node.js 22+** and a **GitHub.com** account.
 
 ![gh-pull dashboard showing fictional demo pull requests](docs/demo.png)
 
-## Run
-
-Requires Node.js 22+ and a GitHub.com account.
+## Local mode
 
 ```sh
 gh auth login
 npm start
 ```
 
-Open <http://localhost:3000>. The server reads your existing GitHub CLI credential. Alternatively, supply `GH_TOKEN` or `GITHUB_TOKEN` in the server environment; the token needs read access to the repositories you want to see. Credentials never go to the browser. The server binds only to `127.0.0.1`.
+Open <http://localhost:3000>. Local mode is the default (`AUTH_MODE=local`). The server uses your GitHub CLI credentials, or `GH_TOKEN` / `GITHUB_TOKEN` if supplied. It binds only to `127.0.0.1`; credentials stay on the server.
 
-Set `PORT` to change the port. Both `npm start` and `npm run dev` automatically restart the server when backend files change; reload the browser to pick up frontend edits. Use `node server.js` if you specifically want to disable automatic restarts.
+`npm start` and `npm run dev` restart the server when backend files change. Reload the browser after frontend edits. Use `node server.js` to run without automatic restarts.
+
+## GitHub App mode
+
+Users select **Sign in with GitHub** and authorize the app. Each session has its own GitHub client and PR cache. This mode never uses the server owner's GitHub CLI credentials or personal token.
+
+Register a [GitHub App](https://github.com/settings/apps/new) with its user authorization callback set to `PUBLIC_URL/auth/callback`. For local development, use `http://localhost:3000/auth/callback`. Create a client secret and configure the app:
+
+```sh
+cp .env.example .env
+# Set AUTH_MODE=github-app and fill in the GitHub App settings in .env.
+node --env-file=.env server.js
+```
+
+`.env` is ignored by Git. `npm start` reads environment variables already set in your shell; it does not load `.env` automatically.
+
+Repository permissions for the full feature set:
+
+| Permission | Access | Purpose |
+| --- | --- | --- |
+| Pull requests | Read and write | View PRs, edit titles, change draft status |
+| Contents | Read and write | Merge PRs |
+| Checks | Read-only | Check results and progress |
+| Commit statuses | Read-only | Commit status results |
+
+Metadata read access is included by GitHub. Read-only Pull requests and Contents permissions can be used if write actions are not needed; GitHub rejects writes without the corresponding permission.
+
+Keep user access token expiration enabled. Webhooks and an app private key are not needed. Leave “Request user authorization (OAuth) during installation” disabled: sign-in starts from the dashboard with browser-bound state and PKCE.
+
+Install the app on the repositories it should access. Private repositories must be accessible to both the app and the signed-in user; organization access may require administrator approval or an active SSO session. The optional app slug adds a **Manage repository access** link. See [GitHub's authorization documentation](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-a-user-access-token-for-a-github-app).
+
+## Configuration
+
+| Variable | Default | Description |
+| --- | --- | --- |
+| `AUTH_MODE` | `local` | `local` or `github-app` |
+| `PORT` | `3000` | Server port |
+| `HOST` | `127.0.0.1` | Bind address in GitHub App mode; local mode always uses loopback |
+| `GH_TOKEN` / `GITHUB_TOKEN` | GitHub CLI login | Local-mode authentication |
+| `PUBLIC_URL` | — | Required in GitHub App mode; public origin without a path |
+| `GITHUB_APP_CLIENT_ID` | — | Required in GitHub App mode; client ID, not app ID |
+| `GITHUB_APP_CLIENT_SECRET` | — | Required in GitHub App mode; kept on the server |
+| `GITHUB_APP_SLUG` | — | Optional app slug for the repository access link |
+
+`PUBLIC_URL` requires HTTPS, except for HTTP localhost development. Its host must match incoming requests, and its `/auth/callback` URL must match the GitHub App registration. Use the same hostname throughout login; `localhost` and `127.0.0.1` are distinct.
 
 ## Features
 
-- Created by me, involving me, and review-requested views.
-- Open (including drafts), merged, closed without merging, or all PRs.
-- Repository, author, status, check summary, review decision, labels, changed-line counts, and update time.
-- Pending checks show a passed/total count, such as “Checks pending · 1/8”, including check runs and commit statuses. Skipped and neutral checks are not counted as passed.
-- Reviewers on the right of each PR, with the same username-based colors as authors and a small colored status icon beside each name. Empty reviewer sections are hidden. Includes teams and deduplicates re-requested reviewers. Up to 100 review requests and 100 latest reviews per PR; a GitHub link appears if there are more.
-- Name colors use 12 evenly spaced OKLCH hues. Initial names are sorted and distributed across the palette; new people receive the most separated unused color without changing existing assignments. Assignments persist in this browser. Beyond 12 people, colors are reused evenly; names remain visible to identify people. Clearing browser storage resets assignments; with storage disabled, assignments last for the session.
-- Group by repository, author, status, or checks; collapse groups.
-- Search loaded PRs by title, repository, author, number, or label; sort by creation or update time.
-- Open PR titles in a new tab.
-- Edit your own PR titles with the pencil icon beside the title. Save (or Enter) updates GitHub; Cancel (or Escape) discards the edit. Titles must be 1–256 characters on one line. Failed saves retain your draft. The server verifies authorship and checks for a changed title before submitting; your token must have permission to update the PR.
-- Click Open on your own PR to convert it to a draft, or click Draft to mark it ready for review (Open). The badge changes after GitHub confirms; failures show an error and can be retried. Other authors' PRs and closed or merged PRs have non-interactive status badges.
-- Merge your own ready PRs with a green button showing the repository’s preferred merge method. The server rechecks readiness and permissions and pins the merge to the displayed commit. Drafts, blocked PRs, merge queues, and stacked PRs do not show this action; use GitHub for queue or stack workflows. Refresh after marking a draft ready to update merge readiness.
-- Repository names in group headings and PR metadata open the repository in a new tab without marking a PR as viewed.
-- Copy a PR URL with the copy icon between its status badge and file-diff link; a check mark confirms it was copied.
-- The source branch is shown in each PR's metadata. Click its name or copy icon to copy the exact branch name; a check mark confirms success.
-- PRs with new updates have brighter, bolder titles; viewed titles are muted. Opening the title, diff, or checks from this dashboard marks the displayed update as viewed (including Ctrl/Cmd-click and middle-click); copying and repository links do not. Newer GitHub `updatedAt` timestamps brighten the title again when data refreshes. Unopened PRs start highlighted. Viewed state is saved per GitHub account in this browser and synchronized across dashboard tabs; reading directly on GitHub or in another browser is not tracked.
-- Click the file-diff icon (a document with plus/minus marks) next to a title to open the code diff directly in a new tab.
-- Shareable filter URLs, responsive layout, keyboard-accessible controls, and light/dark system colors.
-- Pages of 50 PRs, loaded on demand; a 30-second server memory cache. Auto-refresh runs 60 seconds after each load finishes. The Refresh button counts down between loads and is disabled with “Refreshing…” while loading. Manual and automatic refresh keep existing PRs visible until fresh data arrives, bypass the current page's cache, and reset pagination on success. Failed refreshes keep the existing data.
+- **Views and filters:** Created by me, Involving me, and Review requested; open (including drafts), merged, closed, or all PRs. Filters are shareable through the URL.
+- **Search and grouping:** Search loaded PRs by title, repository, author, number, or label. Group by repository, author, status, or checks; collapse groups and sort by creation or update time.
+- **PR details:** Authors, reviewers, review decisions, labels, changed-line counts, source branches, and update times. Authors and reviewers have consistent colors saved in this browser.
+- **Check progress:** Pending badges show passed/total counts, such as **Checks pending · 1/8**. Only successful checks count as passed; skipped and neutral checks do not. Failed-check badges link to GitHub's checks page.
+- **Background refresh:** Refreshes 60 seconds after each load finishes. The button counts down and shows a disabled **Refreshing…** state while fetching. Existing PRs stay visible until fresh data arrives, including when a refresh fails.
+- **Viewed tracking:** New updates have brighter, bolder titles. Opening a PR, diff, or checks link marks the displayed update as viewed. Newer updates highlight it again; tracking is per GitHub account and synchronized across dashboard tabs.
+- **Quick links and copying:** Open PRs, repositories, and diffs in new tabs. Copy PR URLs or branch names with confirmation feedback.
+- **Appearance:** Responsive layout, keyboard-accessible controls, and system light/dark colors.
 
-Created-by-me pagination covers the full authored history without GitHub's search ceiling. Involving-me and review-requested views use GitHub search, which exposes at most 1,000 matches; the dashboard shows a notice when this applies. Search and grouping operate on loaded pages. Labels show the first ten per PR. Check status is the aggregate for the latest commit, not an individual job listing. Only the username-to-color mapping and account-specific viewed PR IDs/timestamps are saved in browser storage; PR contents and credentials are not stored there. With browser storage disabled, viewed state lasts only for the current page session.
+### PR actions
 
-The GraphQL fields follow [GitHub's pull request API](https://docs.github.com/en/graphql/reference/pulls). GitHub writes happen when you save a title edit click your PR's Open/Draft badge to change its draft status, or click a merge button. GitHub Enterprise hosts are not currently supported.
+Actions apply to your own PRs and require GitHub write permissions:
+
+- **Edit a title:** Select the pencil icon. Save or Enter submits; Cancel or Escape discards. Titles must be 1–256 characters on one line. Failed saves retain the draft, and the server checks whether the title changed on GitHub before updating it.
+- **Change draft status:** Select **Open** to convert a PR to draft, or **Draft** to mark it ready for review. The badge changes after GitHub confirms. Refresh to update merge readiness afterward.
+- **Merge:** Eligible PRs show a green button with the repository's preferred merge method. The server rechecks permissions and readiness and pins the merge to the displayed commit. Drafts, blocked PRs, merge queues, and stacked PRs do not show this action.
+
+## Data and sessions
+
+PRs load in pages of 50, with a 30-second server cache. Manual and automatic refresh bypass the cache and reset pagination on success. Search and grouping apply to loaded pages. Created-by-me pagination covers the full authored history; the other views use GitHub search and expose at most 1,000 matches, with a notice when that limit applies.
+
+Labels include the first ten per PR. Reviewers include up to 100 review requests and 100 latest reviews, with a GitHub link when more exist. Check status and counts describe the latest commit's check runs and commit statuses.
+
+Browser storage holds name colors and account-specific viewed PR IDs/timestamps, not PR contents or credentials. Without browser storage, tracking lasts only for the current page. Reading PRs directly on GitHub does not mark them as viewed here.
+
+GitHub App tokens remain on the server; the browser receives an opaque HttpOnly session cookie, marked Secure for HTTPS. Sessions last up to seven days, and expiring GitHub tokens refresh automatically. Sign out ends the dashboard session; app authorization can be revoked separately in GitHub settings.
+
+Sessions, login attempts, and caches are held in memory in a single server process. Restarting ends sessions. A shared session store would be needed for multiple server instances. GitHub Enterprise hosts are not supported.
 
 ## Verify
 
@@ -52,4 +101,4 @@ npm run check
 npm test
 ```
 
-Tests use Node's built-in test runner with mocked GitHub responses; they do not need credentials or network access.
+Tests use Node's built-in test runner and mocked GitHub responses. They cover PR behavior, authentication, token refresh, session isolation, and request validation without credentials or network access.

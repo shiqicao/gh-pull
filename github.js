@@ -99,10 +99,10 @@ export function reviewersFor(pr) {
   return [...reviewers.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
 
-export function createGitHub({ fetchImpl = fetch, getToken = defaultToken } = {}) {
+export function createGitHub({ fetchImpl = fetch, getToken = defaultToken, cacheToken = true, authError = 'GitHub login expired. Run gh auth login, then retry.' } = {}) {
   let token;
   async function graphql(query, variables) {
-    token ||= await getToken();
+    if (!cacheToken || !token) token = await getToken();
     let response;
     try {
       response = await fetchImpl('https://api.github.com/graphql', {
@@ -114,7 +114,7 @@ export function createGitHub({ fetchImpl = fetch, getToken = defaultToken } = {}
     } catch { throw new ApiError('Could not reach GitHub. Check your connection and retry.'); }
     if (response.status === 401) {
       token = undefined;
-      throw new ApiError('GitHub login expired. Run gh auth login, then retry.', 401);
+      throw new ApiError(authError, 401);
     }
     if (response.status === 403 || response.status === 429) {
       throw new ApiError('GitHub denied the request or its rate limit was reached. Check your token permissions or retry later.', 429);

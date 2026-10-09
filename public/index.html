@@ -3,15 +3,24 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="Your GitHub pull requests, in one fast local dashboard.">
+  <meta name="description" content="Your GitHub pull requests, in one fast dashboard.">
   <title>gh-pull · Pull requests</title>
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="/style.css">
   <script type="module" src="/app.js"></script>
 </head>
 <body>
-  <header><div><h1>gh-pull</h1><p class="subtitle">much better github pr dashboard</p></div><button id="refresh" type="button">Refresh</button></header>
-  <main>
+  <header><div><h1>gh-pull</h1><p class="subtitle">much better github pr dashboard</p></div><div class="account-controls"><a id="install" hidden target="_blank" rel="noopener noreferrer">Manage repository access</a><button id="logout" type="button" hidden>Sign out</button><button id="refresh" type="button" hidden>Refresh</button></div></header>
+  <p id="auth-notice" role="alert" hidden></p>
+  <section id="signin" hidden aria-label="Sign in">
+    <h2>Sign in to see your pull requests</h2>
+    <p>Connect your GitHub account to view and manage your PRs.</p>
+    <a href="/auth/login">Sign in with GitHub</a>
+    <p class="hint">Private repositories must also grant access to this GitHub App. Your organization may need to approve it.</p>
+  </section>
+  <p id="session-status" role="status">Connecting…</p>
+  <button id="session-retry" type="button" hidden>Retry connection</button>
+  <main id="dashboard" hidden>
     <form id="filters" aria-label="Pull request filters">
       <label>Show<select id="scope"><option value="authored">Created by me</option><option value="involved">Involving me</option><option value="review">Review requested</option></select></label>
       <label>State<select id="state"><option value="open">Open (including drafts)</option><option value="all">All states</option><option value="merged">Merged</option><option value="closed">Closed</option></select></label>

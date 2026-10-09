@@ -10,6 +10,19 @@ for (const id of controls) {
 let items = [], total = 0, cursor = null, more = false, limited = false, loading = false, controller, generation = 0;
 const refreshInterval = 60_000;
 let nextRefreshAt = Date.now() + refreshInterval;
+let authMode = 'local', authenticated = false;
+
+async function apiFetch(url, options) {
+  const response = await fetch(url, options);
+  if (response.status === 401 && authMode === 'github-app') {
+    authenticated = false;
+    items = []; titleEdits.clear(); draftChanges.clear(); merges.clear();
+    $('results').replaceChildren();
+    $('dashboard').hidden = true;
+    location.replace('/?auth_error=expired');
+  }
+  return response;
+}
 
 function updateRefreshButton() {
   $('refresh').disabled = loading;
@@ -93,7 +106,7 @@ async function mergePull(pr) {
   const change = { saving: true, error: '' };
   merges.set(pr.id, change); render();
   try {
-    const response = await fetch('/api/pulls/merge', {
+    const response = await apiFetch('/api/pulls/merge', {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: pr.id, headOid: pr.headOid, mergeMethod: pr.mergeMethod }),
       signal: AbortSignal.timeout(65_000),
@@ -123,7 +136,7 @@ async function changeDraftStatus(pr) {
   const change = { saving: true, error: '' };
   draftChanges.set(pr.id, change); render();
   try {
-    const response = await fetch(toDraft ? '/api/pulls/draft' : '/api/pulls/ready', {
+    const response = await apiFetch(toDraft ? '/api/pulls/draft' : '/api/pulls/ready', {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: pr.id }), signal: AbortSignal.timeout(65_000),
     });
@@ -177,7 +190,7 @@ function titleEditor(pr) {
     if (draft.saving || !draft.value.trim() || draft.value.trim() === draft.expectedTitle) return;
     draft.saving = true; draft.error = ''; render();
     try {
-      const response = await fetch('/api/pulls/title', {
+      const response = await apiFetch('/api/pulls/title', {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: pr.id, title: draft.value.trim(), expectedTitle: draft.expectedTitle }),
         signal: AbortSignal.timeout(65_000),
@@ -452,6 +465,7 @@ function render() {
 }
 
 async function load({ append = false, refresh = false } = {}) {
+  if (!authenticated) return;
   controller?.abort(); controller = new AbortController();
   const current = ++generation;
   if (!append && !refresh) { items = []; total = 0; cursor = null; more = false; limited = false; }
@@ -467,7 +481,7 @@ async function load({ append = false, refresh = false } = {}) {
   if (append && cursor) query.set('cursor', cursor);
   if (refresh) query.set('refresh', '1');
   try {
-    const response = await fetch(`/api/pulls?${query}`, { signal: controller.signal });
+    const response = await apiFetch(`/api/pulls?${query}`, { signal: controller.signal });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || 'Could not load pull requests.');
     if (current !== generation) return;
@@ -515,7 +529,51 @@ for (const id of controls) $(id).addEventListener(id === 'search' ? 'input' : 'c
 $('refresh').addEventListener('click', () => load({ refresh: true }));
 $('more').addEventListener('click', () => load({ append: true }));
 setInterval(() => {
+  if (!authenticated) return;
   if (!loading && Date.now() >= nextRefreshAt) load({ refresh: true });
   else updateRefreshButton();
 }, 1000);
-load();
+
+async function initializeSession() {
+  $('session-retry').hidden = true;
+  $('session-status').hidden = false;
+  $('session-status').textContent = 'Connecting…';
+  try {
+    const response = await fetch('/api/session');
+    if (!response.ok) throw new Error('Could not connect. Please retry.');
+    const session = await response.json();
+    authMode = session.mode;
+    authenticated = session.authenticated;
+    $('signin').hidden = authenticated;
+    $('dashboard').hidden = !authenticated;
+    $('refresh').hidden = !authenticated;
+    $('logout').hidden = authMode !== 'github-app' || !authenticated;
+    $('install').hidden = !session.installUrl;
+    if (session.installUrl) $('install').href = session.installUrl;
+    const notices = { state: 'Sign-in expired or could not be verified. Please try again.', denied: 'GitHub authorization was cancelled. Sign in when you are ready.', exchange: 'Could not complete GitHub sign-in. Please try again.', expired: 'Your session expired or authorization was revoked. Please sign in again.' };
+    const notice = notices[params.get('auth_error')];
+    $('auth-notice').hidden = !notice;
+    if (notice) $('auth-notice').textContent = notice;
+    $('session-status').hidden = true;
+    if (authenticated) await load();
+  } catch {
+    $('session-status').textContent = 'Could not connect. Please retry.';
+    $('session-retry').hidden = false;
+  }
+}
+$('session-retry').addEventListener('click', initializeSession);
+$('logout').addEventListener('click', async () => {
+  $('logout').disabled = true;
+  try {
+    const response = await fetch('/auth/logout', { method: 'POST' });
+    if (!response.ok) throw new Error();
+    authenticated = false;
+    controller?.abort();
+    location.replace('/');
+  } catch {
+    $('auth-notice').textContent = 'Could not sign out. Please retry.';
+    $('auth-notice').hidden = false;
+    $('logout').disabled = false;
+  }
+});
+initializeSession();
