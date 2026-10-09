@@ -516,6 +516,7 @@ async function load({ append = false, refresh = false } = {}) {
   clearTimeout(readinessTimer); readinessController?.abort();
   controller?.abort(); controller = new AbortController();
   const current = ++generation;
+  const mergeErrorsToClear = new Map(refresh ? [...merges].filter(([, change]) => !change.saving) : []);
   if (!append && !refresh) { items = []; total = 0; cursor = null; more = false; limited = false; }
   loading = true; $('error').hidden = true;
   if (refresh) {
@@ -544,6 +545,10 @@ async function load({ append = false, refresh = false } = {}) {
     viewerLogin = data.viewer;
     viewedUpdates = { ...viewedUpdates, ...readViewedUpdates() };
     items = [...new Map([...(append ? items : []), ...data.items].map(pr => [pr.id, pr])).values()];
+    for (const pr of data.items) {
+      const previous = mergeErrorsToClear.get(pr.id);
+      if (previous && merges.get(pr.id) === previous) merges.delete(pr.id);
+    }
     nameColors = assignNameColors(items.flatMap(pr => [pr.author, ...(pr.reviewers ?? []).map(reviewer => reviewer.name)]), nameColors);
     try { localStorage.setItem(nameColorKey, JSON.stringify(nameColors)); } catch { /* Keep assignments stable for this session. */ }
     total = data.total; cursor = data.pageInfo.endCursor; more = data.pageInfo.hasNextPage;
