@@ -76,7 +76,7 @@ Install the app on the repositories it should access. Private repositories must 
 - **Background refresh:** Refreshes 60 seconds after each load finishes. The button counts down and shows a disabled **Refreshing…** state while fetching. Existing PRs stay visible until fresh data arrives, including when a refresh fails.
 - **Viewed tracking:** New updates have brighter, bolder titles. Opening a PR, diff, or checks link marks the displayed update as viewed. Newer updates highlight it again; tracking is per GitHub account and synchronized across dashboard tabs.
 - **Quick links and copying:** Open PRs, repositories, diffs, and user profiles in new tabs. Usernames keep their existing appearance and show a pointer cursor. Copy PR URLs or branch names with confirmation feedback.
-- **Feedback:** Use **Report an issue** in the footer to open this repository's GitHub issue form.
+- **Feedback:** Use **report an issue** in the footer to open this repository's GitHub issue form.
 - **Appearance:** Responsive layout, keyboard-accessible controls, and system light/dark colors.
 
 ### PR actions
