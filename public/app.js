@@ -148,6 +148,7 @@ function repositoryLink(repo) {
 }
 
 async function mergePull(pr) {
+  if (authMode === 'github-app' && !pr.mergeAccess?.allowed) return;
   if (merges.get(pr.id)?.saving) return;
   const change = { saving: true, error: '' };
   merges.set(pr.id, change); render();
@@ -381,9 +382,25 @@ function render() {
         const merge = element('button', merges.get(pr.id)?.saving ? 'Merging…' : method, 'badge open merge-action');
         merge.type = 'button';
         merge.setAttribute('aria-label', `${method} ${pr.repo} #${pr.number}`);
-        merge.disabled = Boolean(merges.get(pr.id)?.saving || draftChanges.get(pr.id)?.saving || titleEdits.has(pr.id));
+        const blockedAccess = authMode === 'github-app' && !pr.mergeAccess?.allowed;
+        merge.disabled = blockedAccess || Boolean(merges.get(pr.id)?.saving || draftChanges.get(pr.id)?.saving || titleEdits.has(pr.id));
         merge.addEventListener('click', () => mergePull(pr));
-        line.append(merge);
+        if (blockedAccess) {
+          const message = pr.mergeAccess?.message || 'Could not verify app access. Refresh to try again.';
+          const control = element('span', undefined, 'merge-access-blocked');
+          control.setAttribute('role', 'group');
+          control.title = message;
+          control.tabIndex = 0;
+          control.setAttribute('aria-label', `${method} unavailable. ${message}`);
+          control.append(merge); line.append(control);
+          if (pr.mergeAccess?.url) {
+            const install = element('a', pr.mergeAccess.action, 'merge-access-link');
+            install.href = pr.mergeAccess.url;
+            install.target = '_blank'; install.rel = 'noopener noreferrer';
+            install.title = 'Complete setup on GitHub, then refresh this page. Organization access may require owner approval.';
+            line.append(install);
+          }
+        } else line.append(merge);
       }
       const meta = element('div', undefined, 'meta');
       let checks = badge(labels[pr.checks] ?? pr.checks, pr.checks);

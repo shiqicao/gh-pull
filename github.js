@@ -3,7 +3,7 @@ import { promisify } from 'node:util';
 
 const exec = promisify(execFile);
 const mergeFields = `headRefOid mergeable mergeStateStatus mergeQueue { id } stackEntry { id }
-  repository { viewerPermission viewerDefaultMergeMethod mergeCommitAllowed squashMergeAllowed rebaseMergeAllowed }`;
+  repository { nameWithOwner viewerPermission viewerDefaultMergeMethod mergeCommitAllowed squashMergeAllowed rebaseMergeAllowed }`;
 
 export function mergeOptions(pr, viewerLogin) {
   const repo = pr.repository ?? {};
@@ -103,7 +103,7 @@ export function reviewersFor(pr) {
   return [...reviewers.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
 
-export function createGitHub({ fetchImpl = fetch, getToken = defaultToken, cacheToken = true, authError = 'GitHub login expired. Run gh auth login, then retry.' } = {}) {
+export function createGitHub({ fetchImpl = fetch, getToken = defaultToken, cacheToken = true, getMergeAccess, authError = 'GitHub login expired. Run gh auth login, then retry.' } = {}) {
   let token;
   async function graphql(query, variables) {
     if (!cacheToken || !token) token = await getToken();
@@ -127,6 +127,12 @@ export function createGitHub({ fetchImpl = fetch, getToken = defaultToken, cache
     const payload = await response.json();
     if (payload.errors?.length) throw new ApiError(`GitHub: ${payload.errors.map(error => error.message).join('; ')}`);
     return payload.data;
+  }
+  async function withMergeAccess(items) {
+    if (!getMergeAccess) return items;
+    const repos = [...new Set(items.filter(pr => pr.canMerge || pr.mergePending).map(pr => pr.repo))];
+    const access = await getMergeAccess(repos);
+    return items.map(pr => access.has(pr.repo) ? { ...pr, mergeAccess: access.get(pr.repo) } : pr);
   }
   async function list({ scope = 'authored', state = 'open', cursor = null } = {}) {
     const states = { open: ['OPEN'], closed: ['CLOSED'], merged: ['MERGED'], all: ['OPEN', 'CLOSED', 'MERGED'] }[state];
@@ -156,7 +162,7 @@ export function createGitHub({ fetchImpl = fetch, getToken = defaultToken, cache
       total: connection.totalCount ?? connection.issueCount,
       limited: scope !== 'authored' && connection.issueCount > 1000,
       pageInfo: connection.pageInfo,
-      items: connection.nodes.filter(pr => pr?.id).map(pr => ({
+      items: await withMergeAccess(connection.nodes.filter(pr => pr?.id).map(pr => ({
         ...mergeOptions(pr, data.viewer.login),
         id: pr.id, number: pr.number, title: pr.title, url: pr.url, branch: pr.headRefName ?? '',
         status: pr.state === 'OPEN' && pr.isDraft ? 'DRAFT' : pr.state,
@@ -169,7 +175,7 @@ export function createGitHub({ fetchImpl = fetch, getToken = defaultToken, cache
         checks: pr.commits.nodes[0]?.commit.statusCheckRollup?.state ?? 'NONE',
         checkCounts: checkCountsFor(pr),
         labels: pr.labels.nodes.map(label => label.name),
-      })),
+      }))),
     };
   }
 
@@ -181,7 +187,7 @@ export function createGitHub({ fetchImpl = fetch, getToken = defaultToken, cache
         commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }
       } }
     }`, { ids });
-    return { items: data.nodes.filter(pr => pr?.id).map(pr => ({ id: pr.id, ...mergeOptions(pr, data.viewer.login) })) };
+    return { items: await withMergeAccess(data.nodes.filter(pr => pr?.id).map(pr => ({ id: pr.id, repo: pr.repository?.nameWithOwner, ...mergeOptions(pr, data.viewer.login) }))) };
   };
 
   list.merge = async input => {
@@ -199,6 +205,10 @@ export function createGitHub({ fetchImpl = fetch, getToken = defaultToken, cache
     if (!readiness.canMerge) throw new ApiError('This PR is no longer ready to merge. Refresh to see its current status.', 409);
     if (pr.headRefOid !== headOid) throw new ApiError('New commits were pushed. Refresh and review the changes before merging.', 409);
     if (readiness.mergeMethod !== mergeMethod) throw new ApiError('The preferred merge method changed. Refresh before merging.', 409);
+    if (getMergeAccess) {
+      const access = (await getMergeAccess([pr.repository.nameWithOwner])).get(pr.repository.nameWithOwner);
+      if (!access?.allowed) throw new ApiError(access?.message || 'Could not verify app access. Refresh to try again.', 403);
+    }
     const data = await graphql(`mutation($input: MergePullRequestInput!) {
       mergePullRequest(input: $input) { pullRequest { id state updatedAt } }
     }`, { input: { pullRequestId: id, expectedHeadOid: headOid, mergeMethod } });

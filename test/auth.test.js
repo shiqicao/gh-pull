@@ -6,7 +6,7 @@ import { authConfig } from '../auth.js';
 import { createApp } from '../server.js';
 import { createGitHub } from '../github.js';
 
-async function fixture(t, { secure = false } = {}) {
+async function fixture(t, { secure = false, mergeable = false } = {}) {
   let clock = Date.now();
   const config = authConfig({ AUTH_MODE: 'github-app', PUBLIC_URL: secure ? 'https://dashboard.example' : 'http://localhost',
     GITHUB_APP_CLIENT_ID: 'client-id', GITHUB_APP_CLIENT_SECRET: 'secret-not-for-browser', GITHUB_APP_SLUG: 'gh-pull' });
@@ -22,6 +22,10 @@ async function fixture(t, { secure = false } = {}) {
         refresh_token: `refresh:${user}`, refresh_token_expires_in: 86400 });
     }
     const user = options.headers.Authorization.split(':')[1];
+    if (url.includes('/user/installations')) {
+      if (url.includes('/repositories?')) return Response.json({ repositories: [{ full_name: 'team/repo' }] });
+      return Response.json({ installations: user === 'alice' ? [{ id: 12, account: { login: 'team' }, permissions: { contents: 'write' } }] : [] });
+    }
     const data = JSON.parse(options.body);
     calls.push({ user, ...data, authorization: options.headers.Authorization });
     if (revoked) return new Response('', { status: 401 });
@@ -29,6 +33,7 @@ async function fixture(t, { secure = false } = {}) {
     if (data.query.includes('updatePullRequest(')) return Response.json({ data: { updatePullRequest: { pullRequest: { id: 'PR_one', title: 'New title', updatedAt: '2026-10-09' } } } });
     if (data.query.includes('node(id:')) return Response.json({ data: { viewer: { login: user }, node: { __typename: 'PullRequest', id: 'PR_one', title: 'Old title', author: { login: user } } } });
     const connection = { totalCount: 0, issueCount: 0, pageInfo: { hasNextPage: false, endCursor: null }, nodes: [] };
+    if (mergeable) connection.nodes = [{ id: 'PR_merge', number: 1, author: { login: user }, state: 'OPEN', isDraft: false, mergeable: 'MERGEABLE', mergeStateStatus: 'CLEAN', headRefOid: 'a'.repeat(40), repository: { nameWithOwner: 'team/repo', viewerPermission: 'WRITE', squashMergeAllowed: true }, commits: { nodes: [] }, labels: { nodes: [] } }];
     return Response.json({ data: { viewer: { login: user, pullRequests: connection }, search: connection } });
   };
   const app = createApp({ config, list: async () => { throw new Error('Local credentials must never be used'); },
@@ -198,4 +203,15 @@ test('merge readiness uses each hosted session and rejects anonymous requests', 
     assert.equal((await f.call('/api/pulls/readiness?id=PR_1', { headers: { cookie } })).status, 200);
   }
   assert.deepEqual(f.calls.map(call => call.user), ['alice', 'bob']);
+});
+
+
+test('hosted list keeps mergeability and checks installation access separately for each session', async t => {
+  const f = await fixture(t, { mergeable: true });
+  const alice = await f.login('alice'), bob = await f.login('bob');
+  const a = (await f.call('/api/pulls', { headers: { cookie: alice.cookie } })).json().items[0];
+  const b = (await f.call('/api/pulls', { headers: { cookie: bob.cookie } })).json().items[0];
+  assert.equal(a.canMerge, true);assert.equal(a.mergeAccess.allowed, true);
+  assert.equal(b.canMerge, true);assert.equal(b.mergeAccess.reason, 'not_installed');
+  assert.equal(b.mergeAccess.url, 'https://github.com/apps/gh-pull/installations/new');
 });

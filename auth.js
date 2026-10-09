@@ -1,5 +1,6 @@
 import { randomBytes, createHash } from 'node:crypto';
 import { ApiError, createGitHub } from './github.js';
+import { createMergeAccess } from './installation.js';
 
 const sessionLifetime = 7 * 24 * 60 * 60 * 1000;
 const loginLifetime = 10 * 60 * 1000;
@@ -112,6 +113,7 @@ export function createAuth(config, { fetchImpl = fetch, now = Date.now, githubFa
           const id = random();
           const entry = { ...tokens, expires: now() + sessionLifetime, cache: new Map() };
           entry.list = githubFactory({ getToken: () => tokenFor(entry), cacheToken: false,
+            getMergeAccess: createMergeAccess({ getToken: () => tokenFor(entry), fetchImpl, installUrl }),
             authError: 'GitHub authorization expired or was revoked. Please sign in again.' });
           sessions.set(id, entry);
           res.setHeader('Set-Cookie', [cookie(stateName, '', 0), cookie(sessionName, id, sessionLifetime / 1000)]);
