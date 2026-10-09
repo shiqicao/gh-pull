@@ -15,7 +15,10 @@ export function mergeOptions(pr, viewerLogin) {
     ['WRITE', 'MAINTAIN', 'ADMIN'].includes(repo.viewerPermission) &&
     !['REVIEW_REQUIRED', 'CHANGES_REQUESTED'].includes(pr.reviewDecision) &&
     (!checks || checks === 'SUCCESS') && Boolean(pr.headRefOid) && methods.length > 0;
-  return { canMerge, headOid: pr.headRefOid, mergeMethod: methods.includes(repo.viewerDefaultMergeMethod) ? repo.viewerDefaultMergeMethod : methods[0] };
+  const mergePending = Boolean(viewerLogin && pr.author?.login?.toLowerCase() === viewerLogin.toLowerCase() && pr.state === 'OPEN' && !pr.isDraft &&
+    !pr.mergeQueue && !pr.stackEntry && ['WRITE', 'MAINTAIN', 'ADMIN'].includes(repo.viewerPermission) && methods.length &&
+    (pr.mergeable === 'UNKNOWN' || pr.mergeStateStatus === 'UNKNOWN'));
+  return { canMerge, mergePending, headOid: pr.headRefOid, mergeMethod: methods.includes(repo.viewerDefaultMergeMethod) ? repo.viewerDefaultMergeMethod : methods[0] };
 }
 
 export function validateMerge(input) {
@@ -168,6 +171,17 @@ export function createGitHub({ fetchImpl = fetch, getToken = defaultToken, cache
       })),
     };
   }
+
+  list.mergeReadiness = async ids => {
+    const data = await graphql(`query($ids: [ID!]!) {
+      viewer { login }
+      nodes(ids: $ids) { ... on PullRequest {
+        id state isDraft author { login } reviewDecision ${mergeFields}
+        commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }
+      } }
+    }`, { ids });
+    return { items: data.nodes.filter(pr => pr?.id).map(pr => ({ id: pr.id, ...mergeOptions(pr, data.viewer.login) })) };
+  };
 
   list.merge = async input => {
     const { id, headOid, mergeMethod } = validateMerge(input);
