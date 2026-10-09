@@ -87,8 +87,18 @@ function element(tag, text, className) {
 
 function badge(text, kind) { return element('span', text, `badge ${kind.toLowerCase()}`); }
 
+function usernameLink(username, className = '') {
+  // Team names and the missing-author placeholder are not user profiles.
+  if (username === 'deleted-user' || !/^[a-z\d](?:[a-z\d-]*[a-z\d])?$/i.test(username)) return element('span', username, className);
+  const link = element('a', username, `${className} username-link`.trim());
+  link.href = `https://github.com/${encodeURIComponent(username)}`;
+  link.target = '_blank'; link.rel = 'noopener noreferrer';
+  link.setAttribute('aria-label', `${username}'s GitHub profile (opens in a new tab)`);
+  return link;
+}
+
 function usernameBadge(username) {
-  const name = badge(username, 'author');
+  const name = usernameLink(username, 'badge author');
   name.style.setProperty('--author-hue', nameColors[username.toLowerCase()] * 360 / NAME_COLOR_COUNT);
   return name;
 }
@@ -222,6 +232,7 @@ function render() {
     section.addEventListener('toggle', () => section.open ? collapsed.delete(key) : collapsed.add(key));
     const heading = element('summary');
     if ($('group').value === 'repo') heading.append(repositoryLink(name), document.createTextNode(` (${prs.length})`));
+    else if ($('group').value === 'author') heading.append(usernameLink(name), document.createTextNode(` (${prs.length})`));
     else heading.textContent = `${labels[name] ?? name} (${prs.length})`;
     section.append(heading);
     const list = element('ul');

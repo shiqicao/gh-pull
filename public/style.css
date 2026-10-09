@@ -37,6 +37,7 @@ li { padding: 12px 14px; border-top: 1px solid light-dark(#e8ecf0, #262c36); }
 .has-updates .pr-title { color: light-dark(#0969da, #ffffff); font-weight: 600; }
 .pr-title:hover { text-decoration: underline; }
 .repo-link { color: inherit; text-decoration: none; }
+.username-link { color: inherit; text-decoration: none; cursor: pointer; }
 .repo-link:hover { color: light-dark(#0969da, #58a6ff); text-decoration: underline; }
 .pr-links { display: inline-flex; align-items: center; gap: 2px; flex-shrink: 0; }
 .pr-files, .copy-link, .edit-title { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 5px; color: light-dark(#6e7781, #9198a1); background: transparent; }
