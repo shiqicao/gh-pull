@@ -634,7 +634,7 @@ async function initializeSession() {
     $('links-hint').hidden = !authenticated;
     $('refresh').hidden = !authenticated;
     $('logout').hidden = authMode !== 'github-app' || !authenticated;
-    $('install').hidden = !session.installUrl;
+    $('install').hidden = authMode !== 'github-app' || !authenticated || !session.installUrl;
     if (session.installUrl) $('install').href = session.installUrl;
     const notices = { state: 'Sign-in expired or could not be verified. Please try again.', denied: 'GitHub authorization was cancelled. Sign in when you are ready.', exchange: 'Could not complete GitHub sign-in. Please try again.', expired: 'Your session expired or authorization was revoked. Please sign in again.' };
     const notice = notices[params.get('auth_error')];
