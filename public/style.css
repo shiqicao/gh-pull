@@ -69,6 +69,8 @@ li { padding: 12px 14px; border-top: 1px solid light-dark(#e8ecf0, #262c36); }
 .closed, .failure, .error, .changes_requested { background: light-dark(#ffebe9, #481d22); color: light-dark(#a40e26, #ffa198); }
 .pending, .expected, .review_required { background: light-dark(#fff8c5, #3c3010); color: light-dark(#7d4e00, #eac54f); }
 .diff-counts { white-space: nowrap; }
+.diff-counts .additions { color: light-dark(#58745f, #88a58f); }
+.diff-counts .deletions { color: light-dark(#8b6663, #b08c88); }
 #error { padding: 12px; border: 1px solid light-dark(#a40e26, #ffa198); }
 .empty { padding: 24px 0; }
 :focus-visible { outline: 2px solid light-dark(#0969da, #58a6ff); outline-offset: 3px; }
