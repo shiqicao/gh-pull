@@ -22,7 +22,7 @@
   <button id="session-retry" type="button" hidden>Retry connection</button>
   <main id="dashboard" hidden>
     <form id="filters" aria-label="Pull request filters">
-      <label>Show<select id="scope"><option value="authored">Created by me</option><option value="involved">Involving me</option><option value="review">Review requested</option></select></label>
+      <label>Show<select id="scope"><option value="authored">Created by me</option><option value="involved" selected>Involving me</option><option value="review">Review requested</option></select></label>
       <label>State<select id="state"><option value="open">Open (including drafts)</option><option value="all">All states</option><option value="merged">Merged</option><option value="closed">Closed</option></select></label>
       <label class="search">Search loaded PRs<input id="search" type="search" placeholder="Title, repository, author, #number, label…" autocomplete="off"></label>
       <label>Group by<select id="group"><option value="repo">Repository</option><option value="author">Author</option><option value="status">Status</option><option value="checks">Checks</option><option value="none">No grouping</option></select></label>
