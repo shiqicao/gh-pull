@@ -1,4 +1,4 @@
-# <img src="docs/favicon.png" width="32" height="32" alt=""> gh-pull
+# <img src="docs/favicon.png" width="32" height="32" align="middle" alt=""> gh-pull
 
 much better github pr dashboard
 
