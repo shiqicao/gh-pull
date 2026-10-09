@@ -2,6 +2,8 @@
 
 A fast local dashboard for your GitHub pull requests. Plain JavaScript, native browser controls, minimal CSS, and a Node server. No runtime dependencies, installation, or build step.
 
+![gh-pull dashboard showing fictional demo pull requests](docs/demo.png)
+
 ## Run
 
 Requires Node.js 22+ and a GitHub.com account.
@@ -14,6 +16,10 @@ npm start
 Open <http://localhost:3000>. The server reads your existing GitHub CLI credential. Alternatively, supply `GH_TOKEN` or `GITHUB_TOKEN` in the server environment; the token needs read access to the repositories you want to see. Credentials never go to the browser. The server binds only to `127.0.0.1`.
 
 Set `PORT` to change the port. Both `npm start` and `npm run dev` automatically restart the server when backend files change; reload the browser to pick up frontend edits. Use `node server.js` if you specifically want to disable automatic restarts.
+
+## Demo
+
+For screenshots or a quick preview, run `npm start` and open [demo mode](http://localhost:3000/?demo=1). It shows seven fictional PRs across three repositories, with sample authors, reviewers, branches, checks, and statuses. No GitHub login is needed and no GitHub API requests are made. Title edits and draft changes are simulated in memory and reset when you reload. Demo colors and viewed state use separate browser storage; GitHub links are illustrative. Remove `?demo=1` to return to your real PRs.
 
 ## Features
 
