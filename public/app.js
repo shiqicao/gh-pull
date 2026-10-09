@@ -11,6 +11,7 @@ let items = [], total = 0, cursor = null, more = false, limited = false, loading
 const collapsed = new Set();
 const titleEdits = new Map();
 const draftChanges = new Map();
+const merges = new Map();
 let viewerLogin = '';
 const nameColorKey = 'gh-pull.name-colors.v1';
 let nameColors = assignNameColors([]);
@@ -80,6 +81,35 @@ function repositoryLink(repo) {
   return link;
 }
 
+async function mergePull(pr) {
+  if (merges.get(pr.id)?.saving) return;
+  const change = { saving: true, error: '' };
+  merges.set(pr.id, change); render();
+  try {
+    const response = await fetch('/api/pulls/merge', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: pr.id, headOid: pr.headOid, mergeMethod: pr.mergeMethod }),
+      signal: AbortSignal.timeout(65_000),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Merge failed. Refresh to check its status.');
+    const current = items.find(item => item.id === pr.id);
+    if (current) {
+      Object.assign(current, data);
+      if ($('state').value === 'open') {
+        items = items.filter(item => item.id !== pr.id);
+        total = Math.max(0, total - 1);
+      }
+    }
+    merges.delete(pr.id); render();
+    $('summary').append(document.createTextNode(` · Merged ${pr.repo} #${pr.number}`));
+  } catch (error) {
+    change.saving = false;
+    change.error = error.name === 'TimeoutError' ? 'Merge timed out. Refresh to check whether GitHub merged it.' : error.message;
+    render();
+  }
+}
+
 async function changeDraftStatus(pr) {
   if (draftChanges.get(pr.id)?.saving) return;
   const toDraft = pr.status === 'OPEN';
@@ -93,7 +123,7 @@ async function changeDraftStatus(pr) {
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || 'Could not change the PR status. Please retry.');
     const current = items.find(item => item.id === pr.id);
-    if (current) { current.status = data.status; current.updatedAt = data.updatedAt; current.review = data.review; }
+    if (current) { current.status = data.status; current.updatedAt = data.updatedAt; current.review = data.review; current.canMerge = false; }
     draftChanges.delete(pr.id); render();
     $('summary').append(document.createTextNode(toDraft ? ' · PR converted to draft' : ' · PR ready for review'));
   } catch (error) {
@@ -199,7 +229,7 @@ function render() {
       if (['OPEN', 'DRAFT'].includes(pr.status) && pr.author.toLowerCase() === viewerLogin.toLowerCase()) {
         const pending = draftChanges.get(pr.id)?.saving ?? false;
         const status = element('button', pending ? 'Updating…' : labels[pr.status], `badge ${pr.status.toLowerCase()} draft-action`);
-        status.type = 'button'; status.disabled = pending;
+        status.type = 'button'; status.disabled = pending || Boolean(merges.get(pr.id)?.saving);
         status.title = pr.status === 'OPEN' ? 'Convert to draft' : 'Mark ready for review';
         status.setAttribute('aria-label', pr.status === 'OPEN' ? `Convert ${pr.title} to draft` : `Mark ${pr.title} ready for review`);
         status.addEventListener('click', () => changeDraftStatus(pr));
@@ -264,7 +294,7 @@ function render() {
         const edit = element('button', undefined, 'edit-title');
         edit.type = 'button'; edit.title = 'Edit PR title';
         edit.setAttribute('aria-label', `Edit title of ${pr.title}`);
-        edit.disabled = titleEdits.get(pr.id)?.saving ?? false;
+        edit.disabled = Boolean(titleEdits.get(pr.id)?.saving || merges.get(pr.id)?.saving);
         const pencil = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
         for (const [key, value] of Object.entries({ viewBox: '0 0 16 16', width: '16', height: '16', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.5', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true', focusable: 'false' })) pencil.setAttribute(key, value);
         const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
@@ -275,6 +305,15 @@ function render() {
           render(); focusTitleControl(pr.id, '.title-editor input');
         });
         line.append(edit);
+      }
+      if (pr.status === 'OPEN' && pr.canMerge) {
+        const method = { MERGE: 'Merge', SQUASH: 'Squash and merge', REBASE: 'Rebase and merge' }[pr.mergeMethod];
+        const merge = element('button', merges.get(pr.id)?.saving ? 'Merging…' : method, 'merge-action');
+        merge.type = 'button';
+        merge.title = `${method} ${pr.repo} #${pr.number}`;
+        merge.disabled = Boolean(merges.get(pr.id)?.saving || draftChanges.get(pr.id)?.saving || titleEdits.has(pr.id));
+        merge.addEventListener('click', () => mergePull(pr));
+        line.append(merge);
       }
       const meta = element('div', undefined, 'meta');
       let checks = badge(labels[pr.checks] ?? pr.checks, pr.checks);
@@ -348,6 +387,10 @@ function render() {
       for (const label of pr.labels) meta.append(badge(label, 'label'));
       const content = element('div', undefined, 'pr-content');
       content.append(line);
+      if (merges.get(pr.id)?.error) {
+        const error = element('p', merges.get(pr.id).error, 'draft-error');
+        error.setAttribute('role', 'alert'); content.append(error);
+      }
       if (draftChanges.get(pr.id)?.error) {
         const error = element('p', draftChanges.get(pr.id).error, 'draft-error');
         error.setAttribute('role', 'alert'); content.append(error);
@@ -413,6 +456,7 @@ async function load({ append = false, refresh = false } = {}) {
       viewedUpdates = {};
       titleEdits.clear();
       draftChanges.clear();
+      merges.clear();
     }
     viewerLogin = data.viewer;
     viewedUpdates = { ...viewedUpdates, ...readViewedUpdates() };

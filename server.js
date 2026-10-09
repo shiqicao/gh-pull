@@ -2,7 +2,7 @@ import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
-import { createGitHub, ApiError, validateTitleUpdate, validateDraftUpdate } from './github.js';
+import { createGitHub, ApiError, validateTitleUpdate, validateDraftUpdate, validateMerge } from './github.js';
 
 const assets = new Map([
   ['/', ['index.html', 'text/html']],
@@ -11,7 +11,7 @@ const assets = new Map([
   ['/style.css', ['style.css', 'text/css']],
 ]);
 
-export function createApp({ list = createGitHub(), updateTitle = list.updateTitle, convertToDraft = list.convertToDraft, markReadyForReview = list.markReadyForReview } = {}) {
+export function createApp({ list = createGitHub(), updateTitle = list.updateTitle, convertToDraft = list.convertToDraft, markReadyForReview = list.markReadyForReview, merge = list.merge } = {}) {
   const cache = new Map();
   return createServer(async (req, res) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -26,7 +26,7 @@ export function createApp({ list = createGitHub(), updateTitle = list.updateTitl
         req.headers['sec-fetch-site'] === 'cross-site') return send(403, { error: 'Local requests only.' });
     const url = new URL(req.url, `http://${host}`);
     try {
-      if (req.method === 'PATCH' && ['/api/pulls/title', '/api/pulls/draft', '/api/pulls/ready'].includes(url.pathname)) {
+      if (req.method === 'PATCH' && ['/api/pulls/title', '/api/pulls/draft', '/api/pulls/ready', '/api/pulls/merge'].includes(url.pathname)) {
         if (req.headers.origin !== `http://${host}`) return send(403, { error: 'Same-origin requests only.' });
         if (req.headers['content-type']?.split(';')[0].trim() !== 'application/json') return send(415, { error: 'Expected application/json.' });
         const chunks = [];
@@ -39,8 +39,8 @@ export function createApp({ list = createGitHub(), updateTitle = list.updateTitl
         let input;
         try { input = JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { throw new ApiError('Invalid JSON body.', 400); }
         const statusChange = url.pathname !== '/api/pulls/title';
-        input = statusChange ? validateDraftUpdate(input) : validateTitleUpdate(input);
-        const mutate = url.pathname === '/api/pulls/draft' ? convertToDraft : url.pathname === '/api/pulls/ready' ? markReadyForReview : updateTitle;
+        input = url.pathname === '/api/pulls/merge' ? validateMerge(input) : statusChange ? validateDraftUpdate(input) : validateTitleUpdate(input);
+        const mutate = url.pathname === '/api/pulls/merge' ? merge : url.pathname === '/api/pulls/draft' ? convertToDraft : url.pathname === '/api/pulls/ready' ? markReadyForReview : updateTitle;
         if (!mutate) throw new ApiError(statusChange ? 'Status changes are unavailable.' : 'Title editing is unavailable.', 503);
         const result = await mutate(input);
         cache.clear();

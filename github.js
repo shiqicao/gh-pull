@@ -2,8 +2,33 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 
 const exec = promisify(execFile);
+const mergeFields = `headRefOid mergeable mergeStateStatus mergeQueue { id } stackEntry { id }
+  repository { viewerPermission viewerDefaultMergeMethod mergeCommitAllowed squashMergeAllowed rebaseMergeAllowed }`;
+
+export function mergeOptions(pr) {
+  const repo = pr.repository ?? {};
+  const methods = [['MERGE', repo.mergeCommitAllowed], ['SQUASH', repo.squashMergeAllowed], ['REBASE', repo.rebaseMergeAllowed]]
+    .filter(([, allowed]) => allowed).map(([method]) => method);
+  const checks = pr.commits?.nodes[0]?.commit.statusCheckRollup?.state;
+  const canMerge = pr.state === 'OPEN' && pr.isDraft === false && pr.mergeable === 'MERGEABLE' &&
+    ['CLEAN', 'HAS_HOOKS'].includes(pr.mergeStateStatus) && !pr.mergeQueue && !pr.stackEntry &&
+    ['WRITE', 'MAINTAIN', 'ADMIN'].includes(repo.viewerPermission) &&
+    !['REVIEW_REQUIRED', 'CHANGES_REQUESTED'].includes(pr.reviewDecision) &&
+    (!checks || checks === 'SUCCESS') && Boolean(pr.headRefOid) && methods.length > 0;
+  return { canMerge, headOid: pr.headRefOid, mergeMethod: methods.includes(repo.viewerDefaultMergeMethod) ? repo.viewerDefaultMergeMethod : methods[0] };
+}
+
+export function validateMerge(input) {
+  const { id } = validateDraftUpdate(input);
+  if (!/^[a-f0-9]{40}$/i.test(input.headOid ?? '') || !['MERGE', 'SQUASH', 'REBASE'].includes(input.mergeMethod)) {
+    throw new ApiError('Provide the displayed commit and merge method.', 400);
+  }
+  return { id, headOid: input.headOid, mergeMethod: input.mergeMethod };
+}
+
 const fields = `id number title url state isDraft createdAt updatedAt headRefName
   author { login } repository { nameWithOwner }
+  ${mergeFields}
   additions deletions reviewDecision
   reviewRequests(first: 100) {
     pageInfo { hasNextPage }
@@ -111,6 +136,7 @@ export function createGitHub({ fetchImpl = fetch, getToken = defaultToken } = {}
       limited: scope !== 'authored' && connection.issueCount > 1000,
       pageInfo: connection.pageInfo,
       items: connection.nodes.filter(pr => pr?.id).map(pr => ({
+        ...mergeOptions(pr),
         id: pr.id, number: pr.number, title: pr.title, url: pr.url, branch: pr.headRefName ?? '',
         status: pr.state === 'OPEN' && pr.isDraft ? 'DRAFT' : pr.state,
         author: pr.author?.login ?? 'deleted-user', repo: pr.repository.nameWithOwner,
@@ -124,6 +150,25 @@ export function createGitHub({ fetchImpl = fetch, getToken = defaultToken } = {}
       })),
     };
   }
+
+  list.merge = async input => {
+    const { id, headOid, mergeMethod } = validateMerge(input);
+    const current = await graphql(`query($id: ID!) {
+      node(id: $id) { __typename ... on PullRequest { ${fields} } }
+    }`, { id });
+    const pr = current.node;
+    if (pr?.__typename !== 'PullRequest') throw new ApiError('Pull request not found.', 404);
+    const readiness = mergeOptions(pr);
+    if (!readiness.canMerge) throw new ApiError('This PR is no longer ready to merge. Refresh to see its current status.', 409);
+    if (pr.headRefOid !== headOid) throw new ApiError('New commits were pushed. Refresh and review the changes before merging.', 409);
+    if (readiness.mergeMethod !== mergeMethod) throw new ApiError('The preferred merge method changed. Refresh before merging.', 409);
+    const data = await graphql(`mutation($input: MergePullRequestInput!) {
+      mergePullRequest(input: $input) { pullRequest { id state updatedAt } }
+    }`, { input: { pullRequestId: id, expectedHeadOid: headOid, mergeMethod } });
+    const merged = data.mergePullRequest?.pullRequest;
+    if (merged?.state !== 'MERGED') throw new ApiError('GitHub did not confirm the merge. Refresh to check its status.');
+    return { id: merged.id, status: 'MERGED', updatedAt: merged.updatedAt, canMerge: false };
+  };
 
   list.updateTitle = async input => {
     const { id, title, expectedTitle } = validateTitleUpdate(input);

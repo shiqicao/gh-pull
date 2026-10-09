@@ -31,6 +31,7 @@ Set `PORT` to change the port. Both `npm start` and `npm run dev` automatically 
 - Open PR titles in a new tab.
 - Edit your own PR titles with the pencil icon beside the title. Save (or Enter) updates GitHub; Cancel (or Escape) discards the edit. Titles must be 1–256 characters on one line. Failed saves retain your draft. The server verifies authorship and checks for a changed title before submitting; your token must have permission to update the PR.
 - Click Open on your own PR to convert it to a draft, or click Draft to mark it ready for review (Open). The badge changes after GitHub confirms; failures show an error and can be retried. Other authors' PRs and closed or merged PRs have non-interactive status badges.
+- Merge ready PRs with a green button showing the repository’s preferred merge method. The server rechecks readiness and permissions and pins the merge to the displayed commit. Drafts, blocked PRs, merge queues, and stacked PRs do not show this action; use GitHub for queue or stack workflows. Refresh after marking a draft ready to update merge readiness.
 - Repository names in group headings and PR metadata open the repository in a new tab without marking a PR as viewed.
 - Copy a PR URL with the copy icon between its status badge and file-diff link; a check mark confirms it was copied.
 - The source branch is shown in each PR's metadata. Click its name or copy icon to copy the exact branch name; a check mark confirms success.
@@ -41,7 +42,7 @@ Set `PORT` to change the port. Both `npm start` and `npm run dev` automatically 
 
 Created-by-me pagination covers the full authored history without GitHub's search ceiling. Involving-me and review-requested views use GitHub search, which exposes at most 1,000 matches; the dashboard shows a notice when this applies. Search and grouping operate on loaded pages. Labels show the first ten per PR. Check status is the aggregate for the latest commit, not an individual job listing. Only the username-to-color mapping and account-specific viewed PR IDs/timestamps are saved in browser storage; PR contents and credentials are not stored there. With browser storage disabled, viewed state lasts only for the current page session.
 
-The GraphQL fields follow [GitHub's pull request API](https://docs.github.com/en/graphql/reference/pulls). GitHub writes happen when you save a title edit or click your PR's Open/Draft badge to change its draft status. GitHub Enterprise hosts are not currently supported.
+The GraphQL fields follow [GitHub's pull request API](https://docs.github.com/en/graphql/reference/pulls). GitHub writes happen when you save a title edit click your PR's Open/Draft badge to change its draft status, or click a merge button. GitHub Enterprise hosts are not currently supported.
 
 ## Verify
 
