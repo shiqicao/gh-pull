@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Your GitHub pull requests, in one fast local dashboard.">
+  <title>gh-pull · Pull requests</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="/style.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <header><h1>gh-pull</h1><span id="viewer">GitHub pull requests</span><button id="refresh" type="button">Refresh</button></header>
+  <main>
+    <form id="filters" aria-label="Pull request filters">
+      <label>Show<select id="scope"><option value="authored">Created by me</option><option value="involved">Involving me</option><option value="review">Review requested</option></select></label>
+      <label>State<select id="state"><option value="open">Open (including drafts)</option><option value="all">All states</option><option value="merged">Merged</option><option value="closed">Closed</option></select></label>
+      <label class="search">Search loaded PRs<input id="search" type="search" placeholder="Title, repository, author, #number, label…" autocomplete="off"></label>
+      <label>Group by<select id="group"><option value="repo">Repository</option><option value="author">Author</option><option value="status">Status</option><option value="checks">Checks</option><option value="none">No grouping</option></select></label>
+      <label>Sort<select id="sort"><option value="updated">Recently updated</option><option value="created">Newest created</option><option value="oldest">Oldest created</option></select></label>
+    </form>
+    <p id="summary" role="status" aria-live="polite">Loading pull requests…</p>
+    <div id="error" role="alert" hidden></div>
+    <div id="results" aria-busy="true"></div>
+    <button id="more" type="button" hidden>Load more</button>
+    <p class="hint">Pull request links open in a new tab. <span id="updated"></span></p>
+  </main>
+</body>
+</html>
