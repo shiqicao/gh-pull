@@ -10,6 +10,7 @@ const assets = new Map([
   ['/app.js', ['app.js', 'text/javascript']],
   ['/model.js', ['model.js', 'text/javascript']],
   ['/style.css', ['style.css', 'text/css']],
+  ['/favicon.svg', ['favicon.svg', 'image/svg+xml']],
 ]);
 
 export function createApp({ list = createGitHub(), updateTitle = list.updateTitle, convertToDraft = list.convertToDraft, markReadyForReview = list.markReadyForReview, merge = list.merge, config = { mode: 'local' }, authOptions } = {}) {
