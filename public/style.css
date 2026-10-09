@@ -10,6 +10,16 @@ header button { margin-left: auto; }
 [hidden] { display: none !important; }
 .signin-button { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 10px 16px; border-radius: 6px; background: light-dark(#0969da, #58a6ff); color: light-dark(#ffffff, #0d1117); font-weight: 600; text-decoration: none; }
 .signin-button:hover { background: light-dark(#0550ae, #79c0ff); }
+#signin { max-width: 480px; margin: 56px auto 24px; padding: 32px; border: 1px solid light-dark(#d1d9e0, #3d444d); border-radius: 12px; background: light-dark(#f6f8fa, #161b22); }
+#signin .signin-button { width: 100%; }
+.signin-access { margin-top: 24px; padding-top: 20px; border-top: 1px solid light-dark(#d1d9e0, #3d444d); color: light-dark(#59636e, #a7b1bd); font-size: 13px; }
+.signin-access h3 { margin: 0 0 6px; font-size: inherit; font-weight: 600; color: light-dark(#424a53, #c5cdd6); }
+.signin-access p { margin: 0 0 12px; }
+.signin-access p:last-child { margin-bottom: 0; }
+.signin-access a { color: inherit; text-underline-offset: 3px; }
+.signin-access a:hover { color: light-dark(#0969da, #58a6ff); }
+body:has(#signin:not([hidden])) .dashboard-footer { max-width: 480px; margin: 0 auto; }
+body:has(#signin:not([hidden])) #links-hint { display: none; }
 form { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; }
 label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 500; color: light-dark(#59636e, #a7b1bd); }
 input, select, button { font: inherit; padding: 6px 10px; border: 1px solid light-dark(#d1d9e0, #3d444d); border-radius: 6px; color: inherit; }
@@ -79,3 +89,4 @@ li { padding: 12px 14px; border-top: 1px solid light-dark(#e8ecf0, #262c36); }
 :focus-visible { outline: 2px solid light-dark(#0969da, #58a6ff); outline-offset: 3px; }
 input:focus, select:focus, textarea:focus { outline: none; }
 @media (max-width: 600px) { body { padding: 12px; } label { flex: 1; } .search { flex-basis: 100%; } select, input { min-width: 0; } .pr-row { grid-template-columns: minmax(0, 1fr); gap: 10px; } }
+@media (max-width: 600px) { #signin { margin: 32px auto 16px; padding: 24px; } }
