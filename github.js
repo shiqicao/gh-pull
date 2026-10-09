@@ -10,10 +10,11 @@ export function mergeOptions(pr, viewerLogin) {
   const methods = [['MERGE', repo.mergeCommitAllowed], ['SQUASH', repo.squashMergeAllowed], ['REBASE', repo.rebaseMergeAllowed]]
     .filter(([, allowed]) => allowed).map(([method]) => method);
   const checks = pr.commits?.nodes[0]?.commit.statusCheckRollup?.state;
+  // Review decisions can remain REVIEW_REQUIRED on a CLEAN PR; GitHub's merge
+  // status determines whether reviews actually block the merge.
   const canMerge = Boolean(viewerLogin && pr.author?.login && pr.author.login.toLowerCase() === viewerLogin.toLowerCase()) && pr.state === 'OPEN' && pr.isDraft === false && pr.mergeable === 'MERGEABLE' &&
     ['CLEAN', 'HAS_HOOKS'].includes(pr.mergeStateStatus) && !pr.mergeQueue && !pr.stackEntry &&
     ['WRITE', 'MAINTAIN', 'ADMIN'].includes(repo.viewerPermission) &&
-    !['REVIEW_REQUIRED', 'CHANGES_REQUESTED'].includes(pr.reviewDecision) &&
     (!checks || checks === 'SUCCESS') && Boolean(pr.headRefOid) && methods.length > 0;
   const mergePending = Boolean(viewerLogin && pr.author?.login?.toLowerCase() === viewerLogin.toLowerCase() && pr.state === 'OPEN' && !pr.isDraft &&
     !pr.mergeQueue && !pr.stackEntry && ['WRITE', 'MAINTAIN', 'ADMIN'].includes(repo.viewerPermission) && methods.length &&
