@@ -5,12 +5,12 @@ const exec = promisify(execFile);
 const mergeFields = `headRefOid mergeable mergeStateStatus mergeQueue { id } stackEntry { id }
   repository { viewerPermission viewerDefaultMergeMethod mergeCommitAllowed squashMergeAllowed rebaseMergeAllowed }`;
 
-export function mergeOptions(pr) {
+export function mergeOptions(pr, viewerLogin) {
   const repo = pr.repository ?? {};
   const methods = [['MERGE', repo.mergeCommitAllowed], ['SQUASH', repo.squashMergeAllowed], ['REBASE', repo.rebaseMergeAllowed]]
     .filter(([, allowed]) => allowed).map(([method]) => method);
   const checks = pr.commits?.nodes[0]?.commit.statusCheckRollup?.state;
-  const canMerge = pr.state === 'OPEN' && pr.isDraft === false && pr.mergeable === 'MERGEABLE' &&
+  const canMerge = Boolean(viewerLogin && pr.author?.login && pr.author.login.toLowerCase() === viewerLogin.toLowerCase()) && pr.state === 'OPEN' && pr.isDraft === false && pr.mergeable === 'MERGEABLE' &&
     ['CLEAN', 'HAS_HOOKS'].includes(pr.mergeStateStatus) && !pr.mergeQueue && !pr.stackEntry &&
     ['WRITE', 'MAINTAIN', 'ADMIN'].includes(repo.viewerPermission) &&
     !['REVIEW_REQUIRED', 'CHANGES_REQUESTED'].includes(pr.reviewDecision) &&
@@ -136,7 +136,7 @@ export function createGitHub({ fetchImpl = fetch, getToken = defaultToken } = {}
       limited: scope !== 'authored' && connection.issueCount > 1000,
       pageInfo: connection.pageInfo,
       items: connection.nodes.filter(pr => pr?.id).map(pr => ({
-        ...mergeOptions(pr),
+        ...mergeOptions(pr, data.viewer.login),
         id: pr.id, number: pr.number, title: pr.title, url: pr.url, branch: pr.headRefName ?? '',
         status: pr.state === 'OPEN' && pr.isDraft ? 'DRAFT' : pr.state,
         author: pr.author?.login ?? 'deleted-user', repo: pr.repository.nameWithOwner,
@@ -154,11 +154,15 @@ export function createGitHub({ fetchImpl = fetch, getToken = defaultToken } = {}
   list.merge = async input => {
     const { id, headOid, mergeMethod } = validateMerge(input);
     const current = await graphql(`query($id: ID!) {
+      viewer { login }
       node(id: $id) { __typename ... on PullRequest { ${fields} } }
     }`, { id });
     const pr = current.node;
     if (pr?.__typename !== 'PullRequest') throw new ApiError('Pull request not found.', 404);
-    const readiness = mergeOptions(pr);
+    if (!pr.author?.login || pr.author.login.toLowerCase() !== current.viewer.login.toLowerCase()) {
+      throw new ApiError('You can only merge your own pull requests.', 403);
+    }
+    const readiness = mergeOptions(pr, current.viewer.login);
     if (!readiness.canMerge) throw new ApiError('This PR is no longer ready to merge. Refresh to see its current status.', 409);
     if (pr.headRefOid !== headOid) throw new ApiError('New commits were pushed. Refresh and review the changes before merging.', 409);
     if (readiness.mergeMethod !== mergeMethod) throw new ApiError('The preferred merge method changed. Refresh before merging.', 409);

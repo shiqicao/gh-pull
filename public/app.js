@@ -306,7 +306,7 @@ function render() {
         });
         line.append(edit);
       }
-      if (pr.status === 'OPEN' && pr.canMerge) {
+      if (pr.status === 'OPEN' && pr.canMerge && pr.author.toLowerCase() === viewerLogin.toLowerCase()) {
         const method = { MERGE: 'Merge', SQUASH: 'Squash and merge', REBASE: 'Rebase and merge' }[pr.mergeMethod];
         const merge = element('button', merges.get(pr.id)?.saving ? 'Merging…' : method, 'merge-action');
         merge.type = 'button';

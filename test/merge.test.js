@@ -5,7 +5,7 @@ import { createApp } from '../server.js';
 
 const headOid = 'a'.repeat(40);
 const ready = {
-  __typename: 'PullRequest', id: 'PR_1', state: 'OPEN', isDraft: false,
+  author: { login: 'Alice' }, __typename: 'PullRequest', id: 'PR_1', state: 'OPEN', isDraft: false,
   headRefOid: headOid, mergeable: 'MERGEABLE', mergeStateStatus: 'CLEAN',
   reviewDecision: 'APPROVED', mergeQueue: null, stackEntry: null,
   repository: { viewerPermission: 'WRITE', viewerDefaultMergeMethod: 'SQUASH', squashMergeAllowed: true, mergeCommitAllowed: true },
@@ -16,13 +16,13 @@ function client(pr = ready, result = { id: ready.id, state: 'MERGED', updatedAt:
   const calls = [];
   const github = createGitHub({ getToken: async () => 'mock', fetchImpl: async (url, options) => {
     const body = JSON.parse(options.body); calls.push(body);
-    return Response.json({ data: calls.length === 1 ? { node: pr } : { mergePullRequest: { pullRequest: result } } });
+    return Response.json({ data: calls.length === 1 ? { node: pr, viewer: { login: 'alice' } } : { mergePullRequest: { pullRequest: result } } });
   } });
   return { github, calls };
 }
 
 test('merge readiness excludes blocked, draft, queued, stacked and unauthorized PRs', () => {
-  assert.equal(mergeOptions(ready).canMerge, true);
+  assert.equal(mergeOptions(ready, 'alice').canMerge, true);
   for (const overrides of [
     { state: 'MERGED' }, { isDraft: true }, { mergeable: 'CONFLICTING' }, { mergeable: 'UNKNOWN' },
     ...['BLOCKED', 'BEHIND', 'DIRTY', 'DRAFT', 'UNKNOWN', 'UNSTABLE'].map(mergeStateStatus => ({ mergeStateStatus })),
@@ -31,8 +31,8 @@ test('merge readiness excludes blocked, draft, queued, stacked and unauthorized 
     { repository: { ...ready.repository, viewerPermission: 'READ' } },
     { repository: { viewerPermission: 'ADMIN' } },
     { commits: { nodes: [{ commit: { statusCheckRollup: { state: 'PENDING' } } }] } },
-  ]) assert.equal(mergeOptions({ ...ready, ...overrides }).canMerge, false, JSON.stringify(overrides));
-  assert.equal(mergeOptions({ ...ready, repository: { ...ready.repository, squashMergeAllowed: false } }).mergeMethod, 'MERGE');
+  ]) assert.equal(mergeOptions({ ...ready, ...overrides }, 'alice').canMerge, false, JSON.stringify(overrides));
+  assert.equal(mergeOptions({ ...ready, repository: { ...ready.repository, squashMergeAllowed: false } }, 'alice').mergeMethod, 'MERGE');
 });
 
 test('merge rechecks GitHub and pins mutation to displayed head and method', async () => {
@@ -71,4 +71,16 @@ test('merge endpoint requires same origin and JSON, validates input and clears c
   await fetch(`${origin}/api/pulls`);
   assert.equal(lists, 2);
   assert.equal(merges, 1);
+});
+
+
+test('merge is limited to the authenticated author, including missing authors', async () => {
+  for (const author of [{ login: 'bob' }, null]) {
+    const pr = { ...ready, author };
+    assert.equal(mergeOptions(pr, 'alice').canMerge, false);
+    const { github, calls } = client(pr);
+    await assert.rejects(github.merge(input), { status: 403 });
+    assert.equal(calls.length, 1);
+  }
+  assert.equal(mergeOptions(ready).canMerge, false);
 });
