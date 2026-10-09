@@ -8,6 +8,8 @@ header button { margin-left: auto; }
 .account-controls { margin-left: auto; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
 .account-controls a { font-size: 12px; }
 [hidden] { display: none !important; }
+.signin-button { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 10px 16px; border-radius: 6px; background: light-dark(#0969da, #58a6ff); color: light-dark(#ffffff, #0d1117); font-weight: 600; text-decoration: none; }
+.signin-button:hover { background: light-dark(#0550ae, #79c0ff); }
 form { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; }
 label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 500; color: light-dark(#59636e, #a7b1bd); }
 input, select, button { font: inherit; padding: 6px 10px; border: 1px solid light-dark(#d1d9e0, #3d444d); border-radius: 6px; color: inherit; }
