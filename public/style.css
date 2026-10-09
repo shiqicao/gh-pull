@@ -76,6 +76,5 @@ li { padding: 12px 14px; border-top: 1px solid light-dark(#e8ecf0, #262c36); }
 input:focus, select:focus, textarea:focus { outline: none; }
 @media (max-width: 600px) { body { padding: 12px; } label { flex: 1; } .search { flex-basis: 100%; } select, input { min-width: 0; } .pr-row { grid-template-columns: minmax(0, 1fr); gap: 10px; } }
 
-.merge-action { background: light-dark(#1f883d, #238636); color: white; border: 1px solid #238636; padding: 3px 9px; font-size: 12px; }
-.merge-action:hover:not(:disabled) { filter: brightness(1.1); }
-.merge-action:disabled { opacity: 0.6; cursor: progress; }
+.merge-action { font-size: 12px; }
+.merge-action:disabled { cursor: progress; }
