@@ -1,5 +1,7 @@
 # gh-pull
 
+much better github pr dashboard
+
 A fast local dashboard for your GitHub pull requests. Plain JavaScript, native browser controls, minimal CSS, and a Node server. No runtime dependencies, installation, or build step.
 
 ![gh-pull dashboard showing fictional demo pull requests](docs/demo.png)

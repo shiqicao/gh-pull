@@ -9,7 +9,7 @@ label { display: flex; flex-direction: column; gap: 5px; font-size: 13px; }
 input, select, button { font: inherit; padding: 7px 10px; }
 button, summary { cursor: pointer; }
 .search { flex: 1; min-width: 230px; }
-.hint, #summary, #viewer { color: light-dark(#59636e, #a7b1bd); font-size: 13px; }
+.hint, #summary { color: light-dark(#59636e, #a7b1bd); font-size: 13px; }
 details { margin: 16px 0; border: 1px solid light-dark(#d1d9e0, #3d444d); border-radius: 4px; }
 summary { padding: 12px; font-weight: 600; overflow-wrap: anywhere; }
 ul { list-style: none; padding: 0; margin: 0; }

@@ -422,7 +422,6 @@ async function load({ append = false, refresh = false } = {}) {
     total = data.total; cursor = data.pageInfo.endCursor; more = data.pageInfo.hasNextPage;
     limited = data.limited;
     if (limited && items.length >= 1000) more = false;
-    $('viewer').textContent = data.viewer;
     $('updated').textContent = `Fetched ${new Date().toLocaleTimeString()}.`;
   } catch (error) {
     if (current !== generation || error.name === 'AbortError') return;
