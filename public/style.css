@@ -28,7 +28,13 @@ input::placeholder { color: light-dark(#6e7781, #9198a1); }
 button { background: light-dark(#f6f8fa, #21262d); }
 button:hover:not(:disabled) { border-color: light-dark(#afb8c1, #656c76); }
 button:disabled { cursor: default; opacity: 0.6; }
-#refresh, #more { font-size: 13px; font-weight: 500; }
+#more { font-size: 13px; font-weight: 500; }
+#refresh { display: inline-flex; align-items: center; justify-content: center; width: 34px; height: 34px; padding: 7px; }
+#refresh svg { width: 18px; height: 18px; }
+#refresh[aria-busy="true"] { cursor: progress; }
+#refresh[aria-busy="true"] svg { animation: refresh-spin 1s linear infinite; }
+@keyframes refresh-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { #refresh[aria-busy="true"] svg { animation: none; } }
 button, summary { cursor: pointer; }
 .search { flex: 1; min-width: 230px; }
 .hint, #summary { color: light-dark(#59636e, #a7b1bd); font-size: 13px; }

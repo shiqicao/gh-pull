@@ -57,7 +57,10 @@ async function apiFetch(url, options) {
 
 function updateRefreshButton() {
   $('refresh').disabled = loading;
-  $('refresh').textContent = loading ? 'Refreshing…' : `Refresh (${Math.max(0, Math.ceil((nextRefreshAt - Date.now()) / 1000))}s)`;
+  const label = loading ? 'Refreshing…' : `Refresh (auto refresh in ${Math.max(0, Math.ceil((nextRefreshAt - Date.now()) / 1000))}s)`;
+  $('refresh').title = label;
+  $('refresh').setAttribute('aria-label', label);
+  $('refresh').setAttribute('aria-busy', String(loading));
 }
 const collapsed = new Set();
 const titleEdits = new Map();
