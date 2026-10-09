@@ -87,8 +87,18 @@ function element(tag, text, className) {
 
 function badge(text, kind) { return element('span', text, `badge ${kind.toLowerCase()}`); }
 
+function usernameLink(username, className = '') {
+  // Team names and the missing-author placeholder are not user profiles.
+  if (username === 'deleted-user' || !/^[a-z\d](?:[a-z\d-]*[a-z\d])?$/i.test(username)) return element('span', username, className);
+  const link = element('a', username, `${className} username-link`.trim());
+  link.href = `https://github.com/${encodeURIComponent(username)}`;
+  link.target = '_blank'; link.rel = 'noopener noreferrer';
+  link.setAttribute('aria-label', `${username}'s GitHub profile (opens in a new tab)`);
+  return link;
+}
+
 function usernameBadge(username) {
-  const name = badge(username, 'author');
+  const name = usernameLink(username, 'badge author');
   name.style.setProperty('--author-hue', nameColors[username.toLowerCase()] * 360 / NAME_COLOR_COUNT);
   return name;
 }
@@ -222,6 +232,7 @@ function render() {
     section.addEventListener('toggle', () => section.open ? collapsed.delete(key) : collapsed.add(key));
     const heading = element('summary');
     if ($('group').value === 'repo') heading.append(repositoryLink(name), document.createTextNode(` (${prs.length})`));
+    else if ($('group').value === 'author') heading.append(usernameLink(name), document.createTextNode(` (${prs.length})`));
     else heading.textContent = `${labels[name] ?? name} (${prs.length})`;
     section.append(heading);
     const list = element('ul');
@@ -330,7 +341,7 @@ function render() {
       }
       if (pr.status === 'OPEN' && pr.canMerge && pr.author.toLowerCase() === viewerLogin.toLowerCase()) {
         const method = { MERGE: 'Merge', SQUASH: 'Squash and merge', REBASE: 'Rebase and merge' }[pr.mergeMethod];
-        const merge = element('button', merges.get(pr.id)?.saving ? 'Merging…' : method, 'merge-action');
+        const merge = element('button', merges.get(pr.id)?.saving ? 'Merging…' : method, 'badge open merge-action');
         merge.type = 'button';
         merge.title = `${method} ${pr.repo} #${pr.number}`;
         merge.disabled = Boolean(merges.get(pr.id)?.saving || draftChanges.get(pr.id)?.saving || titleEdits.has(pr.id));
@@ -410,7 +421,11 @@ function render() {
       hands.setAttribute('d', 'M8 4v4l2.5 1.5');
       clock.append(face, hands);
       time.append(clock, document.createTextNode(age));
-      meta.append(time, element('span', `+${pr.additions}`, 'additions'), element('span', `−${pr.deletions}`, 'deletions'));
+      const diffCounts = element('span', undefined, 'diff-counts');
+      diffCounts.title = `${pr.additions} additions, ${pr.deletions} deletions`;
+      diffCounts.setAttribute('aria-label', diffCounts.title);
+      diffCounts.append(element('span', String(pr.additions), 'additions success'), element('span', String(pr.deletions), 'deletions failure'));
+      meta.append(time, diffCounts);
       for (const label of pr.labels) meta.append(badge(label, 'label'));
       const content = element('div', undefined, 'pr-content');
       content.append(line);
@@ -546,6 +561,7 @@ async function initializeSession() {
     authenticated = session.authenticated;
     $('signin').hidden = authenticated;
     $('dashboard').hidden = !authenticated;
+    $('links-hint').hidden = !authenticated;
     $('refresh').hidden = !authenticated;
     $('logout').hidden = authMode !== 'github-app' || !authenticated;
     $('install').hidden = !session.installUrl;

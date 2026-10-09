@@ -75,7 +75,8 @@ Install the app on the repositories it should access. Private repositories must 
 - **Check progress:** Pending badges show passed/total counts, such as **Checks pending · 1/8**. Only successful checks count as passed; skipped and neutral checks do not. Failed-check badges link to GitHub's checks page.
 - **Background refresh:** Refreshes 60 seconds after each load finishes. The button counts down and shows a disabled **Refreshing…** state while fetching. Existing PRs stay visible until fresh data arrives, including when a refresh fails.
 - **Viewed tracking:** New updates have brighter, bolder titles. Opening a PR, diff, or checks link marks the displayed update as viewed. Newer updates highlight it again; tracking is per GitHub account and synchronized across dashboard tabs.
-- **Quick links and copying:** Open PRs, repositories, and diffs in new tabs. Copy PR URLs or branch names with confirmation feedback.
+- **Quick links and copying:** Open PRs, repositories, diffs, and user profiles in new tabs. Usernames keep their existing appearance and show a pointer cursor. Copy PR URLs or branch names with confirmation feedback.
+- **Feedback:** Use **Report an issue** in the footer to open this repository's GitHub issue form.
 - **Appearance:** Responsive layout, keyboard-accessible controls, and system light/dark colors.
 
 ### PR actions
@@ -84,7 +85,7 @@ Actions apply to your own PRs and require GitHub write permissions:
 
 - **Edit a title:** Select the pencil icon. Save or Enter submits; Cancel or Escape discards. Titles must be 1–256 characters on one line. Failed saves retain the draft, and the server checks whether the title changed on GitHub before updating it.
 - **Change draft status:** Select **Open** to convert a PR to draft, or **Draft** to mark it ready for review. The badge changes after GitHub confirms. Refresh to update merge readiness afterward.
-- **Merge:** Eligible PRs show a green button with the repository's preferred merge method. The server rechecks permissions and readiness and pins the merge to the displayed commit. Drafts, blocked PRs, merge queues, and stacked PRs do not show this action.
+- **Merge:** Eligible PRs show a button with the repository's preferred merge method. The server rechecks permissions and readiness and pins the merge to the displayed commit. Drafts, blocked PRs, merge queues, and stacked PRs do not show this action.
 
 ## Data and sessions
 
