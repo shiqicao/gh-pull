@@ -623,7 +623,9 @@ async function initializeSession() {
         commit.href = session.version.url;
         commit.target = '_blank'; commit.rel = 'noopener noreferrer';
       }
-      version.append('version ', commit);
+      const separator = element('span', ' | ');
+      separator.setAttribute('aria-hidden', 'true');
+      version.append('version ', commit, separator);
     }
     authMode = session.mode;
     authenticated = session.authenticated;
