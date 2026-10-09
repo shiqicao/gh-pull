@@ -101,6 +101,10 @@ GitHub App tokens remain on the server; the browser receives an opaque HttpOnly 
 
 Sessions, login attempts, and caches are held in memory in a single server process. Restarting ends sessions. A shared session store would be needed for multiple server instances. GitHub Enterprise hosts are not supported.
 
+## Privacy and third-party services
+
+See the [Privacy Policy](PRIVACY.md) for data handling, retention, and user controls, [Third-party services](THIRD_PARTY_SERVICES.md) for GitHub and Railway dependencies, and [Transparency disclosures](TRANSPARENCY.md) for security mechanisms and the scope of compliance claims.
+
 ## Verify
 
 ```sh
