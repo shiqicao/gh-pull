@@ -13,7 +13,15 @@ const assets = new Map([
   ['/favicon.svg', ['favicon.svg', 'image/svg+xml']],
 ]);
 
-export function createApp({ list = createGitHub(), updateTitle = list.updateTitle, convertToDraft = list.convertToDraft, markReadyForReview = list.markReadyForReview, merge = list.merge, config = { mode: 'local' }, authOptions } = {}) {
+export function createApp({ list = createGitHub(), updateTitle = list.updateTitle, convertToDraft = list.convertToDraft, markReadyForReview = list.markReadyForReview, merge = list.merge, config = { mode: 'local' }, authOptions, deploymentEnv = process.env } = {}) {
+  const sha = deploymentEnv.RAILWAY_GIT_COMMIT_SHA;
+  const owner = deploymentEnv.RAILWAY_GIT_REPO_OWNER;
+  const repo = deploymentEnv.RAILWAY_GIT_REPO_NAME;
+  const version = /^[a-f0-9]{40}$/i.test(sha ?? '') ? {
+    sha,
+    url: /^[a-z0-9-]+$/i.test(owner ?? '') && /^[a-z0-9_.-]+$/i.test(repo ?? '')
+      ? `https://github.com/${owner}/${repo}/commit/${sha}` : null,
+  } : null;
   const localCache = new Map();
   const auth = config.mode === 'github-app' ? createAuth(config, authOptions) : null;
   return createServer(async (req, res) => {
@@ -33,8 +41,9 @@ export function createApp({ list = createGitHub(), updateTitle = list.updateTitl
     if ((req.headers.origin && req.headers.origin !== origin && !navigation) ||
         (req.headers['sec-fetch-site'] === 'cross-site' && !navigation)) return send(403, { error: 'Same-origin requests only.' });
     try {
-      if (auth && await auth.handle(req, res, url, send)) return;
-      if (!auth && req.method === 'GET' && url.pathname === '/api/session') return send(200, { mode: 'local', authenticated: true });
+      const sessionSend = (status, body) => send(status, url.pathname === '/api/session' && status === 200 && version ? { ...body, version } : body);
+      if (auth && await auth.handle(req, res, url, sessionSend)) return;
+      if (!auth && req.method === 'GET' && url.pathname === '/api/session') return sessionSend(200, { mode: 'local', authenticated: true });
       const session = auth && url.pathname.startsWith('/api/') ? auth.session(req) : null;
       if (auth && url.pathname.startsWith('/api/') && !session) throw new ApiError('Please sign in with GitHub.', 401);
       const activeList = session ? session.list : list;
