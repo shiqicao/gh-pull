@@ -557,6 +557,7 @@ async function initializeSession() {
     authenticated = session.authenticated;
     $('signin').hidden = authenticated;
     $('dashboard').hidden = !authenticated;
+    $('links-hint').hidden = !authenticated;
     $('refresh').hidden = !authenticated;
     $('logout').hidden = authMode !== 'github-app' || !authenticated;
     $('install').hidden = !session.installUrl;
