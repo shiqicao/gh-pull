@@ -6,7 +6,6 @@ h1 { font-size: 24px; font-weight: 650; letter-spacing: -0.6px; margin: 0; }
 .subtitle { margin: 4px 0 0; font-size: 13px; color: light-dark(#59636e, #a7b1bd); }
 header button { margin-left: auto; }
 .account-controls { margin-left: auto; display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 8px; }
-.account-controls a { font-size: 12px; }
 [hidden] { display: none !important; }
 .signin-button { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 10px 16px; border-radius: 6px; background: light-dark(#0969da, #58a6ff); color: light-dark(#ffffff, #0d1117); font-weight: 600; text-decoration: none; }
 .signin-button:hover { background: light-dark(#0550ae, #79c0ff); }
@@ -23,11 +22,12 @@ body:has(#signin:not([hidden])) .dashboard-footer { max-width: 480px; margin: 0 
 body:has(#signin:not([hidden])) #links-hint { display: none; }
 form { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; }
 label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 500; color: light-dark(#59636e, #a7b1bd); }
-input, select, button { font: inherit; padding: 6px 10px; border: 1px solid light-dark(#d1d9e0, #3d444d); border-radius: 6px; color: inherit; }
+input, select, button, .button-link { font: inherit; padding: 6px 10px; border: 1px solid light-dark(#d1d9e0, #3d444d); border-radius: 6px; color: inherit; }
 input, select { height: 34px; font-size: 13px; font-weight: 400; color: light-dark(#1f2328, #e6edf3); background: light-dark(#ffffff, #0d1117); }
 input::placeholder { color: light-dark(#6e7781, #9198a1); }
-button { background: light-dark(#f6f8fa, #21262d); }
-button:hover:not(:disabled) { border-color: light-dark(#afb8c1, #656c76); }
+button, .button-link { background: light-dark(#f6f8fa, #21262d); }
+button:hover:not(:disabled), .button-link:hover { border-color: light-dark(#afb8c1, #656c76); }
+.button-link { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
 button:disabled { cursor: default; opacity: 0.6; }
 #more { font-size: 13px; font-weight: 500; }
 #refresh { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; padding: 2px; border-radius: 50%; }
