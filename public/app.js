@@ -3,13 +3,6 @@ import { assignNameColors, NAME_COLOR_COUNT, groupPulls, labels, relativeTime, n
 const $ = id => document.getElementById(id);
 const controls = ['scope', 'state', 'search', 'group', 'sort'];
 const params = new URLSearchParams(location.search);
-const demoMode = params.get('demo') === '1';
-const demoClient = demoMode ? (await import('./demo.js')).createDemoClient() : null;
-const apiFetch = (path, options) => demoClient ? demoClient.request(path, options) : fetch(path, options);
-if (demoMode) {
-  $('scope').value = 'involved'; $('state').value = 'all';
-  document.title = 'gh-pull · Demo';
-}
 for (const id of controls) {
   const input = $(id), value = params.get(id);
   if (value !== null && (id === 'search' || [...input.options].some(option => option.value === value))) input.value = value;
@@ -19,7 +12,7 @@ const collapsed = new Set();
 const titleEdits = new Map();
 const draftChanges = new Map();
 let viewerLogin = '';
-const nameColorKey = demoMode ? 'gh-pull.demo.name-colors.v1' : 'gh-pull.name-colors.v1';
+const nameColorKey = 'gh-pull.name-colors.v1';
 let nameColors = assignNameColors([]);
 try { nameColors = assignNameColors([], JSON.parse(localStorage.getItem(nameColorKey))); } catch { /* Session colors still work if storage is unavailable. */ }
 let viewedKey = null, viewedUpdates = {};
@@ -93,7 +86,7 @@ async function changeDraftStatus(pr) {
   const change = { saving: true, error: '' };
   draftChanges.set(pr.id, change); render();
   try {
-    const response = await apiFetch(toDraft ? '/api/pulls/draft' : '/api/pulls/ready', {
+    const response = await fetch(toDraft ? '/api/pulls/draft' : '/api/pulls/ready', {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: pr.id }), signal: AbortSignal.timeout(65_000),
     });
@@ -147,7 +140,7 @@ function titleEditor(pr) {
     if (draft.saving || !draft.value.trim() || draft.value.trim() === draft.expectedTitle) return;
     draft.saving = true; draft.error = ''; render();
     try {
-      const response = await apiFetch('/api/pulls/title', {
+      const response = await fetch('/api/pulls/title', {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: pr.id, title: draft.value.trim(), expectedTitle: draft.expectedTitle }),
         signal: AbortSignal.timeout(65_000),
@@ -410,14 +403,14 @@ async function load({ append = false, refresh = false } = {}) {
   if (append && cursor) query.set('cursor', cursor);
   if (refresh) query.set('refresh', '1');
   try {
-    const response = await apiFetch(`/api/pulls?${query}`, { signal: controller.signal });
+    const response = await fetch(`/api/pulls?${query}`, { signal: controller.signal });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || 'Could not load pull requests.');
     if (current !== generation) return;
-    const nextViewedKey = `gh-pull.${demoMode ? 'demo.' : ''}viewed.v1:${data.viewer.toLowerCase()}`;
+    const nextViewedKey = `gh-pull.viewed.v1:${data.viewer.toLowerCase()}`;
     if (viewedKey !== nextViewedKey) {
       viewedKey = nextViewedKey;
-      viewedUpdates = { ...demoClient?.initialViewed };
+      viewedUpdates = {};
       titleEdits.clear();
       draftChanges.clear();
     }
@@ -429,7 +422,7 @@ async function load({ append = false, refresh = false } = {}) {
     total = data.total; cursor = data.pageInfo.endCursor; more = data.pageInfo.hasNextPage;
     limited = data.limited;
     if (limited && items.length >= 1000) more = false;
-    $('viewer').textContent = demoMode ? `${data.viewer} · demo` : data.viewer;
+    $('viewer').textContent = data.viewer;
     $('updated').textContent = `Fetched ${new Date().toLocaleTimeString()}.`;
   } catch (error) {
     if (current !== generation || error.name === 'AbortError') return;
@@ -442,7 +435,6 @@ async function load({ append = false, refresh = false } = {}) {
 
 function saveFilters() {
   const query = new URLSearchParams(controls.map(id => [id, $(id).value]).filter(([, value]) => value));
-  if (demoMode) query.set('demo', '1');
   history.replaceState(null, '', `?${query}`);
 }
 $('filters').addEventListener('submit', event => event.preventDefault());

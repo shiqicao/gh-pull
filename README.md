@@ -17,10 +17,6 @@ Open <http://localhost:3000>. The server reads your existing GitHub CLI credenti
 
 Set `PORT` to change the port. Both `npm start` and `npm run dev` automatically restart the server when backend files change; reload the browser to pick up frontend edits. Use `node server.js` if you specifically want to disable automatic restarts.
 
-## Demo
-
-For screenshots or a quick preview, run `npm start` and open [demo mode](http://localhost:3000/?demo=1). It shows seven fictional PRs across three repositories, with sample authors, reviewers, branches, checks, and statuses. No GitHub login is needed and no GitHub API requests are made. Title edits and draft changes are simulated in memory and reset when you reload. Demo colors and viewed state use separate browser storage; GitHub links are illustrative. Remove `?demo=1` to return to your real PRs.
-
 ## Features
 
 - Created by me, involving me, and review-requested views.
