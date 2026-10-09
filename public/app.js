@@ -367,7 +367,7 @@ function render() {
         checks.setAttribute('aria-label', `Checks failed: view checks for ${pr.title} (opens in a new tab)`);
       }
       const author = usernameBadge(pr.author);
-      const repo = element('span');
+      const repo = element('span', undefined, 'badge');
       repo.append(repositoryLink(pr.repo), document.createTextNode(` #${pr.number}`));
       meta.append(repo, author, checks);
       if (pr.branch) {
