@@ -596,6 +596,18 @@ async function initializeSession() {
     const response = await fetch('/api/session');
     if (!response.ok) throw new Error('Could not connect. Please retry.');
     const session = await response.json();
+    const version = $('deployed-version');
+    version.replaceChildren();
+    version.hidden = !session.version;
+    if (session.version) {
+      const commit = element(session.version.url ? 'a' : 'span', session.version.sha.slice(0, 7));
+      commit.title = `Deployed commit: ${session.version.sha}`;
+      if (session.version.url) {
+        commit.href = session.version.url;
+        commit.target = '_blank'; commit.rel = 'noopener noreferrer';
+      }
+      version.append('version ', commit);
+    }
     authMode = session.mode;
     authenticated = session.authenticated;
     $('signin').hidden = authenticated;
