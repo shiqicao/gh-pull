@@ -4,7 +4,11 @@ much better github pr dashboard
 
 A fast GitHub pull request dashboard with two authentication modes: use your existing GitHub CLI login locally, or sign in through a GitHub App. Both modes share the same UI and PR actions.
 
-Plain JavaScript, native browser controls, and a Node server. No runtime dependencies or build step. Requires **Node.js 22+** and a **GitHub.com** account.
+**[Open the hosted dashboard](https://gh-pull.up.railway.app/)** and sign in with GitHub—no local setup required.
+
+If you can't get your organization's approval for the hosted GitHub App, you can [host it yourself in local mode](#local-mode) using your existing GitHub CLI login or a personal access token with access to your repositories. Your organization's token and SSO policies still apply.
+
+Plain JavaScript, native browser controls, and a Node server. No runtime dependencies or build step. A **GitHub.com** account is required; running it yourself also requires **Node.js 22+**.
 
 ![gh-pull dashboard showing fictional demo pull requests](docs/demo.png)
 
