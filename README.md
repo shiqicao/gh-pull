@@ -48,7 +48,7 @@ Repository permissions for the full feature set:
 
 Metadata read access is included by GitHub. Read-only Pull requests and Contents permissions can be used if write actions are not needed; GitHub rejects writes without the corresponding permission.
 
-Keep user access token expiration enabled. Webhooks and an app private key are not needed. Leave “Request user authorization (OAuth) during installation” disabled: sign-in starts from the dashboard with browser-bound state and PKCE.
+Keep user access token expiration enabled. An app private key and repository webhooks are not needed. The optional Marketplace webhook is described below. Leave “Request user authorization (OAuth) during installation” disabled: sign-in starts from the dashboard with browser-bound state and PKCE.
 
 Install the app on the repositories it should access. Private repositories must be accessible to both the app and the signed-in user; organization access may require administrator approval or an active SSO session. Set the optional app slug to enable **Install GitHub App** and **Manage repository access** links. Installation and repository approval take place on GitHub; return here and refresh afterward. See [GitHub's authorization documentation](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app/generating-a-user-access-token-for-a-github-app).
 
@@ -64,8 +64,19 @@ Install the app on the repositories it should access. Private repositories must 
 | `GITHUB_APP_CLIENT_ID` | — | Required in GitHub App mode; client ID, not app ID |
 | `GITHUB_APP_CLIENT_SECRET` | — | Required in GitHub App mode; kept on the server |
 | `GITHUB_APP_SLUG` | — | Optional app slug for the repository access link |
+| `GITHUB_MARKETPLACE_WEBHOOK_SECRET` | — | Optional shared secret for signed Marketplace deliveries in GitHub App mode |
 
 `PUBLIC_URL` requires HTTPS, except for HTTP localhost development. Its host must match incoming requests, and its `/auth/callback` URL must match the GitHub App registration. Use the same hostname throughout login; `localhost` and `127.0.0.1` are distinct.
+
+## Marketplace webhook
+
+GitHub App mode provides `POST /webhooks/marketplace`. It requires `application/json` and a valid `X-Hub-Signature-256` computed with `GITHUB_MARKETPLACE_WEBHOOK_SECRET`. Configure the same secret in the Marketplace listing's webhook settings. Without the secret, the endpoint returns 503; local mode returns 404. This endpoint uses signature authentication rather than browser cookies; browser API origin checks remain in place.
+
+The handler accepts signed `ping` events and effective purchases/cancellations for **free plans**. Purchases need no additional entitlement: users install the app and sign in through the existing OAuth flow. Use `PUBLIC_URL/auth/login` as the Marketplace setup URL. Paid plans, trials, and plan changes are not implemented and unsupported purchase actions return 422.
+
+Cancellations immediately disable matching in-memory sessions and clear their PR caches, then revoke their GitHub user tokens. Matching includes the purchasing user's numeric GitHub ID and sessions known to have accessed the account's repositories. Organization matching uses repository owners observed by this process, not an organization membership directory. This ends existing sessions; it does not prevent a later sign-in to the free dashboard or uninstall the GitHub App.
+
+Delivery IDs and payload hashes are kept in memory for 24 hours (up to 1,000 entries), with expired entries removed on subsequent deliveries. Duplicate deliveries share processing. Failed revocations return an error and retain inaccessible credentials until retry or session expiry. Monitor failed deliveries and [redeliver them from GitHub](https://docs.github.com/en/webhooks/testing-and-troubleshooting-webhooks/redelivering-webhooks); GitHub does not automatically retry. State is process-local and lost on restart: this is not a durable billing system or a shared queue for multiple instances.
 
 ## Features
 

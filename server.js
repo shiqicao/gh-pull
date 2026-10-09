@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { createGitHub, ApiError, validateTitleUpdate, validateDraftUpdate, validateMerge } from './github.js';
 import { authConfig, createAuth } from './auth.js';
+import { createMarketplaceWebhook } from './marketplace.js';
 
 const assets = new Map([
   ['/', ['index.html', 'text/html']],
@@ -24,6 +25,7 @@ export function createApp({ list = createGitHub(), updateTitle = list.updateTitl
   } : null;
   const localCache = new Map();
   const auth = config.mode === 'github-app' ? createAuth(config, authOptions) : null;
+  const marketplace = auth ? createMarketplaceWebhook({ secret: config.marketplaceWebhookSecret, cancel: auth.cancelMarketplace }) : null;
   return createServer(async (req, res) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'no-referrer');
@@ -37,6 +39,11 @@ export function createApp({ list = createGitHub(), updateTitle = list.updateTitl
     try { url = new URL(req.url, origin); }
     catch { return send(400, { error: 'Invalid request URL.' }); }
     if (url.origin !== origin) return send(403, { error: 'Invalid request origin.' });
+    if (url.pathname === '/webhooks/marketplace') {
+      if (!marketplace) return send(404, { error: 'Not found.' });
+      try { return send(200, await marketplace(req)); }
+      catch (error) { return send(error instanceof ApiError ? error.status : 500, { error: error instanceof ApiError ? error.message : 'Webhook processing failed. Redeliver to retry.' }); }
+    }
     const navigation = auth && req.method === 'GET' && ['/', '/auth/login', '/auth/callback'].includes(url.pathname);
     if ((req.headers.origin && req.headers.origin !== origin && !navigation) ||
         (req.headers['sec-fetch-site'] === 'cross-site' && !navigation)) return send(403, { error: 'Same-origin requests only.' });

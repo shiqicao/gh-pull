@@ -1,16 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { request } from 'node:http';
-import { createHash } from 'node:crypto';
+import { createHash, createHmac } from 'node:crypto';
 import { authConfig } from '../auth.js';
 import { createApp } from '../server.js';
 import { createGitHub } from '../github.js';
 
-async function fixture(t, { secure = false, mergeable = false } = {}) {
+async function fixture(t, { secure = false, mergeable = false, marketplace = false } = {}) {
   let clock = Date.now();
   const config = authConfig({ AUTH_MODE: 'github-app', PUBLIC_URL: secure ? 'https://dashboard.example' : 'http://localhost',
-    GITHUB_APP_CLIENT_ID: 'client-id', GITHUB_APP_CLIENT_SECRET: 'secret-not-for-browser', GITHUB_APP_SLUG: 'gh-pull' });
-  const exchanges = [], calls = [];
+    GITHUB_APP_CLIENT_ID: 'client-id', GITHUB_APP_CLIENT_SECRET: 'secret-not-for-browser', GITHUB_APP_SLUG: 'gh-pull', GITHUB_MARKETPLACE_WEBHOOK_SECRET: marketplace ? 'webhook-test' : undefined });
+  const exchanges = [], calls = [], revocations = [];
+  let revocationFailure = false;
   let failRefresh = false, revoked = false;
   const fetchImpl = async (url, options) => {
     if (url.endsWith('/login/oauth/access_token')) {
@@ -21,7 +22,12 @@ async function fixture(t, { secure = false, mergeable = false } = {}) {
       return Response.json({ access_token: `access:${user}:${exchanges.length}`, expires_in: 3600,
         refresh_token: `refresh:${user}`, refresh_token_expires_in: 86400 });
     }
+    if (url.endsWith('/token') && options.method === 'DELETE') {
+      if (revocationFailure) return new Response('', { status: 503 });
+      revocations.push(JSON.parse(options.body).access_token);return new Response(null, { status: 204 });
+    }
     const user = options.headers.Authorization.split(':')[1];
+    if (url === 'https://api.github.com/user') return Response.json({ id: user === 'alice' ? 1 : 2, login: user });
     if (url.includes('/user/installations')) {
       if (url.includes('/repositories?')) return Response.json({ repositories: [{ full_name: 'team/repo' }] });
       return Response.json({ installations: user === 'alice' ? [{ id: 12, account: { login: 'team' }, permissions: { contents: 'write' } }] : [] });
@@ -63,7 +69,7 @@ async function fixture(t, { secure = false, mergeable = false } = {}) {
     assert.equal(response.headers.location, '/');
     return { cookie: cookies(response), response, start };
   }
-  return { call, begin, login, config, exchanges, calls, advance: ms => { clock += ms; }, revoke: () => { revoked = true; }, failRefresh: () => { failRefresh = true; } };
+  return { call, begin, login, config, exchanges, calls, revocations, failRevocation: value => { revocationFailure = value; }, advance: ms => { clock += ms; }, revoke: () => { revoked = true; }, failRefresh: () => { failRefresh = true; } };
 }
 
 test('authentication config defaults to local and rejects incomplete or unsafe hosted configuration', () => {
@@ -214,4 +220,45 @@ test('hosted list keeps mergeability and checks installation access separately f
   assert.equal(a.canMerge, true);assert.equal(a.mergeAccess.allowed, true);
   assert.equal(b.canMerge, true);assert.equal(b.mergeAccess.reason, 'not_installed');
   assert.equal(b.mergeAccess.url, 'https://github.com/apps/gh-pull/installations/new');
+});
+
+
+function marketplaceCancellation(f, account, id = 'cancel-1') {
+  const body = JSON.stringify({ action: 'cancelled', effective_date: '2026-01-01T00:00:00Z', marketplace_purchase: { account, plan: { price_model: 'FREE' } } });
+  return f.call('/webhooks/marketplace', { method: 'POST', body, headers: { 'content-type': 'application/json', 'x-github-event': 'marketplace_purchase', 'x-github-delivery': id, 'x-hub-signature-256': 'sha256=' + createHmac('sha256', 'webhook-test').update(body).digest('hex') } });
+}
+
+test('Marketplace cancellation revokes affected user sessions without ending unrelated sessions', async t => {
+  const f = await fixture(t, { marketplace: true });
+  const alice = await f.login('alice'), bob = await f.login('bob');
+  assert.equal((await marketplaceCancellation(f, { id: 1, login: 'alice', type: 'User' })).status, 200);
+  assert.deepEqual(f.revocations, ['access:alice:1']);
+  assert.equal((await f.call('/api/session', { headers: { cookie: alice.cookie } })).json().authenticated, false);
+  assert.equal((await f.call('/api/session', { headers: { cookie: bob.cookie } })).json().authenticated, true);
+  assert.equal((await marketplaceCancellation(f, { id: 1, login: 'alice', type: 'User' })).status, 200);
+  assert.equal(f.revocations.length, 1);
+});
+
+test('organization cancellation clears sessions that loaded its PRs, and failed token revocations remain retryable', async t => {
+  const f = await fixture(t, { marketplace: true, mergeable: true });
+  const alice = await f.login('alice'), bob = await f.login('bob');
+  await f.call('/api/pulls', { headers: { cookie: alice.cookie } });
+  f.failRevocation(true);
+  const account = { id: 3, login: 'team', type: 'Organization' };
+  assert.equal((await marketplaceCancellation(f, account)).status, 502);
+  assert.equal((await f.call('/api/session', { headers: { cookie: alice.cookie } })).json().authenticated, false);
+  assert.equal((await f.call('/api/session', { headers: { cookie: bob.cookie } })).json().authenticated, true);
+  f.failRevocation(false);
+  assert.equal((await f.call('/api/pulls', { headers: { cookie: alice.cookie } })).status, 401);
+  assert.equal((await f.call('/auth/logout', { method: 'POST', headers: { cookie: alice.cookie, origin: f.config.origin } })).status, 200);
+  assert.equal((await marketplaceCancellation(f, account)).status, 200);
+  assert.deepEqual(f.revocations, ['access:alice:1']);
+});
+
+test('Marketplace cancellation refreshes expired access tokens before revoking them', async t => {
+  const f = await fixture(t, { marketplace: true });
+  await f.login('alice');
+  f.advance(3600_000);
+  assert.equal((await marketplaceCancellation(f, { id: 1, login: 'alice', type: 'User' })).status, 200);
+  assert.deepEqual(f.revocations, ['access:alice:2']);
 });
