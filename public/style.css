@@ -64,7 +64,7 @@ li { padding: 12px 14px; border-top: 1px solid light-dark(#e8ecf0, #262c36); }
 .badge.author { color: light-dark(oklch(42% 0.12 var(--author-hue)), oklch(82% 0.12 var(--author-hue))); background: light-dark(oklch(96% 0.03 var(--author-hue)), oklch(25% 0.05 var(--author-hue))); font-weight: 600; }
 .badge.review-status { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; width: 16px; height: 16px; padding: 0; border-radius: 50%; font-weight: 700; }
 .review-status.commented { color: light-dark(#0969da, #79c0ff); background: light-dark(#ddf4ff, #152e49); }
-.open, .success, .approved { background: light-dark(#dafbe1, #12361f); color: light-dark(#116329, #7ee787); }
+.open, .success, .approved, .merge-action { background: light-dark(#dafbe1, #12361f); color: light-dark(#116329, #7ee787); }
 .merged { background: light-dark(#fbefff, #352044); color: light-dark(#8250df, #d2a8ff); }
 .closed, .failure, .error, .changes_requested { background: light-dark(#ffebe9, #481d22); color: light-dark(#a40e26, #ffa198); }
 .pending, .expected, .review_required { background: light-dark(#fff8c5, #3c3010); color: light-dark(#7d4e00, #eac54f); }
