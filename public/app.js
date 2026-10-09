@@ -424,7 +424,7 @@ function render() {
       const diffCounts = element('span', undefined, 'diff-counts');
       diffCounts.title = `${pr.additions} additions, ${pr.deletions} deletions`;
       diffCounts.setAttribute('aria-label', diffCounts.title);
-      diffCounts.append(element('span', String(pr.additions), 'additions'), document.createTextNode('/'), element('span', String(pr.deletions), 'deletions'));
+      diffCounts.append(element('span', String(pr.additions), 'additions success'), element('span', String(pr.deletions), 'deletions failure'));
       meta.append(time, diffCounts);
       for (const label of pr.labels) meta.append(badge(label, 'label'));
       const content = element('div', undefined, 'pr-content');
