@@ -55,13 +55,6 @@ async function apiFetch(url, options) {
   return response;
 }
 
-function setTooltip(control, text) {
-  control.classList.add('has-tooltip');
-  control.dataset.tooltip = text;
-  control.addEventListener('keydown', event => { if (event.key === 'Escape') control.dataset.tooltipDismissed = 'true'; });
-  for (const event of ['mouseleave', 'blur']) control.addEventListener(event, () => { delete control.dataset.tooltipDismissed; });
-}
-
 function updateRefreshButton() {
   $('refresh').disabled = loading;
   $('refresh').textContent = loading ? 'Refreshing…' : `Refresh (${Math.max(0, Math.ceil((nextRefreshAt - Date.now()) / 1000))}s)`;
@@ -300,7 +293,7 @@ function render() {
         const pending = draftChanges.get(pr.id)?.saving ?? false;
         const status = element('button', pending ? 'Updating…' : labels[pr.status], `badge ${pr.status.toLowerCase()} draft-action`);
         status.type = 'button'; status.disabled = pending || Boolean(merges.get(pr.id)?.saving);
-        setTooltip(status, pr.status === 'OPEN' ? 'Convert to draft' : 'Mark ready for review');
+        status.title = pr.status === 'OPEN' ? 'Convert to draft' : 'Mark ready for review';
         status.setAttribute('aria-label', pr.status === 'OPEN' ? `Convert ${pr.title} to draft` : `Mark ${pr.title} ready for review`);
         status.addEventListener('click', () => changeDraftStatus(pr));
         line.append(status);
