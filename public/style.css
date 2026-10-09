@@ -67,7 +67,7 @@ li { padding: 12px 14px; border-top: 1px solid light-dark(#e8ecf0, #262c36); }
 .draft-action:hover:not(:disabled), .merge-action:hover:not(:disabled) { outline: 1px solid currentColor; }
 .draft-action:disabled, .merge-action:disabled { cursor: progress; opacity: 0.7; }
 .draft-action { position: relative; }
-.draft-action::after { content: attr(data-tooltip); display: none; position: absolute; left: 0; bottom: calc(100% + 6px); z-index: 2; padding: 5px 8px; border-radius: 6px; background: light-dark(#1f2328, #e6edf3); color: light-dark(#ffffff, #0d1117); font-size: 12px; font-weight: 400; white-space: nowrap; }
+.draft-action::after { content: attr(data-tooltip); display: none; position: absolute; left: 0; bottom: calc(100% + 6px); z-index: 2; padding: 6px 10px; border: 1px solid light-dark(#d1d9e0, #3d444d); border-radius: 6px; background: light-dark(#ffffff, #21262d); color: light-dark(#424a53, #c5cdd6); box-shadow: 0 4px 12px light-dark(rgb(31 35 40 / 12%), rgb(0 0 0 / 35%)); font-size: 12px; font-weight: 400; line-height: 1.5; white-space: nowrap; }
 .draft-action:not(:disabled):not([data-tooltip-dismissed]):is(:hover, :focus-visible)::after { display: block; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
 .meta { gap: 6px 10px; margin-top: 6px; font-size: 12px; color: light-dark(#59636e, #a7b1bd); }
