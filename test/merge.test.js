@@ -26,7 +26,7 @@ test('merge readiness excludes blocked, draft, queued, stacked and unauthorized 
   for (const overrides of [
     { state: 'MERGED' }, { isDraft: true }, { mergeable: 'CONFLICTING' }, { mergeable: 'UNKNOWN' },
     ...['BLOCKED', 'BEHIND', 'DIRTY', 'DRAFT', 'UNKNOWN', 'UNSTABLE'].map(mergeStateStatus => ({ mergeStateStatus })),
-    { reviewDecision: 'REVIEW_REQUIRED' }, { reviewDecision: 'CHANGES_REQUESTED' },
+    { reviewDecision: 'REVIEW_REQUIRED', mergeStateStatus: 'BLOCKED' }, { reviewDecision: 'CHANGES_REQUESTED', mergeStateStatus: 'BLOCKED' },
     { mergeQueue: { id: 'q' } }, { stackEntry: { id: 's' } },
     { repository: { ...ready.repository, viewerPermission: 'READ' } },
     { repository: { viewerPermission: 'ADMIN' } },
@@ -40,6 +40,21 @@ test('merge rechecks GitHub and pins mutation to displayed head and method', asy
   assert.equal((await github.merge(input)).status, 'MERGED');
   assert.deepEqual(calls[1].variables.input, { pullRequestId: ready.id, expectedHeadOid: headOid, mergeMethod: 'SQUASH' });
   assert.match(calls[0].query, /mergeStateStatus/);
+});
+
+test('nonblocking review decisions do not override GitHub’s clean merge status', async () => {
+  for (const reviewDecision of ['REVIEW_REQUIRED', 'CHANGES_REQUESTED']) {
+    for (const mergeStateStatus of ['CLEAN', 'HAS_HOOKS']) {
+      const pr = { ...ready, reviewDecision, mergeStateStatus };
+      assert.equal(mergeOptions(pr, 'alice').canMerge, true);
+      const { github, calls } = client(pr);
+      assert.equal((await github.merge(input)).status, 'MERGED');
+      assert.equal(calls[1].variables.input.expectedHeadOid, headOid);
+    }
+    const { github, calls } = client({ ...ready, reviewDecision, mergeStateStatus: 'BLOCKED' });
+    await assert.rejects(github.merge(input), { status: 409 });
+    assert.equal(calls.length, 1);
+  }
 });
 
 test('merge rejects changed commits, stale readiness, changed method and malformed input without mutation', async () => {
