@@ -480,6 +480,18 @@ function render() {
       diffCounts.setAttribute('aria-label', diffCounts.title);
       diffCounts.append(element('span', String(pr.additions), 'additions success'), element('span', String(pr.deletions), 'deletions failure'));
       meta.append(time, diffCounts);
+      if (Number.isInteger(pr.commentCount) && pr.commentCount >= 0) {
+        const comments = element('span', undefined, 'comment-count');
+        comments.title = `${pr.commentCount} ${pr.commentCount === 1 ? 'comment' : 'comments'}`;
+        comments.setAttribute('aria-label', comments.title);
+        const bubble = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        for (const [key, value] of Object.entries({ viewBox: '0 0 16 16', width: '14', height: '14', fill: 'none', stroke: 'currentColor', 'stroke-width': '1.5', 'stroke-linecap': 'round', 'stroke-linejoin': 'round', 'aria-hidden': 'true', focusable: 'false' })) bubble.setAttribute(key, value);
+        const outline = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        outline.setAttribute('d', 'M3 2.5h10a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H7l-4 3v-3a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1Z');
+        bubble.append(outline);
+        comments.append(bubble, document.createTextNode(String(pr.commentCount)));
+        meta.append(comments);
+      }
       for (const label of pr.labels) meta.append(badge(label, 'label'));
       const content = element('div', undefined, 'pr-content');
       content.append(line);

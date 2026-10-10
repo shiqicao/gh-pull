@@ -95,6 +95,8 @@ li { padding: 12px 14px; border-top: 1px solid light-dark(#e8ecf0, #262c36); }
 .merged { background: light-dark(#fbefff, #352044); color: light-dark(#8250df, #d2a8ff); }
 .closed, .failure, .error, .changes_requested { background: light-dark(#ffebe9, #481d22); color: light-dark(#a40e26, #ffa198); }
 .pending, .expected, .review_required { background: light-dark(#fff8c5, #3c3010); color: light-dark(#7d4e00, #eac54f); }
+.comment-count { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.comment-count svg { flex-shrink: 0; }
 .diff-counts { display: inline-flex; overflow: hidden; border-radius: 4px; white-space: nowrap; font-size: 11px; font-variant-numeric: tabular-nums; }
 .diff-counts > span { padding: 1px 5px; }
 .diff-counts .deletions { border-left: 1px solid light-dark(#d1d9e0, #3d444d); }

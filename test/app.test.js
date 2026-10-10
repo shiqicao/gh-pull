@@ -422,3 +422,16 @@ test('ready endpoint enforces same-origin JSON and clears the cache after succes
   assert.equal(writes, 1);
   await fetch(base + '/api/pulls'); assert.equal(reads, 2);
 });
+
+
+test('comment totals are fetched for authored and search views, preserving zero and unknown counts', async () => {
+  const list = createGitHub({ getToken: async () => 'test', fetchImpl: async (url, options) => {
+    assert.match(JSON.parse(options.body).query, /totalCommentsCount/);
+    const connection = { totalCount: 3, issueCount: 3, pageInfo: { hasNextPage: false },
+      nodes: [node({ totalCommentsCount: 12 }), node({ totalCommentsCount: 0 }), node({ totalCommentsCount: null })] };
+    return Response.json({ data: { viewer: { login: 'alice', pullRequests: connection }, search: connection } });
+  } });
+  for (const scope of ['authored', 'involved', 'review']) {
+    assert.deepEqual((await list({ scope })).items.map(pr => pr.commentCount), [12, 0, null]);
+  }
+});

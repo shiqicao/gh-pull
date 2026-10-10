@@ -33,7 +33,7 @@ export function validateMerge(input) {
 const fields = `id number title url state isDraft createdAt updatedAt headRefName
   author { login } repository { nameWithOwner }
   ${mergeFields}
-  additions deletions reviewDecision
+  additions deletions totalCommentsCount reviewDecision
   reviewRequests(first: 100) {
     pageInfo { hasNextPage }
     nodes { requestedReviewer {
@@ -169,6 +169,7 @@ export function createGitHub({ fetchImpl = fetch, getToken = defaultToken, cache
         author: pr.author?.login ?? 'deleted-user', repo: pr.repository.nameWithOwner,
         createdAt: pr.createdAt, updatedAt: pr.updatedAt,
         additions: pr.additions, deletions: pr.deletions,
+        commentCount: pr.totalCommentsCount ?? null,
         review: pr.reviewDecision || 'NONE',
         reviewers: reviewersFor(pr),
         reviewersTruncated: Boolean(pr.reviewRequests?.pageInfo.hasNextPage || pr.latestReviews?.pageInfo.hasNextPage),
