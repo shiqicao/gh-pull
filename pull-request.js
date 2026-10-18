@@ -26,12 +26,17 @@ function checkCountsFor(pr) {
   };
 }
 
-export function reviewersFor(pr) {
+export function reviewersFor(pr, viewerLogin) {
   const reviewers = new Map();
   for (const review of pr.latestReviews?.nodes ?? []) {
     const name = review?.author?.login;
     if (name && name !== pr.author?.login && review.state !== 'PENDING') {
-      reviewers.set(name, { name, state: review.state });
+      reviewers.set(name, { name, state: review.state, ...(review.id ? {
+        reviewId: review.id, reviewUrl: review.url,
+        canRevoke: review.state === 'APPROVED' && pr.state === 'OPEN' &&
+          name.toLowerCase() === viewerLogin?.toLowerCase() &&
+          ['WRITE', 'MAINTAIN', 'ADMIN'].includes(pr.repository?.viewerPermission),
+      } : {}) });
     }
   }
   // A new request takes precedence over a previous review from the same person.
@@ -68,7 +73,7 @@ export function normalizePullRequest(pr, viewerLogin) {
     closingIssueCount: pr.closingIssuesReferences?.totalCount ?? 0,
     closingIssuesTruncated: Boolean(pr.closingIssuesReferences?.pageInfo.hasNextPage),
     review: reviewState(pr),
-    reviewers: reviewersFor(pr),
+    reviewers: reviewersFor(pr, viewerLogin),
     reviewersTruncated: Boolean(pr.reviewRequests?.pageInfo.hasNextPage || pr.latestReviews?.pageInfo.hasNextPage),
     checks: pr.commits.nodes[0]?.commit.statusCheckRollup?.state ?? 'NONE',
     checkCounts: checkCountsFor(pr),

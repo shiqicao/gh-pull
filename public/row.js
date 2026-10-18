@@ -30,7 +30,7 @@ function checks(pr) {
 export function renderRow(node, gutter, ctx) {
   const { pr } = node;
   const { viewedStore, markViewed, viewerLogin, draftChanges, merges, titleEdits, changeDraftStatus,
-    render, focusTitleControl, createMergeAction, issuePopover, titleEditor, nameColors } = ctx;
+    render, focusTitleControl, createMergeAction, issuePopover, titleEditor, reviewControl, nameColors } = ctx;
   const hasUpdates = viewedStore.hasUpdates(pr), own = pr.author.toLowerCase() === viewerLogin.toLowerCase();
   const url = githubUrl(pr.url), hasUrl = url !== nothing;
   const author = name => usernameLink(name, 'badge author', nameColors[name.toLowerCase()] * 360 / NAME_COLOR_COUNT);
@@ -79,7 +79,7 @@ export function renderRow(node, gutter, ctx) {
       ${pr.reviewers?.length || pr.reviewersTruncated ? html`<div class="reviewers" role="group" aria-label="Reviewers">
         ${repeat(pr.reviewers ?? [], reviewer => reviewer.name, reviewer => {
           const [description, kind, symbol] = reviewStates[reviewer.state] ?? [reviewer.state, 'none', '·'];
-          return html`<span class="reviewer" title=${`${reviewer.name}: ${description}`} aria-label=${`${reviewer.name}: ${description}`}>${author(reviewer.name)}<span class=${`badge ${kind} review-status`} aria-hidden="true">${symbol}</span></span>`;
+          return html`<span class="reviewer" title=${`${reviewer.name}: ${description}`} aria-label=${`${reviewer.name}: ${description}`}>${author(reviewer.name)}${reviewer.canRevoke ? reviewControl(pr, reviewer) : html`<span class=${`badge ${kind} review-status`} aria-hidden="true">${symbol}</span>`}</span>`;
         })}
         ${pr.reviewersTruncated && hasUrl ? html`<a href=${url} target="_blank" rel="noopener noreferrer" data-view-pr>View all on GitHub</a>` : nothing}
       </div>` : nothing}

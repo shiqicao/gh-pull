@@ -35,7 +35,7 @@ const fields = `id number title url state isDraft createdAt updatedAt headRefNam
   }
   latestReviews(first: 100) {
     pageInfo { hasNextPage }
-    nodes { author { login } state }
+    nodes { id url author { login } state }
   }
   labels(first: 10) { nodes { name } }
   commits(last: 1) { nodes { commit { statusCheckRollup {
@@ -46,6 +46,15 @@ const fields = `id number title url state isDraft createdAt updatedAt headRefNam
       statusContextCountsByState { state count }
     }
   } } } }`;
+
+export function validateReviewDismissal(input) {
+  const { id } = validateDraftUpdate(input);
+  if (typeof input.reviewId !== 'string' || !input.reviewId.trim() || input.reviewId.length > 200 ||
+      typeof input.message !== 'string' || !input.message.trim() || input.message.trim().length > 1000) {
+    throw new ApiError('Provide a review ID and a reason (1–1,000 characters).', 400);
+  }
+  return { id, reviewId: input.reviewId, message: input.message.trim() };
+}
 
 export function validateTitleUpdate(input) {
   if (!input || typeof input.id !== 'string' || !input.id.trim() || input.id.length > 200 ||
@@ -244,6 +253,34 @@ export function createGitHub(options = {}) {
     if (merged?.state !== 'MERGED') throw new ApiError('GitHub did not confirm the merge. Refresh to check its status.');
     dependencyCache.clear();
     return { id: merged.id, status: 'MERGED', updatedAt: merged.updatedAt, canMerge: false };
+  };
+
+  list.dismissReview = async input => {
+    const { id, reviewId, message } = validateReviewDismissal(input);
+    const data = await graphql(`query($id: ID!) {
+      viewer { login }
+      node(id: $id) { ... on PullRequestReview {
+        id state author { login } pullRequest { id state }
+      } }
+    }`, { id: reviewId });
+    const review = data.node;
+    if (!review || review.pullRequest?.id !== id) throw new ApiError('Review not found on this pull request.', 404);
+    if (review.author?.login?.toLowerCase() !== data.viewer.login.toLowerCase()) {
+      throw new ApiError('You can only revoke your own approval.', 403);
+    }
+    if (review.pullRequest.state !== 'OPEN' || review.state !== 'APPROVED') {
+      throw new ApiError('This approval is no longer active on an open PR. Refresh to see its status.', 409);
+    }
+    const result = await graphql(`mutation($input: DismissPullRequestReviewInput!) {
+      dismissPullRequestReview(input: $input) { pullRequestReview {
+        state pullRequest { ${fields} }
+      } }
+    }`, { input: { pullRequestReviewId: reviewId, message } });
+    const dismissed = result.dismissPullRequestReview?.pullRequestReview;
+    if (dismissed?.state !== 'DISMISSED' || !dismissed.pullRequest) {
+      throw new ApiError('GitHub did not confirm the revocation. Refresh to check its status.');
+    }
+    return normalizePullRequest(dismissed.pullRequest, data.viewer.login);
   };
 
   list.updateTitle = async input => {

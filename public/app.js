@@ -62,7 +62,7 @@ async function apiFetch(url, options) {
   const response = await fetch(url, options);
   if (response.status === 401 && authMode === 'github-app') {
     authenticated = false;
-    items = []; titleEdits.clear(); draftChanges.clear(); merges.clear(); mergeSelections.clear();
+    items = []; titleEdits.clear(); reviewChanges.clear(); draftChanges.clear(); merges.clear(); mergeSelections.clear();
     $('results').replaceChildren();
     $('dashboard').hidden = true;
     location.replace('/?auth_error=expired');
@@ -82,9 +82,9 @@ function updateRefreshButton() {
   $('refresh').setAttribute('aria-busy', String(busy));
 }
 
-function savingPull(id) { return titleEdits.get(id)?.saving || draftChanges.get(id)?.saving || merges.get(id)?.saving; }
+function savingPull(id) { return reviewChanges.get(id)?.saving || titleEdits.get(id)?.saving || draftChanges.get(id)?.saving || merges.get(id)?.saving; }
 function protectedPull(id) {
-  return titleEdits.has(id) || issuePopover.pullId === id || draftChanges.get(id)?.saving || merges.get(id)?.saving;
+  return reviewChanges.has(id) || titleEdits.has(id) || issuePopover.pullId === id || draftChanges.get(id)?.saving || merges.get(id)?.saving;
 }
 function responseError(response, data, fallback) {
   const error = new Error(data.error || fallback);
@@ -162,6 +162,7 @@ function syncActivity() {
 }
 
 const collapsed = new Set();
+const reviewChanges = new Map();
 const titleEdits = new Map();
 const draftChanges = new Map();
 const merges = new Map();
@@ -283,6 +284,54 @@ async function changeDraftStatus(pr) {
   });
 }
 
+function reviewControl(pr, reviewer) {
+  const panelId = `review-${pr.id}`;
+  const draft = reviewChanges.get(pr.id);
+  const close = () => { if (!draft?.saving) document.getElementById(panelId)?.hidePopover(); };
+  const open = event => {
+    reviewChanges.set(pr.id, { reviewId: reviewer.reviewId, value: '', confirm: false, saving: false, error: '' });
+    const rect = event.currentTarget.getBoundingClientRect();
+    renderEditorRow(pr.id);
+    const panel = document.getElementById(panelId);
+    panel.style.left = `${Math.max(8, Math.min(rect.right - 340, innerWidth - 348))}px`;
+    panel.style.top = `${Math.max(8, Math.min(rect.bottom + 6, innerHeight - 310))}px`;
+    panel.showPopover();
+    panel.querySelector('button')?.focus();
+  };
+  const submit = async event => {
+    event.preventDefault();
+    if (draft.saving || !draft.value.trim()) return;
+    await changePull(pr, reviewChanges, {
+      action: 'revoke', input: { reviewId: draft.reviewId, message: draft.value.trim() },
+      message: 'Approval revoked',
+      apply(current, data) { if (current) Object.assign(current, data); },
+      onSuccess: () => { focusTitleControl(pr.id, '.pr-title'); scheduleMergeReadiness(); void load({ refresh: true, background: true }); },
+      onError: () => { const panel = document.getElementById(panelId); if (panel && !panel.matches(':popover-open')) panel.showPopover(); },
+    });
+  };
+  return html`<button type="button" class="badge approved review-action" aria-label="Your approval options"
+      aria-haspopup="dialog" ?disabled=${draft?.saving} @click=${open}><span class="badge approved review-status" aria-hidden="true">✓</span><svg class="review-chevron" width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true"><path d="m2.5 3.75 2.5 2.5 2.5-2.5" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    <div id=${panelId} class="review-popover" popover="auto" role="dialog" aria-label="Your approval"
+      @toggle=${event => {
+        if (event.newState === 'closed' && !reviewChanges.get(pr.id)?.saving) {
+          reviewChanges.delete(pr.id); renderEditorRow(pr.id); focusTitleControl(pr.id, '.review-action'); polling.invalidate();
+        }
+      }}>
+      ${draft?.confirm ? html`<form @submit=${submit}>
+        <strong>Revoke your approval?</strong>
+        <p>Your review and comments will remain, but this approval will no longer count toward merging.</p>
+        <label>Reason <span class="review-required">· required</span>
+          <textarea aria-label="Reason" required maxlength="1000" .value=${live(draft.value)} ?disabled=${draft.saving}
+            @input=${event => { draft.value = event.target.value; renderEditorRow(pr.id); }}></textarea>
+        </label>
+        ${draft.error ? html`<p class="error-message" role="alert">${draft.error}</p>` : nothing}
+        <div class="review-buttons"><button type="button" ?disabled=${draft.saving} @click=${close}>Cancel</button>
+        <button type="submit" ?disabled=${draft.saving || !draft.value.trim()}>${draft.saving ? 'Revoking…' : 'Revoke approval'}</button></div>
+      </form>` : html`<a href=${githubUrl(reviewer.reviewUrl)} target="_blank" rel="noopener noreferrer">View review ↗</a>
+        <button type="button" @click=${() => { draft.confirm = true; renderEditorRow(pr.id); document.getElementById(panelId).querySelector('textarea').focus(); }}>Revoke approval…</button>`}
+    </div>`;
+}
+
 function focusTitleControl(id, selector) {
   [...$('results').querySelectorAll('.pr-row')].find(row => row.dataset.prId === id)?.querySelector(selector)?.focus();
 }
@@ -317,7 +366,7 @@ function titleEditor(pr) {
 const rowElements = new Map();
 const groupCache = new Map();
 const rowContext = () => ({ viewedStore, markViewed, viewerLogin, draftChanges, merges, titleEdits,
-  changeDraftStatus, render, focusTitleControl, createMergeAction, issuePopover, titleEditor, nameColors });
+  changeDraftStatus, render, focusTitleControl, createMergeAction, issuePopover, titleEditor, reviewControl, nameColors });
 function renderEditorRow(id) {
   const row = rowElements.get(id);
   if (row) renderTemplate(renderRow(row.node, row.gutter, rowContext()), row.entry);
@@ -448,7 +497,7 @@ async function load({ append = false, refresh = false, background = false } = {}
       queryEditor?.clearRepositoryCache();
       issuePopover.close();
       mergedStore.clear();
-      titleEdits.clear();
+      titleEdits.clear(); reviewChanges.clear();
       draftChanges.clear();
       merges.clear(); mergeSelections.clear();
     }
