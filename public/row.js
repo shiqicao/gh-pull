@@ -1,6 +1,7 @@
+import { actionButton, iconButton, formError } from './controls.js';
 import { html, nothing, repeat } from './vendor/lit-html.js';
 import { labels, relativeTime, NAME_COLOR_COUNT } from './model.js';
-import { iconTemplate as icon, badge, githubUrl, usernameLink, repositoryLink, copyFeedback } from './templates.js';
+import { iconTemplate as icon, badge, githubUrl, usernameLink, repositoryLink, copyFeedback, reviewStatus } from './templates.js';
 
 const reviewLabels = { APPROVED: 'Approved', CHANGES_REQUESTED: 'Changes requested', REVIEW_REQUIRED: 'Review required', REVIEW_BYPASS_AVAILABLE: 'Review bypass available' };
 const reviewStates = {
@@ -49,22 +50,23 @@ export function renderRow(node, gutter, ctx) {
     <div class=${`pr-row${hasUpdates ? ' has-updates' : ''}`} data-pr-id=${pr.id} @click=${onOpen} @auxclick=${onOpen}>
       <div class="pr-content"><div class="title-line">
         ${node.parent ? html`<span class="sr-only">Merges into #${node.parent.pr.number}: ${node.parent.pr.title}</span>` : nothing}
-        ${own && ['OPEN', 'DRAFT'].includes(pr.status) ? html`<button type="button" class=${`badge ${pr.status.toLowerCase()} draft-action`}
-          ?disabled=${pending || Boolean(merges.get(pr.id)?.saving)} title=${pr.status === 'OPEN' ? 'Convert to draft' : 'Mark ready for review'}
-          aria-label=${pr.status === 'OPEN' ? `Convert ${pr.title} to draft` : `Mark ${pr.title} ready for review`}
-          @click=${() => changeDraftStatus(pr)}>${pending ? 'Updating…' : labels[pr.status]}</button>` : badge(labels[pr.status], pr.status)}
+        ${own && ['OPEN', 'DRAFT'].includes(pr.status) ? actionButton({ className: `badge ${pr.status.toLowerCase()} draft-action`,
+          disabled: pending || Boolean(merges.get(pr.id)?.saving), title: pr.status === 'OPEN' ? 'Convert to draft' : 'Mark ready for review',
+          label: pr.status === 'OPEN' ? `Convert ${pr.title} to draft` : `Mark ${pr.title} ready for review`,
+          onClick: () => changeDraftStatus(pr), content: pending ? 'Updating…' : labels[pr.status] }) : badge(labels[pr.status], pr.status)}
         ${hasUrl ? html`<span class="pr-links">
-          <button class="copy-link icon-button" type="button" title="Copy PR link" aria-label=${`Copy link to ${pr.title}`} ${copyFeedback(url, 'PR link copied', 'Copy PR link')}><span class="copy-symbol">${icon('copy')}</span><span class="copy-feedback-symbol" aria-hidden="true" hidden></span></button>
+          ${iconButton({ icon: 'copy', className: 'copy-link', title: 'Copy PR link', label: `Copy link to ${pr.title}`,
+            copy: { text: url, success: 'PR link copied' } })}
           <a class="pr-files icon-button" href=${githubUrl(pr.url, 'files')} target="_blank" rel="noopener noreferrer" data-view-pr
             title="View code changes (opens in a new tab)" aria-label=${`View code changes for ${pr.title}${filesKnown ? `, ${pr.changedFiles} ${pr.changedFiles === 1 ? 'file' : 'files'} changed` : ''} (opens in a new tab)`}>${icon('files')}${filesKnown ? html`<span class="file-count">${pr.changedFiles}</span>` : nothing}</a>
         </span>` : nothing}
         <a class="pr-title" href=${url} target="_blank" rel="noopener noreferrer" data-view-pr aria-label=${`${hasUpdates ? 'New updates: ' : ''}${pr.title} (opens in a new tab)`}>${pr.title}</a>
-        ${own ? html`<button class="edit-title icon-button" type="button" title="Edit PR title" aria-label=${`Edit title of ${pr.title}`}
-          ?disabled=${Boolean(titleEdits.get(pr.id)?.saving || merges.get(pr.id)?.saving)} @click=${edit}>${icon('edit')}</button>` : nothing}
+        ${own ? iconButton({ icon: 'edit', className: 'edit-title', title: 'Edit PR title', label: `Edit title of ${pr.title}`,
+          disabled: Boolean(titleEdits.get(pr.id)?.saving || merges.get(pr.id)?.saving), onClick: edit }) : nothing}
         ${createMergeAction(pr, hasUrl ? url : null)}
       </div>
-      ${merges.get(pr.id)?.error ? html`<p class="draft-error error-message" role="alert">${merges.get(pr.id).error}</p>` : nothing}
-      ${draftChanges.get(pr.id)?.error ? html`<p class="draft-error error-message" role="alert">${draftChanges.get(pr.id).error}</p>` : nothing}
+      ${formError(merges.get(pr.id)?.error, 'draft-error')}
+      ${formError(draftChanges.get(pr.id)?.error, 'draft-error')}
       ${titleEdits.has(pr.id) && own ? titleEditor(pr) : nothing}
       <div class="meta">
         <span class="badge">${repositoryLink(pr.repo)} #${pr.number}</span>${author(pr.author)}${checks(pr)}${dependency(node)}
@@ -79,7 +81,7 @@ export function renderRow(node, gutter, ctx) {
       ${pr.reviewers?.length || pr.reviewersTruncated ? html`<div class="reviewers" role="group" aria-label="Reviewers">
         ${repeat(pr.reviewers ?? [], reviewer => reviewer.name, reviewer => {
           const [description, kind, symbol] = reviewStates[reviewer.state] ?? [reviewer.state, 'none', '·'];
-          return html`<span class="reviewer" title=${`${reviewer.name}: ${description}`} aria-label=${`${reviewer.name}: ${description}`}>${author(reviewer.name)}${reviewer.canRevoke ? reviewControl(pr, reviewer) : html`<span class=${`badge ${kind} review-status`} aria-hidden="true">${symbol}</span>`}</span>`;
+          return html`<span class="reviewer" title=${`${reviewer.name}: ${description}`} aria-label=${`${reviewer.name}: ${description}`}>${author(reviewer.name)}${reviewer.canRevoke ? reviewControl(pr, reviewer) : reviewStatus(symbol, kind)}</span>`;
         })}
         ${pr.reviewersTruncated && hasUrl ? html`<a href=${url} target="_blank" rel="noopener noreferrer" data-view-pr>View all on GitHub</a>` : nothing}
       </div>` : nothing}

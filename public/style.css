@@ -714,7 +714,7 @@ input:focus, select:focus, textarea:focus {
   font: inherit;
   white-space: nowrap;
 }
-.issue-popover {
+.anchored-popover {
   position: fixed;
   inset: auto;
   margin: 0;
@@ -729,7 +729,7 @@ input:focus, select:focus, textarea:focus {
   box-shadow: 0 8px 24px #0003;
   font-size: var(--font-size-body);
 }
-.issue-popover.measuring { display: block; visibility: hidden; pointer-events: none; }
+.anchored-popover.measuring { display: block; visibility: hidden; pointer-events: none; }
 .issue-popover h2 { margin: 0 0 8px; font-size: var(--font-size-body); }
 .issue-list { list-style: none; margin: 0; padding: 0; }
 .issue-list li { display: flex; gap: 8px; padding: 8px 0; }
@@ -856,17 +856,35 @@ input:focus, select:focus, textarea:focus {
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;
 }
-.review-chevron { flex-shrink: 0; }
+.review-action svg { flex-shrink: 0; }
 
 .review-popover {
-  position: fixed; margin: 0; box-sizing: border-box;
-  width: min(340px, calc(100vw - 16px)); max-height: calc(100vh - 16px); overflow: auto;
-  padding: 16px; border: 1px solid var(--color-border); border-radius: 10px;
-  background: var(--color-page); color: var(--color-text); text-align: left;
-  box-shadow: 0 8px 28px #0003; font-size: var(--font-size-small);
+  box-sizing: border-box;
+  width: min(360px, calc(100vw - 16px));
+  padding: 20px;
+  border-radius: 10px;
+  text-align: left;
+  font-size: var(--font-size-small);
 }
-.review-popover > a, .review-popover > button { display: block; margin: 4px 0; }
+.review-popover:has(.popover-menu) { width: min(240px, calc(100vw - 16px)); padding: 6px; }
+.popover-menu-item {
+  display: flex; align-items: center; justify-content: space-between; box-sizing: border-box;
+  width: 100%; min-height: 36px; padding: 8px 10px; border: 0; border-radius: var(--radius-control);
+  background: transparent; color: var(--color-text); font: inherit; text-align: left; text-decoration: none;
+}
+.popover-menu-item:hover, .popover-menu-item:hover:not(:disabled) { background: var(--color-hover); }
+.popover-menu-item.destructive { color: var(--color-danger-text); }
+.popover-menu-item.destructive:hover:not(:disabled) { background: var(--color-danger-bg); }
+.review-popover h2 { margin: 0; font-size: 15px; line-height: 1.4; font-weight: 600; }
+.review-popover .form-description { margin: 8px 0 18px; color: var(--color-muted); }
+.form-label { display: block; font-weight: 600; }
+.form-label .form-input { font-weight: 400; }
+.review-popover .form-input { min-height: 96px; margin: 8px 0 16px; line-height: 1.5; }
+.review-popover .form-actions { padding-top: 14px; border-top: 1px solid var(--color-divider); }
+.button-danger { color: var(--color-danger-text); font-weight: 600; }
+.button-danger:hover:not(:disabled) { background: var(--color-danger-bg); border-color: var(--color-danger-text); }
 .review-popover p { margin: 10px 0; line-height: 1.5; }
-.review-popover textarea { display: block; box-sizing: border-box; width: 100%; min-height: 80px; margin: 6px 0 12px; resize: vertical; font: inherit; padding: 8px; border: 1px solid var(--color-border); border-radius: 6px; background: var(--color-page); color: var(--color-text); }
-.review-required { color: var(--color-muted); }
-.review-buttons { display: flex; justify-content: flex-end; gap: 8px; }
+.form-input { box-sizing: border-box; font: inherit; padding: 8px; border: 1px solid var(--color-border); border-radius: var(--radius-control); background: var(--color-page); color: var(--color-text); }
+textarea.form-input { display: block; width: 100%; min-height: 80px; margin: 6px 0 12px; resize: vertical; }
+.review-required { float: right; color: var(--color-muted); font-weight: 400; font-size: 11px; }
+.form-actions { display: flex; justify-content: flex-end; gap: 8px; }
