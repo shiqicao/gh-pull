@@ -66,3 +66,5 @@ class ClipboardDirective extends AsyncDirective {
   disconnected() { this.restore(); }
 }
 export const copyFeedback = directive(ClipboardDirective);
+
+export const reviewStatus = (symbol, kind) => html`<span class=${`badge ${kind} review-status`} aria-hidden="true">${symbol}</span>`;

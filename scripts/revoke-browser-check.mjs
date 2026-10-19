@@ -20,10 +20,20 @@ test('own approval menu confirms, preserves errors and updates dismissed state',
   const { page, origin, errors } = await browserFixture(t, { list });
   await page.goto(origin);
   await page.getByRole('button', { name: 'Your approval options' }).click();
+  assert.equal(await page.getByRole('button', { name: 'Your approval options' }).getAttribute('aria-expanded'), 'true');
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === 'Your approval options');
+  await page.getByRole('button', { name: 'Your approval options' }).click();
   await page.getByRole('button', { name: 'Revoke approval…', exact: true }).click();
   const submit = page.getByRole('button', { name: 'Revoke approval', exact: true });
   assert.equal(await submit.isDisabled(), true);
   await page.getByRole('textbox', { name: 'Reason', exact: true }).fill('Needs another look');
+  await page.setViewportSize({ width: 420, height: 500 });
+  await page.waitForFunction(() => {
+    const rect = document.querySelector('#review-actions').getBoundingClientRect();
+    return rect.left >= 7 && rect.right <= innerWidth - 7 && rect.top >= 7 && rect.bottom <= innerHeight - 7;
+  });
+  await page.setViewportSize({ width: 1280, height: 720 });
   await page.screenshot({ path: '/tmp/gh-pull-revoke-preview.png' });
   await submit.click();
   await page.getByRole('alert').filter({ hasText: 'Repository rules' }).waitFor();

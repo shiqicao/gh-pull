@@ -1,10 +1,12 @@
-import { html, render as renderTemplate, repeat, nothing, live } from './vendor/lit-html.js';
+import { actionButton, formField, formError, formActions } from './controls.js';
+import { html, render as renderTemplate, repeat, nothing } from './vendor/lit-html.js';
 import { githubUrl, usernameLink, repositoryLink } from './templates.js';
 import { renderRow } from './row.js';
 import { drawDependencies } from './dependencies.js';
 import { createPollingSchedule, pendingPulls } from './polling.js';
 import { createViewedStore, createLatestRequest, mergePullPages, createMergedStore } from './state.js';
 import { createIssuePopover } from './issues.js';
+import { createReviewControls } from './reviews.js';
 import { element, icon, clipboardFeedback } from './ui.js';
 import { assignNameColors, dependencyLanes, groupPulls, labels } from './model.js';
 import { queryFromParams, queryPresets, setQueryPreset, normalizeQuery, queryError, matchesQueryState } from './query.js';
@@ -201,8 +203,8 @@ function createMergeAction(pr, prUrl) {
   const blocked = authMode === 'github-app' && !pr.mergeAccess?.allowed;
   const disabled = blocked || Boolean(merges.get(pr.id)?.saving || draftChanges.get(pr.id)?.saving || titleEdits.has(pr.id));
   const controls = html`<span class=${`merge-controls${methods.length > 1 ? ' merge-split' : ''}`}>
-    <button class="badge open merge-action" type="button" aria-label=${`${names[selected]} ${pr.repo} #${pr.number}`} ?disabled=${disabled}
-      @click=${() => mergePull(pr, selected)}>${merges.get(pr.id)?.saving ? 'Merging…' : names[selected]}</button>
+    ${actionButton({ className: 'badge open merge-action', label: `${names[selected]} ${pr.repo} #${pr.number}`, disabled,
+      onClick: () => mergePull(pr, selected), content: merges.get(pr.id)?.saving ? 'Merging…' : names[selected] })}
     ${methods.length > 1 ? html`<span class="merge-method-trigger open"><select class="merge-method" title="Merge method"
       aria-label=${`Merge method for ${pr.repo} #${pr.number}`} ?disabled=${disabled}
       @change=${event => { mergeSelections.set(pr.id, event.target.value); render(); }}>
@@ -284,53 +286,19 @@ async function changeDraftStatus(pr) {
   });
 }
 
-function reviewControl(pr, reviewer) {
-  const panelId = `review-${pr.id}`;
-  const draft = reviewChanges.get(pr.id);
-  const close = () => { if (!draft?.saving) document.getElementById(panelId)?.hidePopover(); };
-  const open = event => {
-    reviewChanges.set(pr.id, { reviewId: reviewer.reviewId, value: '', confirm: false, saving: false, error: '' });
-    const rect = event.currentTarget.getBoundingClientRect();
-    renderEditorRow(pr.id);
-    const panel = document.getElementById(panelId);
-    panel.style.left = `${Math.max(8, Math.min(rect.right - 340, innerWidth - 348))}px`;
-    panel.style.top = `${Math.max(8, Math.min(rect.bottom + 6, innerHeight - 310))}px`;
-    panel.showPopover();
-    panel.querySelector('button')?.focus();
-  };
-  const submit = async event => {
-    event.preventDefault();
-    if (draft.saving || !draft.value.trim()) return;
+const reviewControls = createReviewControls({
+  changes: reviewChanges,
+  onClose(id) { renderEditorRow(id); polling.invalidate(); },
+  async submit(pr, draft) {
     await changePull(pr, reviewChanges, {
       action: 'revoke', input: { reviewId: draft.reviewId, message: draft.value.trim() },
       message: 'Approval revoked',
       apply(current, data) { if (current) Object.assign(current, data); },
-      onSuccess: () => { focusTitleControl(pr.id, '.pr-title'); scheduleMergeReadiness(); void load({ refresh: true, background: true }); },
-      onError: () => { const panel = document.getElementById(panelId); if (panel && !panel.matches(':popover-open')) panel.showPopover(); },
+      onSuccess: () => { reviewControls.reset(); focusTitleControl(pr.id, '.pr-title'); scheduleMergeReadiness(); void load({ refresh: true, background: true }); },
+      onError: reviewControls.recover,
     });
-  };
-  return html`<button type="button" class="badge approved review-action" aria-label="Your approval options"
-      aria-haspopup="dialog" ?disabled=${draft?.saving} @click=${open}><span class="badge approved review-status" aria-hidden="true">✓</span><svg class="review-chevron" width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true"><path d="m2.5 3.75 2.5 2.5 2.5-2.5" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-    <div id=${panelId} class="review-popover" popover="auto" role="dialog" aria-label="Your approval"
-      @toggle=${event => {
-        if (event.newState === 'closed' && !reviewChanges.get(pr.id)?.saving) {
-          reviewChanges.delete(pr.id); renderEditorRow(pr.id); focusTitleControl(pr.id, '.review-action'); polling.invalidate();
-        }
-      }}>
-      ${draft?.confirm ? html`<form @submit=${submit}>
-        <strong>Revoke your approval?</strong>
-        <p>Your review and comments will remain, but this approval will no longer count toward merging.</p>
-        <label>Reason <span class="review-required">· required</span>
-          <textarea aria-label="Reason" required maxlength="1000" .value=${live(draft.value)} ?disabled=${draft.saving}
-            @input=${event => { draft.value = event.target.value; renderEditorRow(pr.id); }}></textarea>
-        </label>
-        ${draft.error ? html`<p class="error-message" role="alert">${draft.error}</p>` : nothing}
-        <div class="review-buttons"><button type="button" ?disabled=${draft.saving} @click=${close}>Cancel</button>
-        <button type="submit" ?disabled=${draft.saving || !draft.value.trim()}>${draft.saving ? 'Revoking…' : 'Revoke approval'}</button></div>
-      </form>` : html`<a href=${githubUrl(reviewer.reviewUrl)} target="_blank" rel="noopener noreferrer">View review ↗</a>
-        <button type="button" @click=${() => { draft.confirm = true; renderEditorRow(pr.id); document.getElementById(panelId).querySelector('textarea').focus(); }}>Revoke approval…</button>`}
-    </div>`;
-}
+  },
+});
 
 function focusTitleControl(id, selector) {
   [...$('results').querySelectorAll('.pr-row')].find(row => row.dataset.prId === id)?.querySelector(selector)?.focus();
@@ -354,11 +322,11 @@ function titleEditor(pr) {
   };
   return html`<form class="title-editor" aria-label=${`Edit title of ${pr.repo} #${pr.number}`} @submit=${submit}
     @keydown=${event => { if (event.key === 'Escape') { event.preventDefault(); close(); } }}>
-    <input type="text" .value=${live(draft.value)} required maxlength="256" aria-label="Pull request title" ?disabled=${draft.saving}
-      @input=${event => { draft.value = event.target.value; renderEditorRow(pr.id); }}>
-    <button type="submit" ?disabled=${draft.saving || !draft.value.trim() || draft.value.trim() === draft.expectedTitle}>${draft.saving ? 'Saving…' : 'Save'}</button>
-    <button type="button" ?disabled=${draft.saving} @click=${close}>Cancel</button>
-    ${draft.error ? html`<p class="title-error error-message" role="alert">${draft.error}</p>` : nothing}
+    ${formField({ label: 'Pull request title', value: draft.value, maxLength: 256, disabled: draft.saving,
+      onInput: value => { draft.value = value; renderEditorRow(pr.id); } })}
+    ${formActions({ saving: draft.saving, disabled: !draft.value.trim() || draft.value.trim() === draft.expectedTitle,
+      submitLabel: 'Save', pendingLabel: 'Saving…', onCancel: close })}
+    ${formError(draft.error, 'title-error')}
   </form>`;
 }
 
@@ -366,7 +334,7 @@ function titleEditor(pr) {
 const rowElements = new Map();
 const groupCache = new Map();
 const rowContext = () => ({ viewedStore, markViewed, viewerLogin, draftChanges, merges, titleEdits,
-  changeDraftStatus, render, focusTitleControl, createMergeAction, issuePopover, titleEditor, reviewControl, nameColors });
+  changeDraftStatus, render, focusTitleControl, createMergeAction, issuePopover, titleEditor, reviewControl: reviewControls.button, nameColors });
 function renderEditorRow(id) {
   const row = rowElements.get(id);
   if (row) renderTemplate(renderRow(row.node, row.gutter, rowContext()), row.entry);
@@ -448,6 +416,7 @@ function render() {
     if (selection) focused.setSelectionRange(...selection);
   }
   issuePopover.reposition();
+  reviewControls.reconcile(activeRows);
   results.querySelector('.empty')?.remove();
   if (!count && !loading) results.append(element('p', 'No pull requests found for this query.', 'empty'));
   results.setAttribute('aria-busy', String(loading));
@@ -495,7 +464,7 @@ async function load({ append = false, refresh = false, background = false } = {}
     if (!loads.isCurrent(request)) return;
     if (viewedStore.selectAccount(data.viewer)) {
       queryEditor?.clearRepositoryCache();
-      issuePopover.close();
+      issuePopover.close(); reviewControls.reset();
       mergedStore.clear();
       titleEdits.clear(); reviewChanges.clear();
       draftChanges.clear();
