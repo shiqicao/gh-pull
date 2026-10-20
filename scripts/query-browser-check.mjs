@@ -108,12 +108,15 @@ test('autocomplete keyboard, mid-query replacements, escaped input, undo and foc
   await editor.fill('');
   await editor.press('End');
   await page.keyboard.type('rep');
-  await page.locator('.cm-tooltip-autocomplete').waitFor();
+  await page.locator('.cm-tooltip-autocomplete:not(.cm-tooltip-autocomplete-disabled) [role=option][aria-selected=true]').waitFor();
   await editor.press('Enter');
   assert.equal(await editor.innerText(), 'repo:');
   assert.equal(calls.length, before);
   await editor.press('Control+Space');
-  await page.getByRole('option', { name: 'example/dashboard', exact: true }).waitFor();
+  // A refresh can retain visible options while CodeMirror temporarily disables
+  // acceptance. Wait for the selected option to be actionable before pressing Tab.
+  await page.locator('.cm-tooltip-autocomplete:not(.cm-tooltip-autocomplete-disabled)')
+    .getByRole('option', { name: 'example/dashboard', exact: true }).and(page.locator('[aria-selected=true]')).waitFor();
   await editor.press('Tab');
   assert.equal(await editor.innerText(), 'repo:example/dashboard');
   await editor.press('Enter');
