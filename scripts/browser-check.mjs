@@ -115,10 +115,14 @@ test('title, draft, ready and merge interactions preserve read state and retry b
   for (const state of ['Draft', 'Open', 'Merged']) {
     f.laterUpdate(); await f.refresh();
     assert.equal(await f.unread(), true);
-    const button = state === 'Merged' ? '.merge-action' : '.draft-action';
-    f.reject(true); await page.click(button); await page.locator('.draft-error').waitFor();
+    const act = async () => {
+      if (state === 'Merged') return page.click('.merge-action');
+      await page.click('.lifecycle-action');
+      await page.getByRole('button', { name: state === 'Draft' ? 'Convert to draft' : 'Mark ready for review', exact: true }).click();
+    };
+    f.reject(true); await act(); await page.locator('.draft-error').waitFor();
     assert.equal(await f.unread(), true);
-    f.reject(false); await page.click(button); await f.waitRead();
+    f.reject(false); await act(); await f.waitRead();
     assert.equal(await page.locator('.title-line > .badge').first().textContent(), state);
     await f.open(); assert.equal(await f.unread(), false);
   }

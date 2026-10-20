@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { toGitHubQuery, repositoryScope } from './public/query.js';
-import { createGitHub, ApiError, validateTitleUpdate, validateDraftUpdate, validateMerge, validateReviewDismissal } from './github.js';
+import { createGitHub, ApiError, validateTitleUpdate, validateDraftUpdate, validateMerge, validateReviewDismissal, validateClose } from './github.js';
 import { cachedRequest } from './request-cache.js';
 import { authConfig, createAuth } from './auth.js';
 import { createMarketplaceWebhook } from './marketplace.js';
@@ -24,6 +24,7 @@ const assets = new Map([
   ['/vendor/svg.LICENSE.txt', ['vendor/svg.LICENSE.txt', 'text/plain']],
   ['/controls.js', ['controls.js', 'text/javascript']],
   ['/popover.js', ['popover.js', 'text/javascript']],
+  ['/lifecycle.js', ['lifecycle.js', 'text/javascript']],
   ['/reviews.js', ['reviews.js', 'text/javascript']],
   ['/issues.js', ['issues.js', 'text/javascript']],
   ['/ui.js', ['ui.js', 'text/javascript']],
@@ -42,6 +43,8 @@ const assets = new Map([
 ]);
 
 const mutations = new Map([
+  ['/api/pulls/close', { method: 'closePull', validate: validateClose, unavailable: 'Closing PRs is unavailable.' }],
+  ['/api/pulls/reopen', { method: 'reopenPull', validate: validateDraftUpdate, unavailable: 'Reopening PRs is unavailable.' }],
   ['/api/pulls/revoke', { method: 'dismissReview', validate: validateReviewDismissal, unavailable: 'Review revocation is unavailable.' }],
   ['/api/pulls/title', { method: 'updateTitle', validate: validateTitleUpdate, unavailable: 'Title editing is unavailable.' }],
   ['/api/pulls/draft', { method: 'convertToDraft', validate: validateDraftUpdate, unavailable: 'Status changes are unavailable.' }],
@@ -49,7 +52,7 @@ const mutations = new Map([
   ['/api/pulls/merge', { method: 'merge', validate: validateMerge, unavailable: 'Status changes are unavailable.' }],
 ]);
 
-export function createApp({ list = createGitHub(), updateTitle = list.updateTitle, convertToDraft = list.convertToDraft, markReadyForReview = list.markReadyForReview, merge = list.merge, dismissReview = list.dismissReview, config = { mode: 'local' }, localControl, authOptions, deploymentEnv = process.env } = {}) {
+export function createApp({ list = createGitHub(), updateTitle = list.updateTitle, convertToDraft = list.convertToDraft, markReadyForReview = list.markReadyForReview, merge = list.merge, dismissReview = list.dismissReview, closePull = list.closePull, reopenPull = list.reopenPull, config = { mode: 'local' }, localControl, authOptions, deploymentEnv = process.env } = {}) {
   const sha = deploymentEnv.RAILWAY_GIT_COMMIT_SHA;
   const owner = deploymentEnv.RAILWAY_GIT_REPO_OWNER;
   const repo = deploymentEnv.RAILWAY_GIT_REPO_NAME;
@@ -118,7 +121,7 @@ export function createApp({ list = createGitHub(), updateTitle = list.updateTitl
         let input;
         try { input = JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { throw new ApiError('Invalid JSON body.', 400); }
         input = mutation.validate(input);
-        const actions = session ? session.list : { merge, convertToDraft, markReadyForReview, updateTitle, dismissReview };
+        const actions = session ? session.list : { merge, convertToDraft, markReadyForReview, updateTitle, dismissReview, closePull, reopenPull };
         const mutate = actions[mutation.method];
         if (!mutate) throw new ApiError(mutation.unavailable, 503);
         const result = await mutate(input);
