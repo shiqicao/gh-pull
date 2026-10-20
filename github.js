@@ -170,7 +170,7 @@ export function createGitHub(options = {}) {
       total: connection.totalCount ?? connection.issueCount,
       limited: connection.issueCount > 1000,
       pageInfo: connection.pageInfo,
-      items: await withDependencyParents(await withMergeAccess(await withReviewThreadCounts(connection.nodes.filter(pr => pr?.id).map(pr => normalizePullRequest(pr, data.viewer.login))))),
+      items: await withDependencyParents(await withMergeAccess(connection.nodes.filter(pr => pr?.id).map(pr => normalizePullRequest(pr, data.viewer.login)))),
     };
   }
 
@@ -230,7 +230,16 @@ export function createGitHub(options = {}) {
       viewer { login }
       nodes(ids: $ids) { ... on PullRequest { ${fields} } }
     }`, { ids });
-    return { items: await withDependencyParents(await withMergeAccess(await withReviewThreadCounts(data.nodes.filter(pr => pr?.id).map(pr => normalizePullRequest(pr, data.viewer.login))))) };
+    return { items: await withDependencyParents(await withMergeAccess(data.nodes.filter(pr => pr?.id).map(pr => normalizePullRequest(pr, data.viewer.login)))) };
+  };
+
+  list.reviewCounts = async ids => {
+    const data = await graphql(`query ReviewCountVersions($ids: [ID!]!) {
+      nodes(ids: $ids) { ... on PullRequest { id updatedAt totalCommentsCount } }
+    }`, { ids });
+    return { items: await withReviewThreadCounts(data.nodes.filter(pr => pr?.id).map(pr => ({
+      id: pr.id, updatedAt: pr.updatedAt, commentCount: pr.totalCommentsCount,
+    }))) };
   };
 
   list.mergeReadiness = async ids => {

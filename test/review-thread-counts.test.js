@@ -29,3 +29,20 @@ test('partial, failed, inconsistent and runaway lookups fall back instead of sho
   const result = await createReviewThreadCounts(async () => response(Array(100).fill(true), 1001, String(++calls)))([pr]);
   assert.equal(calls, 10); assert.equal(result[0].reviewThreadCounts, null);
 });
+
+test('main list and status never fetch review threads; dedicated lookup uses lightweight versions', async () => {
+  const { createGitHub } = await import('../github.js');
+  const calls = [];
+  const node = { id: 'one', updatedAt: pr.updatedAt, totalCommentsCount: 4, state: 'OPEN', author: { login: 'alice' }, repository: { nameWithOwner: 'team/repo' }, labels: { nodes: [] }, commits: { nodes: [] } };
+  const list = createGitHub({ getToken: async () => 'mock', fetchImpl: async (url, options) => {
+    const request = JSON.parse(options.body); calls.push(request.query);
+    if (request.query.includes('query ReviewThreadCounts')) return Response.json({ data: response([true, false]) });
+    if (request.query.includes('query ReviewCountVersions')) return Response.json({ data: { nodes: [node] } });
+    return Response.json({ data: { viewer: { login: 'alice', pullRequests: { totalCount: 1, nodes: [node], pageInfo: { hasNextPage: false } } }, nodes: [node] } });
+  } });
+  await list(); await list.status(['one']);
+  assert.equal(calls.length, 2); assert.ok(calls.every(query => !query.includes('reviewThreads')));
+  const result = await list.reviewCounts(['one']);
+  assert.deepEqual(result.items[0].reviewThreadCounts, { resolved: 1, total: 2 });
+  assert.doesNotMatch(calls[2], /commits|latestReviews|mergeable/);
+});
