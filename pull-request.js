@@ -58,6 +58,8 @@ export function reviewState(pr) {
 export function normalizePullRequest(pr, viewerLogin) {
   return {
     ...mergeOptions(pr, viewerLogin),
+    canClose: pr.state === 'OPEN' && pr.viewerCanClose === true && pr.author?.login?.toLowerCase() === viewerLogin?.toLowerCase(),
+    canReopen: pr.state === 'CLOSED' && pr.viewerCanReopen === true && pr.author?.login?.toLowerCase() === viewerLogin?.toLowerCase(),
     id: pr.id, number: pr.number, title: pr.title, url: pr.url, branch: pr.headRefName ?? '',
     defaultBranch: pr.repository.defaultBranchRef?.name ?? '',
     baseBranch: pr.baseRefName ?? '', branchRepository: pr.headRepository?.nameWithOwner ?? null,

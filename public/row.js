@@ -1,4 +1,4 @@
-import { actionButton, iconButton, formError } from './controls.js';
+import { iconButton, formError } from './controls.js';
 import { html, nothing, repeat } from './vendor/lit-html.js';
 import { labels, relativeTime, NAME_COLOR_COUNT } from './model.js';
 import { iconTemplate as icon, badge, githubUrl, usernameLink, repositoryLink, copyFeedback, reviewStatus } from './templates.js';
@@ -30,8 +30,8 @@ function checks(pr) {
 
 export function renderRow(node, gutter, ctx) {
   const { pr } = node;
-  const { viewedStore, markViewed, viewerLogin, draftChanges, merges, titleEdits, changeDraftStatus,
-    render, focusTitleControl, createMergeAction, issuePopover, titleEditor, reviewControl, nameColors } = ctx;
+  const { viewedStore, markViewed, viewerLogin, draftChanges, merges, titleEdits,
+    render, focusTitleControl, createMergeAction, issuePopover, titleEditor, reviewControl, lifecycleControl, savingPull, nameColors } = ctx;
   const hasUpdates = viewedStore.hasUpdates(pr), own = pr.author.toLowerCase() === viewerLogin.toLowerCase();
   const url = githubUrl(pr.url), hasUrl = url !== nothing;
   const author = name => usernameLink(name, 'badge author', nameColors[name.toLowerCase()] * 360 / NAME_COLOR_COUNT);
@@ -42,7 +42,6 @@ export function renderRow(node, gutter, ctx) {
     if (!titleEdits.has(pr.id)) titleEdits.set(pr.id, { value: pr.title, expectedTitle: pr.title, saving: false, error: '' });
     render(); focusTitleControl(pr.id, '.title-editor input');
   };
-  const pending = draftChanges.get(pr.id)?.saving ?? false;
   const filesKnown = Number.isInteger(pr.changedFiles) && pr.changedFiles >= 0;
   const age = relativeTime(pr.updatedAt), diff = `${pr.additions} additions, ${pr.deletions} deletions`;
   const commentTitle = `${pr.commentCount} ${pr.commentCount === 1 ? 'comment' : 'comments'}`;
@@ -50,10 +49,7 @@ export function renderRow(node, gutter, ctx) {
     <div class=${`pr-row${hasUpdates ? ' has-updates' : ''}`} data-pr-id=${pr.id} @click=${onOpen} @auxclick=${onOpen}>
       <div class="pr-content"><div class="title-line">
         ${node.parent ? html`<span class="sr-only">Merges into #${node.parent.pr.number}: ${node.parent.pr.title}</span>` : nothing}
-        ${own && ['OPEN', 'DRAFT'].includes(pr.status) ? actionButton({ className: `badge ${pr.status.toLowerCase()} draft-action`,
-          disabled: pending || Boolean(merges.get(pr.id)?.saving), title: pr.status === 'OPEN' ? 'Convert to draft' : 'Mark ready for review',
-          label: pr.status === 'OPEN' ? `Convert ${pr.title} to draft` : `Mark ${pr.title} ready for review`,
-          onClick: () => changeDraftStatus(pr), content: pending ? 'Updating…' : labels[pr.status] }) : badge(labels[pr.status], pr.status)}
+        ${own && (['OPEN', 'DRAFT'].includes(pr.status) || pr.canReopen) ? lifecycleControl(pr, Boolean(savingPull(pr.id))) : badge(labels[pr.status], pr.status)}
         ${hasUrl ? html`<span class="pr-links">
           ${iconButton({ icon: 'copy', className: 'copy-link', title: 'Copy PR link', label: `Copy link to ${pr.title}`,
             copy: { text: url, success: 'PR link copied' } })}
