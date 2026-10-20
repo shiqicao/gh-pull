@@ -165,3 +165,4 @@ The extension workflow tests native builds on each supported platform. Version t
 ## License
 
 [MIT](LICENSE) © 2026 shiqicao. Third-party attribution and license terms are listed in [THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES).
+
