@@ -426,6 +426,7 @@ test('ready endpoint enforces same-origin JSON and clears the cache after succes
 
 test('file and comment totals are fetched for authored and search views, preserving zero and unknown counts', async () => {
   const list = createGitHub({ getToken: async () => 'test', fetchImpl: async (url, options) => {
+    if (JSON.parse(options.body).query.includes('ReviewThreadCounts')) return Response.json({ data: { node: { reviewThreads: { totalCount: 0, nodes: [], pageInfo: { hasNextPage: false } } } } });
     assert.match(JSON.parse(options.body).query, /totalCommentsCount/);
     assert.match(JSON.parse(options.body).query, /changedFiles/);
     const connection = { totalCount: 3, issueCount: 3, pageInfo: { hasNextPage: false },

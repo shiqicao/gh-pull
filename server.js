@@ -25,6 +25,7 @@ const assets = new Map([
   ['/controls.js', ['controls.js', 'text/javascript']],
   ['/popover.js', ['popover.js', 'text/javascript']],
   ['/lifecycle.js', ['lifecycle.js', 'text/javascript']],
+  ['/review-counts.js', ['review-counts.js', 'text/javascript']],
   ['/reviews.js', ['reviews.js', 'text/javascript']],
   ['/issues.js', ['issues.js', 'text/javascript']],
   ['/ui.js', ['ui.js', 'text/javascript']],
@@ -150,10 +151,10 @@ export function createApp({ list = createGitHub(), updateTitle = list.updateTitl
         return send(200, await cachedRequest(cache, JSON.stringify(['repositories', scope]),
           () => activeList.repositories(scope), { ttl: 5 * 60_000 }));
       }
-      if (['/api/pulls/readiness', '/api/pulls/status'].includes(url.pathname)) {
+      if (['/api/pulls/readiness', '/api/pulls/status', '/api/pulls/review-counts'].includes(url.pathname)) {
         const ids = url.searchParams.getAll('id');
         if (!ids.length || ids.length > 50 || ids.some(id => !id.trim() || id.length > 200)) return send(400, { error: 'Provide 1–50 valid PR IDs.' });
-        const kind = url.pathname.endsWith('/status') ? 'status' : 'mergeReadiness';
+        const kind = url.pathname.endsWith('/review-counts') ? 'reviewCounts' : url.pathname.endsWith('/status') ? 'status' : 'mergeReadiness';
         if (!activeList[kind]) return send(200, { items: [] });
         const key = JSON.stringify([kind, [...new Set(ids)].sort()]);
         return send(200, await cachedRequest(cache, key, async () => {
@@ -161,10 +162,10 @@ export function createApp({ list = createGitHub(), updateTitle = list.updateTitl
           // A node refresh can reveal changes before search's cached page expires.
           // Reconcile query membership through a fresh search on the next list read.
           if (kind === 'status') for (const cachedKey of cache.keys()) {
-            if (!['status', 'mergeReadiness', 'repositories'].includes(JSON.parse(cachedKey)[0])) cache.delete(cachedKey);
+            if (!['status', 'mergeReadiness', 'repositories', 'reviewCounts'].includes(JSON.parse(cachedKey)[0])) cache.delete(cachedKey);
           }
           return result;
-        }, { ttl: kind === 'status' ? 10_000 : 1000 }));
+        }, { ttl: kind === 'reviewCounts' ? 60_000 : kind === 'status' ? 10_000 : 1000 }));
       }
       if (url.pathname === '/api/pulls') {
         const scope = url.searchParams.get('scope') ?? 'authored';

@@ -1,3 +1,4 @@
+import { createReviewCountsLoader } from './review-counts.js';
 import { actionButton, formField, formError, formActions } from './controls.js';
 import { html, render as renderTemplate, repeat, nothing } from './vendor/lit-html.js';
 import { githubUrl, usernameLink, repositoryLink } from './templates.js';
@@ -27,6 +28,21 @@ let statusLoading = false, statusController, statusOffset = 0, loadedPages = 1;
 let events;
 let authMode = 'local', authenticated = false;
 let readinessTimer, readinessController;
+
+const reviewCountsLoader = createReviewCountsLoader({
+  async fetchCounts(id, signal) {
+    const response = await apiFetch(`/api/pulls/review-counts?${new URLSearchParams({ id })}`, { signal: AbortSignal.any([signal, AbortSignal.timeout(35_000)]) });
+    const data = await response.json();
+    if (!response.ok) throw responseError(response, data, 'Could not load review counts.');
+    return data;
+  },
+  onCounts(id, updatedAt, counts) {
+    const pr = items.find(item => item.id === id);
+    if (!pr || pr.updatedAt !== updatedAt || savingPull(id)) return;
+    pr.reviewThreadCounts = counts;
+    renderEditorRow(id);
+  },
+});
 
 function scheduleMergeReadiness(attempt = 0) {
   clearTimeout(readinessTimer);
@@ -64,7 +80,7 @@ function scheduleMergeReadiness(attempt = 0) {
 async function apiFetch(url, options) {
   const response = await fetch(url, options);
   if (response.status === 401 && authMode === 'github-app') {
-    authenticated = false;
+    authenticated = false; reviewCountsLoader.clear();
     items = []; titleEdits.clear(); reviewChanges.clear(); lifecycleChanges.clear(); draftChanges.clear(); merges.clear(); mergeSelections.clear();
     $('results').replaceChildren();
     $('dashboard').hidden = true;
@@ -235,6 +251,7 @@ async function changePull(pr, changes, { action, input = {}, apply, message, onS
   statusController?.abort(); statusLoading = false;
   clearTimeout(readinessTimer); readinessController?.abort();
   change.saving = true; change.error = '';
+  reviewCountsLoader.clear();
   changes.set(pr.id, change); render();
   const messages = changeMessages[action] ?? changeMessages.status;
   try {
@@ -444,6 +461,7 @@ function render() {
   results.querySelector('.empty')?.remove();
   if (!count && !loading) results.append(element('p', 'No pull requests found for this query.', 'empty'));
   results.setAttribute('aria-busy', String(loading));
+  reviewCountsLoader.update(items.filter(pr => !savingPull(pr.id)), viewerLogin);
   $('more').hidden = !more; $('more').disabled = loading;
   updateRefreshButton();
 }
@@ -685,7 +703,7 @@ async function initializeSession() {
       syncActivity();
     }
   } catch {
-    authenticated = false;
+    authenticated = false; reviewCountsLoader.clear();
     $('dashboard').hidden = true;
     $('refresh').hidden = true;
     $('session-status').hidden = false;
@@ -699,7 +717,7 @@ $('logout').addEventListener('click', async () => {
   try {
     const response = await fetch('/auth/logout', { method: 'POST' });
     if (!response.ok) throw new Error();
-    authenticated = false;
+    authenticated = false; reviewCountsLoader.clear();
     loads.cancel();
     location.replace('/');
   } catch {

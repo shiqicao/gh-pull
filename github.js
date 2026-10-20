@@ -1,3 +1,4 @@
+import { createReviewThreadCounts } from './review-thread-counts.js';
 import { repositoryScope } from './public/query.js';
 import { ApiError, createGraphQLClient } from './github-client.js';
 import { mergeOptions, normalizePullRequest, reviewState } from './pull-request.js';
@@ -82,6 +83,7 @@ export function validateDraftUpdate(input) {
 export function createGitHub(options = {}) {
   const { getMergeAccess } = options;
   const graphql = createGraphQLClient(options);
+  const withReviewThreadCounts = createReviewThreadCounts(graphql);
 
   async function ownedPullRequest(id, selection, deniedMessage) {
     const data = await graphql(`query($id: ID!) {
@@ -229,6 +231,15 @@ export function createGitHub(options = {}) {
       nodes(ids: $ids) { ... on PullRequest { ${fields} } }
     }`, { ids });
     return { items: await withDependencyParents(await withMergeAccess(data.nodes.filter(pr => pr?.id).map(pr => normalizePullRequest(pr, data.viewer.login)))) };
+  };
+
+  list.reviewCounts = async ids => {
+    const data = await graphql(`query ReviewCountVersions($ids: [ID!]!) {
+      nodes(ids: $ids) { ... on PullRequest { id updatedAt totalCommentsCount } }
+    }`, { ids });
+    return { items: await withReviewThreadCounts(data.nodes.filter(pr => pr?.id).map(pr => ({
+      id: pr.id, updatedAt: pr.updatedAt, commentCount: pr.totalCommentsCount,
+    }))) };
   };
 
   list.mergeReadiness = async ids => {
