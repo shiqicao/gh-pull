@@ -6,6 +6,7 @@ import { drawDependencies } from './dependencies.js';
 import { createPollingSchedule, pendingPulls } from './polling.js';
 import { createViewedStore, createLatestRequest, mergePullPages, createMergedStore } from './state.js';
 import { createIssuePopover } from './issues.js';
+import { createLifecycleControls } from './lifecycle.js';
 import { createReviewControls } from './reviews.js';
 import { element, icon, clipboardFeedback } from './ui.js';
 import { assignNameColors, dependencyLanes, groupPulls, labels } from './model.js';
@@ -64,7 +65,7 @@ async function apiFetch(url, options) {
   const response = await fetch(url, options);
   if (response.status === 401 && authMode === 'github-app') {
     authenticated = false;
-    items = []; titleEdits.clear(); reviewChanges.clear(); draftChanges.clear(); merges.clear(); mergeSelections.clear();
+    items = []; titleEdits.clear(); reviewChanges.clear(); lifecycleChanges.clear(); draftChanges.clear(); merges.clear(); mergeSelections.clear();
     $('results').replaceChildren();
     $('dashboard').hidden = true;
     location.replace('/?auth_error=expired');
@@ -84,9 +85,9 @@ function updateRefreshButton() {
   $('refresh').setAttribute('aria-busy', String(busy));
 }
 
-function savingPull(id) { return reviewChanges.get(id)?.saving || titleEdits.get(id)?.saving || draftChanges.get(id)?.saving || merges.get(id)?.saving; }
+function savingPull(id) { return lifecycleChanges.get(id)?.saving || reviewChanges.get(id)?.saving || titleEdits.get(id)?.saving || draftChanges.get(id)?.saving || merges.get(id)?.saving; }
 function protectedPull(id) {
-  return reviewChanges.has(id) || titleEdits.has(id) || issuePopover.pullId === id || draftChanges.get(id)?.saving || merges.get(id)?.saving;
+  return lifecycleChanges.has(id) || reviewChanges.has(id) || titleEdits.has(id) || issuePopover.pullId === id || draftChanges.get(id)?.saving || merges.get(id)?.saving;
 }
 function responseError(response, data, fallback) {
   const error = new Error(data.error || fallback);
@@ -164,6 +165,7 @@ function syncActivity() {
 }
 
 const collapsed = new Set();
+const lifecycleChanges = new Map();
 const reviewChanges = new Map();
 const titleEdits = new Map();
 const draftChanges = new Map();
@@ -201,7 +203,7 @@ function createMergeAction(pr, prUrl) {
   if (!methods.includes(mergeSelections.get(pr.id))) mergeSelections.delete(pr.id);
   const selected = mergeSelections.get(pr.id) ?? (methods.includes(pr.mergeMethod) ? pr.mergeMethod : methods[0]);
   const blocked = authMode === 'github-app' && !pr.mergeAccess?.allowed;
-  const disabled = blocked || Boolean(merges.get(pr.id)?.saving || draftChanges.get(pr.id)?.saving || titleEdits.has(pr.id));
+  const disabled = blocked || Boolean(merges.get(pr.id)?.saving || draftChanges.get(pr.id)?.saving || titleEdits.has(pr.id) || lifecycleChanges.has(pr.id));
   const controls = html`<span class=${`merge-controls${methods.length > 1 ? ' merge-split' : ''}`}>
     ${actionButton({ className: 'badge open merge-action', label: `${names[selected]} ${pr.repo} #${pr.number}`, disabled,
       onClick: () => mergePull(pr, selected), content: merges.get(pr.id)?.saving ? 'Merging…' : names[selected] })}
@@ -247,6 +249,7 @@ async function changePull(pr, changes, { action, input = {}, apply, message, onS
     changes.delete(pr.id); render();
     markViewed({ id: pr.id, updatedAt: data.updatedAt });
     $('summary').append(document.createTextNode(` · ${message}`));
+    if (data.warning) { $('mutation-notice').textContent = data.warning; $('mutation-notice').hidden = false; }
     polling.invalidate();
     onSuccess?.();
   } catch (error) {
@@ -285,6 +288,27 @@ async function changeDraftStatus(pr) {
     onSuccess: scheduleMergeReadiness,
   });
 }
+
+const lifecycleControls = createLifecycleControls({
+  changes: lifecycleChanges, changeDraft: changeDraftStatus,
+  onClose(id) { renderEditorRow(id); polling.invalidate(); },
+  async submit(pr, draft, action) {
+    await changePull(pr, lifecycleChanges, {
+      action, input: action === 'close' ? { comment: draft.value } : {},
+      message: action === 'close' ? 'Pull request closed' : 'Pull request reopened',
+      apply(current, data) {
+        mergedStore.confirm(data);
+        if (current) Object.assign(current, data);
+        items = items.map(item => mergedStore.reconcile(item));
+        if (current && !matchesQueryState(current, appliedQuery)) {
+          items = items.filter(item => item.id !== current.id); total = Math.max(0, total - 1);
+        }
+      },
+      onSuccess() { lifecycleControls.reset(); scheduleMergeReadiness(); void load({ refresh: true, background: true }); },
+      onError: lifecycleControls.recover,
+    });
+  },
+});
 
 const reviewControls = createReviewControls({
   changes: reviewChanges,
@@ -334,7 +358,7 @@ function titleEditor(pr) {
 const rowElements = new Map();
 const groupCache = new Map();
 const rowContext = () => ({ viewedStore, markViewed, viewerLogin, draftChanges, merges, titleEdits,
-  changeDraftStatus, render, focusTitleControl, createMergeAction, issuePopover, titleEditor, reviewControl: reviewControls.button, nameColors });
+  changeDraftStatus, render, focusTitleControl, createMergeAction, issuePopover, titleEditor, reviewControl: reviewControls.button, lifecycleControl: lifecycleControls.button, savingPull, nameColors });
 function renderEditorRow(id) {
   const row = rowElements.get(id);
   if (row) renderTemplate(renderRow(row.node, row.gutter, rowContext()), row.entry);
@@ -416,7 +440,7 @@ function render() {
     if (selection) focused.setSelectionRange(...selection);
   }
   issuePopover.reposition();
-  reviewControls.reconcile(activeRows);
+  reviewControls.reconcile(activeRows); lifecycleControls.reconcile(activeRows);
   results.querySelector('.empty')?.remove();
   if (!count && !loading) results.append(element('p', 'No pull requests found for this query.', 'empty'));
   results.setAttribute('aria-busy', String(loading));
@@ -464,9 +488,10 @@ async function load({ append = false, refresh = false, background = false } = {}
     if (!loads.isCurrent(request)) return;
     if (viewedStore.selectAccount(data.viewer)) {
       queryEditor?.clearRepositoryCache();
-      issuePopover.close(); reviewControls.reset();
+      issuePopover.close(); reviewControls.reset(); lifecycleControls.reset();
       mergedStore.clear();
-      titleEdits.clear(); reviewChanges.clear();
+      $('mutation-notice').hidden = true; $('mutation-notice').textContent = '';
+      titleEdits.clear(); reviewChanges.clear(); lifecycleChanges.clear();
       draftChanges.clear();
       merges.clear(); mergeSelections.clear();
     }

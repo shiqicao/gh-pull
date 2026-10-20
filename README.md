@@ -167,3 +167,5 @@ The extension workflow tests native builds on each supported platform. Version t
 [MIT](LICENSE) © 2026 shiqicao. Third-party attribution and license terms are listed in [THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES).
 
 Review indicators show **resolved/total review threads** when a PR has review threads. Hover for the total comment count. Counts refresh at most once a minute per PR version; PRs with no review threads show the plain comment count. Failed or incomplete lookups (including more than 1,000 threads) fall back to the comment count instead of showing partial resolution totals.
+
+On your own PRs, the Open/Draft badge menu includes **Close pull request…** when GitHub permits it. Confirm with an optional comment; the branch is retained. Closed PRs offer **Reopen pull request** when permitted. Closing a parent refreshes its dependent PRs. If closing succeeds but the comment cannot be confirmed, the dashboard reports that separately.

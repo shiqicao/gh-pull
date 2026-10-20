@@ -17,7 +17,7 @@ export function validateMerge(input) {
   return { id, headOid: input.headOid, mergeMethod: input.mergeMethod };
 }
 
-const fields = `id number title url state isDraft createdAt updatedAt headRefName baseRefName
+const fields = `viewerCanClose viewerCanReopen id number title url state isDraft createdAt updatedAt headRefName baseRefName
   headRepository { nameWithOwner }
   author { login } repository { nameWithOwner defaultBranchRef { name } }
   ${mergeFields}
@@ -47,6 +47,13 @@ const fields = `id number title url state isDraft createdAt updatedAt headRefNam
       statusContextCountsByState { state count }
     }
   } } } }`;
+
+export function validateClose(input) {
+  const { id } = validateDraftUpdate(input);
+  const comment = input.comment ?? '';
+  if (typeof comment !== 'string' || comment.length > 4000) throw new ApiError('Comment must be at most 4,000 characters.', 400);
+  return { id, comment: comment.trim() };
+}
 
 export function validateReviewDismissal(input) {
   const { id } = validateDraftUpdate(input);
@@ -114,7 +121,7 @@ export function createGitHub(options = {}) {
         definitions.push(`$owner${i}: String!`, `$repo${i}: String!`, `$branch${i}: String!`);
         queries.push(`p${i}: repository(owner: $owner${i}, name: $repo${i}) {
           pullRequests(headRefName: $branch${i}, states: [OPEN, CLOSED, MERGED], first: 10, orderBy: {field: UPDATED_AT, direction: DESC}) {
-            pageInfo { hasNextPage } nodes { id number state headRefName headRepository { nameWithOwner } }
+            pageInfo { hasNextPage } nodes { id number state updatedAt headRefName headRepository { nameWithOwner } }
           }
         }`);
       });
@@ -126,7 +133,7 @@ export function createGitHub(options = {}) {
           const open = matches.filter(n => n.state === 'OPEN');
           const match = !connection?.pageInfo?.hasNextPage && (open.length === 1 ? open[0] : !open.length && matches.length === 1 ? matches[0] : null);
           if (dependencyCache.size >= 256) dependencyCache.clear();
-          dependencyCache.set(key, { until: Date.now() + 60_000, parent: match ? { id: match.id, number: match.number, status: match.state } : null });
+          dependencyCache.set(key, { until: Date.now() + 60_000, parent: match ? { id: match.id, number: match.number, status: match.state, ...(match.updatedAt ? { updatedAt: match.updatedAt } : {}) } : null });
         });
       } catch {
         // The graph is supplementary: a lookup failure must not hide loaded PRs.
@@ -256,6 +263,34 @@ export function createGitHub(options = {}) {
     dependencyCache.clear();
     return { id: merged.id, status: 'MERGED', updatedAt: merged.updatedAt, canMerge: false };
   };
+
+  async function setClosed(input, closed) {
+    const { id, comment = '' } = closed ? validateClose(input) : validateDraftUpdate(input);
+    let { pr, viewer } = await ownedPullRequest(id, fields, 'You can only close or reopen your own pull requests.');
+    const expected = closed ? 'CLOSED' : 'OPEN';
+    if (pr.state === 'MERGED') throw new ApiError('Merged pull requests cannot be closed or reopened.', 409);
+    if (pr.state === expected) {
+      dependencyCache.clear();
+      return { ...normalizePullRequest(pr, viewer), ...(comment ? { warning: 'This PR was already closed. No additional comment was posted.' } : {}) };
+    }
+    if (!(closed ? pr.viewerCanClose : pr.viewerCanReopen)) throw new ApiError('GitHub does not allow this action on this pull request.', 403);
+    const name = closed ? 'closePullRequest' : 'reopenPullRequest';
+    const type = closed ? 'ClosePullRequestInput' : 'ReopenPullRequestInput';
+    const data = await graphql(`mutation($input: ${type}!) { ${name}(input: $input) { pullRequest { ${fields} } } }`, { input: { pullRequestId: id } });
+    pr = data[name]?.pullRequest;
+    if (pr?.state !== expected) throw new ApiError('GitHub did not confirm the status change. Refresh to check its status.');
+    dependencyCache.clear();
+    let warning;
+    if (closed && comment) {
+      try {
+        const posted = await graphql(`mutation($input: AddCommentInput!) { addComment(input: $input) { commentEdge { node { id } } } }`, { input: { subjectId: id, body: comment } });
+        if (!posted.addComment?.commentEdge?.node?.id) throw new Error('Unconfirmed comment');
+      } catch { warning = 'PR closed, but the comment could not be confirmed. Check GitHub before posting it again.'; }
+    }
+    return { ...normalizePullRequest(pr, viewer), ...(warning ? { warning } : {}) };
+  }
+  list.closePull = input => setClosed(input, true);
+  list.reopenPull = input => setClosed(input, false);
 
   list.dismissReview = async input => {
     const { id, reviewId, message } = validateReviewDismissal(input);

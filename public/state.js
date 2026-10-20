@@ -67,11 +67,24 @@ export function mergePullPages(previous, incoming, append) {
 // Merging is irreversible. Remember confirmations even after a row is removed,
 // so a stale search result cannot resurrect it as open. Scoped to one account.
 export function createMergedStore() {
-  const merged = new Map();
+  const merged = new Map(), transitions = new Map();
   return {
-    clear() { merged.clear(); },
+    clear() { merged.clear(); transitions.clear(); },
+    confirm(pr) {
+      transitions.set(pr.id, { status: pr.status, updatedAt: pr.updatedAt, canClose: pr.canClose, canReopen: pr.canReopen,
+        canMerge: pr.canMerge ?? false, mergePending: pr.mergePending ?? false });
+    },
     reconcile(pr) {
-      const parent = merged.get(pr.dependencyParent?.id);
+      const transition = transitions.get(pr.id);
+      if (transition) {
+        if (pr.status === 'MERGED' || Date.parse(pr.updatedAt) > Date.parse(transition.updatedAt)) transitions.delete(pr.id);
+        else pr = { ...pr, ...transition };
+      }
+      const parentTransition = transitions.get(pr.dependencyParent?.id);
+      if (parentTransition && (pr.dependencyParent.status === 'MERGED' || Date.parse(pr.dependencyParent.updatedAt) > Date.parse(parentTransition.updatedAt))) {
+        transitions.delete(pr.dependencyParent.id);
+      }
+      const parent = merged.get(pr.dependencyParent?.id) ?? transitions.get(pr.dependencyParent?.id);
       if (parent) pr = { ...pr, dependencyParent: { ...pr.dependencyParent, ...parent } };
       const known = merged.get(pr.id);
       if (pr.status === 'MERGED' && (!known || Date.parse(pr.updatedAt) >= Date.parse(known.updatedAt))) {
