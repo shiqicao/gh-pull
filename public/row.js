@@ -45,7 +45,9 @@ export function renderRow(node, gutter, ctx) {
   const pending = draftChanges.get(pr.id)?.saving ?? false;
   const filesKnown = Number.isInteger(pr.changedFiles) && pr.changedFiles >= 0;
   const age = relativeTime(pr.updatedAt), diff = `${pr.additions} additions, ${pr.deletions} deletions`;
-  const commentTitle = `${pr.commentCount} ${pr.commentCount === 1 ? 'comment' : 'comments'}`;
+  const threads = pr.reviewThreadCounts?.total > 0 ? pr.reviewThreadCounts : null;
+  const commentTitle = threads ? `${threads.resolved} of ${threads.total} review threads resolved; ${pr.commentCount ?? 0} total comments`
+    : `${pr.commentCount} ${pr.commentCount === 1 ? 'comment' : 'comments'}${pr.reviewThreadCounts === null ? '; review thread resolution unavailable' : ''}`;
   return html`${gutter ? html`<div class="dependency-gutter" aria-hidden="true"></div>` : nothing}
     <div class=${`pr-row${hasUpdates ? ' has-updates' : ''}`} data-pr-id=${pr.id} @click=${onOpen} @auxclick=${onOpen}>
       <div class="pr-content"><div class="title-line">
@@ -75,7 +77,7 @@ export function renderRow(node, gutter, ctx) {
         ${pr.review !== 'NONE' ? badge(reviewLabels[pr.review] ?? pr.review, pr.review, pr.review === 'REVIEW_BYPASS_AVAILABLE' ? 'GitHub requires reviews for this branch, but your account can bypass branch protections.' : nothing) : nothing}
         <time class="updated-time" datetime=${pr.updatedAt} title=${`Updated ${new Date(pr.updatedAt).toLocaleString()}`} aria-label=${`Updated ${age}`}>${icon('clock', 14)}${age}</time>
         <span class="diff-counts" title=${diff} aria-label=${diff}><span class="additions success">${pr.additions}</span><span class="deletions failure">${pr.deletions}</span></span>
-        ${Number.isInteger(pr.commentCount) && pr.commentCount >= 0 ? html`<span class="comment-count" title=${commentTitle} aria-label=${commentTitle}>${icon('comment', 14)}${pr.commentCount}</span>` : nothing}
+        ${Number.isInteger(pr.commentCount) && pr.commentCount >= 0 ? html`<span class="comment-count" title=${commentTitle} aria-label=${commentTitle}>${icon('comment', 14)}${threads ? `${threads.resolved}/${threads.total}` : pr.commentCount}</span>` : nothing}
         ${issuePopover.button(pr)}${pr.labels.map(label => badge(label, 'label'))}
       </div><span class="sr-only" role="status"></span></div>
       ${pr.reviewers?.length || pr.reviewersTruncated ? html`<div class="reviewers" role="group" aria-label="Reviewers">

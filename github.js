@@ -1,3 +1,4 @@
+import { createReviewThreadCounts } from './review-thread-counts.js';
 import { repositoryScope } from './public/query.js';
 import { ApiError, createGraphQLClient } from './github-client.js';
 import { mergeOptions, normalizePullRequest, reviewState } from './pull-request.js';
@@ -75,6 +76,7 @@ export function validateDraftUpdate(input) {
 export function createGitHub(options = {}) {
   const { getMergeAccess } = options;
   const graphql = createGraphQLClient(options);
+  const withReviewThreadCounts = createReviewThreadCounts(graphql);
 
   async function ownedPullRequest(id, selection, deniedMessage) {
     const data = await graphql(`query($id: ID!) {
@@ -161,7 +163,7 @@ export function createGitHub(options = {}) {
       total: connection.totalCount ?? connection.issueCount,
       limited: connection.issueCount > 1000,
       pageInfo: connection.pageInfo,
-      items: await withDependencyParents(await withMergeAccess(connection.nodes.filter(pr => pr?.id).map(pr => normalizePullRequest(pr, data.viewer.login)))),
+      items: await withDependencyParents(await withMergeAccess(await withReviewThreadCounts(connection.nodes.filter(pr => pr?.id).map(pr => normalizePullRequest(pr, data.viewer.login))))),
     };
   }
 
@@ -221,7 +223,7 @@ export function createGitHub(options = {}) {
       viewer { login }
       nodes(ids: $ids) { ... on PullRequest { ${fields} } }
     }`, { ids });
-    return { items: await withDependencyParents(await withMergeAccess(data.nodes.filter(pr => pr?.id).map(pr => normalizePullRequest(pr, data.viewer.login)))) };
+    return { items: await withDependencyParents(await withMergeAccess(await withReviewThreadCounts(data.nodes.filter(pr => pr?.id).map(pr => normalizePullRequest(pr, data.viewer.login))))) };
   };
 
   list.mergeReadiness = async ids => {

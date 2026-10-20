@@ -165,3 +165,5 @@ The extension workflow tests native builds on each supported platform. Version t
 ## License
 
 [MIT](LICENSE) © 2026 shiqicao. Third-party attribution and license terms are listed in [THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES).
+
+Review indicators show **resolved/total review threads** when a PR has review threads. Hover for the total comment count. Counts refresh at most once a minute per PR version; PRs with no review threads show the plain comment count. Failed or incomplete lookups (including more than 1,000 threads) fall back to the comment count instead of showing partial resolution totals.
