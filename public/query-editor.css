@@ -175,7 +175,6 @@ button.saved-view-save:not(:disabled) { background: var(--color-control); border
 .saved-views-popover .form-description, .saved-views-popover .error-message { margin: 0; font-size: 13px; overflow-wrap: anywhere; }
 .saved-views-popover .error-message { font-size: 12px; }
 .saved-views-popover.saved-views-menu { width: min(240px, calc(100vw - 16px)); padding: 6px; }
-.saved-views-menu .popover-menu > .form-description { padding: 6px 8px 4px; font-size: 12px; color: var(--color-muted); }
 .saved-views-menu .popover-menu-item { padding: 7px 8px; min-height: 0; }
 .saved-views-menu form { padding: 8px; }
 @media (max-width: 600px) { .saved-view-pills { flex-basis: 100%; } .saved-view-actions { flex-basis: 100%; } }
