@@ -40,7 +40,7 @@ export function createLifecycleControls({ changes, submit, changeDraft, onClose 
       if (active?.id === pr.id) { active = pr; content(); }
       return actionButton({ className: `badge ${pr.status.toLowerCase()} lifecycle-action`, label: `Status options for ${pr.title}`,
         popover: popover.panel, expanded: popover.pullId === pr.id, disabled: disabled || [...changes.values()].some(change => change.saving),
-        content: html`${labels[pr.status]}${icon('chevron-down', 10)}`,
+        content: html`${labels[pr.status]}${icon('chevron-down', 12)}`,
         onClick: event => {
           if (active?.id !== pr.id) {
             if (active) changes.delete(active.id);

@@ -48,7 +48,7 @@ export function createReviewControls({ changes, submit, onClose }) {
             changes.set(pr.id, { reviewId: reviewer.reviewId, value: '', confirm: false, saving: false, error: '' });
           }
           popover.attach(event.currentTarget); content();
-        }, content: html`${reviewStatus('✓', 'approved')}${icon('chevron-down', 10)}` });
+        }, content: html`${reviewStatus('✓', 'approved')}${icon('chevron-down', 12)}` });
     },
   };
 }

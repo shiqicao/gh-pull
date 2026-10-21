@@ -794,16 +794,16 @@ input:focus, select:focus, textarea:focus {
   border-radius: 0 var(--radius-small) var(--radius-small) 0;
 }
 
+/* The same rounded 16-unit chevron used by ui.js icons. */
 .merge-method-trigger::after {
   content: '';
   position: absolute;
-  width: 5px;
-  height: 5px;
-  left: 8px;
-  top: calc(50% - 4px);
-  border-right: 1.5px solid currentColor;
-  border-bottom: 1.5px solid currentColor;
-  transform: rotate(45deg);
+  width: 12px;
+  height: 12px;
+  left: 6px;
+  top: calc(50% - 6px);
+  background: currentColor;
+  mask: var(--dropdown-arrow) center / contain no-repeat;
   pointer-events: none;
 }
 
@@ -891,3 +891,16 @@ textarea.form-input { display: block; width: 100%; min-height: 80px; margin: 6px
 
 .lifecycle-action { display: inline-flex; align-items: center; gap: 4px; }
 #mutation-notice { padding: 10px 12px; border: 1px solid var(--color-border); border-radius: var(--radius-control); background: var(--color-warning-bg); }
+
+/* Preserve native select interaction while matching the app's menu chevrons. */
+select:not([multiple]):not([size]) {
+  appearance: none;
+  background-image: var(--dropdown-arrow);
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 12px 12px;
+  padding-right: 30px;
+}
+@media (forced-colors: active) {
+  select:not([multiple]):not([size]) { appearance: auto; background-image: none; }
+}
