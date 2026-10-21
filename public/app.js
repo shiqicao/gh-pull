@@ -1,3 +1,4 @@
+import { createSavedViews } from './saved-views.js';
 import { createReviewCountsLoader } from './review-counts.js';
 import { actionButton, formField, formError, formActions } from './controls.js';
 import { html, render as renderTemplate, repeat, nothing } from './vendor/lit-html.js';
@@ -80,7 +81,7 @@ function scheduleMergeReadiness(attempt = 0) {
 async function apiFetch(url, options) {
   const response = await fetch(url, options);
   if (response.status === 401 && authMode === 'github-app') {
-    authenticated = false; reviewCountsLoader.clear();
+    authenticated = false; reviewCountsLoader.clear(); savedViews?.reset();
     items = []; titleEdits.clear(); reviewChanges.clear(); lifecycleChanges.clear(); draftChanges.clear(); merges.clear(); mergeSelections.clear();
     $('results').replaceChildren();
     $('dashboard').hidden = true;
@@ -535,6 +536,7 @@ async function load({ append = false, refresh = false, background = false } = {}
     data.items = data.items.filter(pr => !excluded.has(pr.id));
     data.total = Math.max(0, data.total - excluded.size);
     loadedPages = append ? loadedPages + 1 : pages;
+    if (viewerLogin && viewerLogin !== data.viewer) savedViews?.reset({ reload: true });
     viewerLogin = data.viewer;
     items = mergePullPages(items, data.items, append);
     for (const pr of data.items) {
@@ -567,7 +569,7 @@ function saveFilters() {
   const query = new URLSearchParams({ q: appliedQuery, group: $('group').value });
   history.replaceState(null, '', `?${query}`);
 }
-let queryEditor;
+let queryEditor, savedViews;
 async function initializeQueryEditor() {
   if (queryEditor) return;
   const { createQueryEditor } = await import('./query-editor.js');
@@ -581,9 +583,19 @@ async function initializeQueryEditor() {
     },
     onChange: updateQueryControls, onSubmit: applyQuery,
   });
+  savedViews = createSavedViews({ enabled: authMode === 'local', getQuery: () => queryEditor.value, getAppliedQuery: () => appliedQuery, getGroup: () => $('group').value, onOpen: () => queryEditor.closeSuggestions(),
+    apply: (query, group, draft = query) => { $('group').value = group; queryEditor.setValue(query); applyQuery(); queryEditor.setValue(draft); updateQueryControls(); render(); },
+    request: async input => {
+      const response = await apiFetch('/api/saved-views', input ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input), signal: AbortSignal.timeout(35_000) } : { signal: AbortSignal.timeout(35_000) });
+      const data = await response.json();
+      if (!response.ok) throw responseError(response, data, 'Could not save views.');
+      return data;
+    },
+  });
   updateQueryControls();
 }
 function updateQueryControls() {
+  savedViews?.update();
   const value = queryEditor.value;
   for (const [control, preset] of Object.entries(queryPresets(value))) $(control).value = preset;
   const error = queryError(value);
@@ -611,7 +623,7 @@ for (const id of ['scope', 'state', 'sort']) $(id).addEventListener('change', ()
   queryEditor.setValue(setQueryPreset(queryEditor.value, id, $(id).value));
   applyQuery();
 });
-$('group').addEventListener('change', () => { saveFilters(); render(); });
+$('group').addEventListener('change', () => { saveFilters(); savedViews?.update(); render(); });
 $('refresh').addEventListener('click', () => load({ refresh: true }));
 $('more').addEventListener('click', () => load({ append: true }));
 setInterval(poll, 1000);
@@ -703,7 +715,7 @@ async function initializeSession() {
       syncActivity();
     }
   } catch {
-    authenticated = false; reviewCountsLoader.clear();
+    authenticated = false; reviewCountsLoader.clear(); savedViews?.reset();
     $('dashboard').hidden = true;
     $('refresh').hidden = true;
     $('session-status').hidden = false;
@@ -717,7 +729,7 @@ $('logout').addEventListener('click', async () => {
   try {
     const response = await fetch('/auth/logout', { method: 'POST' });
     if (!response.ok) throw new Error();
-    authenticated = false; reviewCountsLoader.clear();
+    authenticated = false; reviewCountsLoader.clear(); savedViews?.reset();
     loads.cancel();
     location.replace('/');
   } catch {

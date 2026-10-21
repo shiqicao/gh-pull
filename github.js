@@ -174,6 +174,8 @@ export function createGitHub(options = {}) {
     };
   }
 
+  list.viewer = async () => (await graphql('query SavedViewsViewer { viewer { login } }')).viewer.login;
+
   list.repositories = async query => {
     const scope = repositoryScope(query);
     async function discover(people) {

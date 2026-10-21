@@ -1,3 +1,4 @@
+import { createSavedViewsStore, rankSavedViews } from './saved-views.js';
 import { isSea, getAsset } from 'node:sea';
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
@@ -13,6 +14,7 @@ import { createUpdateCheck } from './extension-updates.js';
 
 const assets = new Map([
   ['/', ['index.html', 'text/html']],
+  ['/saved-views.js', ['saved-views.js', 'text/javascript']],
   ['/app.js', ['app.js', 'text/javascript']],
   ['/row.js', ['row.js', 'text/javascript']],
   ['/templates.js', ['templates.js', 'text/javascript']],
@@ -53,7 +55,7 @@ const mutations = new Map([
   ['/api/pulls/merge', { method: 'merge', validate: validateMerge, unavailable: 'Status changes are unavailable.' }],
 ]);
 
-export function createApp({ list = createGitHub(), updateTitle = list.updateTitle, convertToDraft = list.convertToDraft, markReadyForReview = list.markReadyForReview, merge = list.merge, dismissReview = list.dismissReview, closePull = list.closePull, reopenPull = list.reopenPull, config = { mode: 'local' }, localControl, authOptions, deploymentEnv = process.env } = {}) {
+export function createApp({ savedViews = createSavedViewsStore(), list = createGitHub(), updateTitle = list.updateTitle, convertToDraft = list.convertToDraft, markReadyForReview = list.markReadyForReview, merge = list.merge, dismissReview = list.dismissReview, closePull = list.closePull, reopenPull = list.reopenPull, config = { mode: 'local' }, localControl, authOptions, deploymentEnv = process.env } = {}) {
   const sha = deploymentEnv.RAILWAY_GIT_COMMIT_SHA;
   const owner = deploymentEnv.RAILWAY_GIT_REPO_OWNER;
   const repo = deploymentEnv.RAILWAY_GIT_REPO_NAME;
@@ -108,6 +110,27 @@ export function createApp({ list = createGitHub(), updateTitle = list.updateTitl
       if (auth && url.pathname.startsWith('/api/') && !session) throw new ApiError('Please sign in with GitHub.', 401);
       const activeList = session ? session.list : list;
       const cache = session ? session.cache : localCache;
+      if (url.pathname === '/api/saved-views') {
+        if (auth) return send(404, { error: 'Saved views are available in local mode.' });
+        if (!['GET', 'POST'].includes(req.method)) return send(405, { error: 'Method not allowed.' });
+        let input;
+        if (req.method === 'POST') {
+          if (req.headers.origin !== origin) return send(403, { error: 'Same-origin requests only.' });
+          if (req.headers['content-type']?.split(';')[0].trim() !== 'application/json') return send(415, { error: 'Expected application/json.' });
+          const chunks = []; let size = 0;
+          for await (const chunk of req) {
+            size += chunk.length;
+            if (size > 8192) throw new ApiError('Request body is too large.', 413);
+            chunks.push(chunk);
+          }
+          try { input = JSON.parse(Buffer.concat(chunks).toString('utf8')); }
+          catch { throw new ApiError('Invalid JSON body.', 400); }
+        }
+        if (!activeList.viewer) throw new ApiError('Could not identify the GitHub account.', 503);
+        const account = await activeList.viewer();
+        if (input && input.account !== account) throw new ApiError('GitHub account changed. Reopen Views and try again.', 409);
+        return send(200, { account, views: req.method === 'GET' ? rankSavedViews(await savedViews.list(account)) : await savedViews.change(account, input) });
+      }
       const mutation = mutations.get(url.pathname);
       if (req.method === 'PATCH' && mutation) {
         if (req.headers.origin !== origin) return send(403, { error: 'Same-origin requests only.' });
