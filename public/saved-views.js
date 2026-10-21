@@ -159,7 +159,6 @@ export function createSavedViews({ request, getQuery, getAppliedQuery, getGroup,
     popover.panel.classList.toggle('saved-views-overflow', mode === 'more');
     if (popupTrigger) popover.attach(popupTrigger, { anchor: mode === 'save' ? footer : popupTrigger, align: ['save', 'more'].includes(mode) ? 'end' : 'start' });
     render(mode === 'more' ? html`<div class="popover-menu" aria-label="More saved views">${repeat(overflow, view => view.id, view => html`<button type="button" class="popover-menu-item" title=${`${view.query} · Group by: ${groupName(view.group)}`} @click=${() => select(view)}>${view.name}</button>`)}</div>` : mode === 'menu' ? html`<div class="popover-menu">
-      <p class="form-description">${view?.name}</p>
       <button type="button" class="popover-menu-item" @click=${() => { mode = 'rename'; name = view.name; content(); popover.panel.querySelector('input').focus(); }}>Rename…</button>
       <button type="button" class="popover-menu-item destructive" @click=${() => { mode = 'delete'; content(); }}>Delete…</button>
     </div>` : html`<form @submit=${event => {
