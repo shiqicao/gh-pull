@@ -8,15 +8,20 @@ export function createPopover({ id, className = '', label, labelledBy, align = '
   if (label) panel.setAttribute('aria-label', label);
   if (labelledBy) panel.setAttribute('aria-labelledby', labelledBy);
   document.body.append(panel);
-  let trigger;
+  let trigger, anchor, alignment = align;
   const isOpen = () => panel.matches(':popover-open');
   function position() {
-    if ((!isOpen() && !panel.classList.contains('measuring')) || !trigger?.isConnected) return;
-    const rect = trigger.getBoundingClientRect(), width = panel.offsetWidth, height = panel.offsetHeight;
-    const left = align === 'end' ? rect.right - width : rect.left;
-    panel.style.left = `${Math.max(8, Math.min(left, innerWidth - width - 8))}px`;
+    if ((!isOpen() && !panel.classList.contains('measuring')) || !anchor?.isConnected) return;
+    // Client rectangles include CSS zoom; fixed-position coordinates do not.
+    const scale = panel.getBoundingClientRect().width / panel.offsetWidth || 1;
+    const viewportWidth = innerWidth / scale, viewportHeight = innerHeight / scale;
+    panel.style.maxWidth = `${Math.max(0, viewportWidth - 16)}px`;
+    const bounds = anchor.getBoundingClientRect(), width = panel.offsetWidth, height = panel.offsetHeight;
+    const rect = { left: bounds.left / scale, right: bounds.right / scale, top: bounds.top / scale, bottom: bounds.bottom / scale };
+    const left = alignment === 'end' ? rect.right - width : rect.left;
+    panel.style.left = `${Math.max(8, Math.min(left, viewportWidth - width - 8))}px`;
     const below = rect.bottom + 6;
-    panel.style.top = `${Math.max(8, Math.min(below + height <= innerHeight - 8 ? below : rect.top - height - 6, innerHeight - height - 8))}px`;
+    panel.style.top = `${Math.max(8, Math.min(below + height <= viewportHeight - 8 ? below : rect.top - height - 6, viewportHeight - height - 8))}px`;
   }
   panel.addEventListener('beforetoggle', event => {
     const opening = event.newState === 'open';
@@ -35,9 +40,11 @@ export function createPopover({ id, className = '', label, labelledBy, align = '
     panel, reposition: position,
     get isOpen() { return isOpen(); },
     get pullId() { return isOpen() ? trigger?.closest('.pr-row')?.dataset.prId : null; },
-    attach(button) {
+    attach(button, options = {}) {
       if (trigger !== button && isOpen()) panel.hidePopover();
       trigger?.setAttribute('aria-expanded', 'false'); trigger = button;
+      anchor = options.anchor ?? button; alignment = options.align ?? align;
+      if (isOpen()) { trigger?.setAttribute('aria-expanded', 'true'); position(); }
     },
     close() { if (isOpen()) panel.hidePopover(); },
     destroy() {

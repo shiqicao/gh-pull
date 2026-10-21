@@ -88,5 +88,6 @@ export function createQueryEditor({ parent, value, onChange, onSubmit, getItems,
       if (next !== editor.state.doc.toString()) editor.dispatch({ changes: { from: 0, to: editor.state.doc.length, insert: next } });
     },
     focus() { editor.focus(); },
+    closeSuggestions() { closeCompletion(editor); },
   };
 }

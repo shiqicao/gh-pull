@@ -189,7 +189,7 @@ test('invalid drafts are local, failed searches can retry, pagination preserves 
   await f.submit('repo:example/sdk');
   await page.locator('#error').waitFor();
   assert.match(await page.locator('#error').textContent(), /Search is temporarily unavailable/);
-  f.fail(false); await page.getByRole('button', { name: 'Retry', exact: true }).click();
+  f.fail(false); await page.locator('#error').getByRole('button', { name: 'Retry', exact: true }).click();
   await page.locator('.pr-row').first().waitFor();
   await page.click('#more');
   await page.waitForFunction(() => document.querySelectorAll('.pr-row').length === 3);
@@ -227,12 +227,8 @@ test('late search responses cannot replace newer results', async t => {
 test('editor and suggestions fit mobile and desktop in light and dark themes', async t => {
   const { page, editor, open, errors } = await fixture(t);
   await open();
-  const fontLoaded = await page.evaluate(async () => {
-    await document.fonts.ready;
-    return [...document.fonts].some(font => font.family === 'Inter' && font.status === 'loaded');
-  });
-  assert.equal(fontLoaded, true);
-  assert.match(await page.locator('body').evaluate(node => getComputedStyle(node).fontFamily), /Inter/);
+  await page.evaluate(() => document.fonts.ready);
+  assert.match(await page.locator('body').evaluate(node => getComputedStyle(node).fontFamily), /-apple-system.*BlinkMacSystemFont.*Segoe UI/);
   const dir = process.env.BROWSER_ARTIFACT_DIR || '/tmp/gh-pull-query-browser';
   await mkdir(dir, { recursive: true });
   for (const colorScheme of ['light', 'dark']) {

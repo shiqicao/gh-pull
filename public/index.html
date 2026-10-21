@@ -28,6 +28,8 @@
   <p id="session-status" role="status">Connecting…</p>
   <button id="session-retry" type="button" hidden>Retry connection</button>
   <main id="dashboard" hidden>
+    <section class="search-panel" aria-label="Search and saved views">
+    <section id="saved-views" aria-label="Saved views" hidden></section>
     <form id="filters" aria-label="Pull request filters">
       <div class="query-search">
         <div class="query-caption"><span id="query-label" class="field-label">Search pull requests</span><span id="query-help" class="query-guidance help-text"><span id="query-hint" role="status" aria-live="polite">Enter to search</span> · Ctrl+Space for suggestions · <a href="https://docs.github.com/en/search-github/searching-on-github/searching-issues-and-pull-requests" target="_blank" rel="noopener noreferrer">Search syntax</a></span><span id="query-feedback" class="query-guidance help-text" role="status" aria-live="polite" hidden></span></div>
@@ -38,6 +40,8 @@
       <label class="field field-label">Group by<select id="group"><option value="repo">Repository</option><option value="author">Author</option><option value="status">Status</option><option value="checks">Checks</option><option value="none">No grouping</option></select></label>
       <label class="field field-label">Sort<select id="sort"><option value="updated">Recently updated</option><option value="created">Newest created</option><option value="oldest">Oldest created</option><option value="relevance">Best match</option><option value="custom" disabled>Custom</option></select></label>
     </form>
+    <div id="saved-view-footer" hidden></div>
+    </section>
     <p id="summary" role="status" aria-live="polite">Loading pull requests…</p>
     <div id="error" role="alert" hidden></div>
     <p id="mutation-notice" role="status" hidden></p>

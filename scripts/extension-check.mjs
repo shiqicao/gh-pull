@@ -40,7 +40,7 @@ test('standalone extension launches, embeds assets, reuses, stops, and recovers 
   assert.equal((await (await fetch(url + '/api/session')).json()).mode, 'local');
   assert.equal((await fetch(url + '/api/cli')).status, 403);
   assert.equal((await fetch(url + '/api/cli', { method: 'POST' })).status, 403);
-  for (const asset of ['/app.js', '/issues.js', '/polling.js', '/theme.css', '/style.css', '/query-editor.css', '/query-editor.js', '/vendor/codemirror.js', '/favicon.svg', '/fonts/InterVariable-4.1.woff2']) {
+  for (const asset of ['/app.js', '/saved-views.js', '/issues.js', '/polling.js', '/theme.css', '/style.css', '/query-editor.css', '/query-editor.js', '/vendor/codemirror.js', '/favicon.svg', '/fonts/InterVariable-4.1.woff2']) {
     const response = await fetch(url + asset);
     assert.equal(response.status, 200, asset);
     assert.ok((await response.arrayBuffer()).byteLength > 0, asset);

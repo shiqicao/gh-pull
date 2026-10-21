@@ -14,7 +14,7 @@
   --lane-review: light-dark(#6e7781, #8b949e);
   --lane-running: light-dark(#9a6700, #d29922);
   --lane-failed: light-dark(#cf222e, #f85149);
-  --font-ui: 'Inter', system-ui, sans-serif;
+  --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif;
   --color-text: light-dark(#1f2328, #e6edf3);
   --color-page: light-dark(#ffffff, #0d1117);
   --color-muted: light-dark(#59636e, #a7b1bd);

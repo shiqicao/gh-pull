@@ -39,7 +39,8 @@ test('packaged dashboard works in a browser without source assets or external re
   await page.goto(origin);
   await page.locator('.pr-row').waitFor();
   assert.equal(await page.locator('.pr-files .file-count').textContent(), '8');
-  assert.equal(await page.evaluate(async () => { await document.fonts.ready; return [...document.fonts].some(font => font.family === 'Inter' && font.status === 'loaded'); }), true);
+  await page.evaluate(() => document.fonts.ready);
+  assert.match(await page.locator('body').evaluate(node => getComputedStyle(node).fontFamily), /-apple-system.*BlinkMacSystemFont.*Segoe UI/);
   const artifacts = process.env.BROWSER_ARTIFACT_DIR || '/tmp/gh-pull-extension-browser';
   await mkdir(artifacts, { recursive: true });
   for (const colorScheme of ['light', 'dark']) for (const width of [1440, 375]) {
