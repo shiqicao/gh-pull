@@ -1,6 +1,7 @@
 import { html, render, repeat, nothing } from './vendor/lit-html.js';
 import { formField, formError, formActions } from './controls.js';
 import { createPopover } from './popover.js';
+import { icon } from './ui.js';
 import { queryError } from './query.js';
 
 export function createSavedViews({ request, getQuery, getAppliedQuery, getGroup, apply, enabled, onOpen = () => {} }) {
@@ -51,12 +52,12 @@ export function createSavedViews({ request, getQuery, getAppliedQuery, getGroup,
             popovertarget=${view.id === activeId ? popover.panel.id : nothing}
             title=${view.id === activeId ? `Rename or delete “${view.name}”` : `${view.query} · Group by: ${groupName(view.group)}`}
             @click=${event => { event.preventDefault(); view.id === activeId ? open('menu', event.currentTarget) : select(view); }}>
-            <span>${view.name}</span><span class="saved-view-indicators" aria-hidden="true"><span class=${`saved-view-dot ${view.id === activeId && differs(view) ? 'edited' : ''}`}></span><span class="saved-view-arrow">${view.id === activeId ? '▾' : ''}</span></span>
+            <span>${view.name}</span><span class="saved-view-indicators" aria-hidden="true"><span class=${`saved-view-dot ${view.id === activeId && differs(view) ? 'edited' : ''}`}></span><span class="saved-view-arrow">${view.id === activeId ? icon('chevron-down', 12) : nothing}</span></span>
           </button>`)}
         <button type="button" class="saved-view-more" aria-haspopup="dialog" aria-controls=${popover.panel.id}
           popovertarget=${popover.panel.id}
           aria-expanded=${String(popover.isOpen && mode === 'more')} ?disabled=${busy || loading}
-          @click=${event => { event.preventDefault(); open('more', event.currentTarget); }}><span class="saved-view-more-label"></span><span aria-hidden="true">▾</span></button>
+          @click=${event => { event.preventDefault(); open('more', event.currentTarget); }}><span class="saved-view-more-label"></span><span class="saved-view-arrow" aria-hidden="true">${icon('chevron-down', 12)}</span></button>
       </div>
       `, root);
     render(html`<div id="saved-view-status" class=${`saved-view-status ${tone}`} role="status" aria-live="polite">
