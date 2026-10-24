@@ -10,11 +10,12 @@ import { createViewedStore, createLatestRequest, mergePullPages, createMergedSto
 import { createIssuePopover } from './issues.js';
 import { createLifecycleControls } from './lifecycle.js';
 import { createReviewControls } from './reviews.js';
-import { element, icon, clipboardFeedback } from './ui.js';
+import { element, icon, clipboardFeedback, observeStickyTop } from './ui.js';
 import { assignNameColors, dependencyLanes, groupPulls, labels, isOwn, mergeLabels, mergeMethodLabels } from './model.js';
 import { queryFromParams, queryPresets, setQueryPreset, normalizeQuery, queryError, matchesQueryState } from './query.js';
 
 const $ = id => document.getElementById(id);
+observeStickyTop($('sticky-top'));
 const params = new URLSearchParams(location.search);
 if ([...$('group').options].some(option => option.value === params.get('group'))) $('group').value = params.get('group');
 let appliedQuery = queryFromParams(params);

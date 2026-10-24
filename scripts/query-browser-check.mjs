@@ -132,7 +132,9 @@ test('autocomplete keyboard, mid-query replacements, escaped input, undo and foc
 
   await editor.fill('label:');
   await editor.press('End'); await editor.press('Control+Space');
-  await page.getByRole('option', { name: '"good first issue"', exact: true }).click();
+  // Visible options can briefly be disabled while a new completion is fetched.
+  await page.locator('.cm-tooltip-autocomplete:not(.cm-tooltip-autocomplete-disabled)')
+    .getByRole('option', { name: '"good first issue"', exact: true }).click();
   assert.equal(await editor.innerText(), 'label:"good first issue"');
   await editor.press('Control+z');
   assert.equal(await editor.innerText(), 'label:');
