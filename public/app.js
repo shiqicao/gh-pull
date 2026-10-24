@@ -31,7 +31,7 @@ const polling = createPollingSchedule();
 const issuePopover = createIssuePopover({ onClose: () => polling.invalidate() });
 let loadedPages = 1;
 let authMode = 'local', authenticated = false;
-const background = createBackgroundRefresh({
+const backgroundRefresh = createBackgroundRefresh({
   state: {
     get items() { return items; }, set items(value) { items = value; },
     get total() { return total; }, set total(value) { total = value; },
@@ -41,7 +41,7 @@ const background = createBackgroundRefresh({
   polling, loads, mergedStore, apiFetch, responseError, savingPull, render, load, updateRefreshButton,
   onUpdate: text => { $('updated').textContent = text; },
 });
-const { scheduleMergeReadiness, cancelBackgroundRequests, poll, syncActivity } = background;
+const { scheduleMergeReadiness, cancelBackgroundRequests, poll, syncActivity } = backgroundRefresh;
 
 const reviewCountsLoader = createReviewCountsLoader({
   async fetchCounts(id, signal) {
@@ -71,7 +71,7 @@ async function apiFetch(url, options) {
 }
 
 function updateRefreshButton() {
-  const busy = loading || background.statusLoading;
+  const busy = loading || backgroundRefresh.statusLoading;
   $('refresh').disabled = busy;
   const paused = document.hidden || !navigator.onLine;
   const seconds = Math.max(0, Math.ceil((polling.nextAt(pendingPulls(items).length > 0) - Date.now()) / 1000));
@@ -532,7 +532,7 @@ window.addEventListener('focus', poll);
 document.addEventListener('click', event => {
   if (event.detail > 0) event.target.closest('a[target="_blank"]')?.blur();
 });
-window.addEventListener('pagehide', background.closeEvents);
+window.addEventListener('pagehide', backgroundRefresh.closeEvents);
 window.addEventListener('pageshow', syncActivity);
 
 $('update-copy-symbol').append(icon('copy', 14));

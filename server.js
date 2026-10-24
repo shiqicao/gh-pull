@@ -164,7 +164,6 @@ function handleEvents(res, cache, subscribers) {
     clearInterval(heartbeat); streams.delete(res);
     if (!streams.size) subscribers.delete(cache);
   });
-  return;
 }
 
 async function handleStatus(url, activeList, cache, send) {
