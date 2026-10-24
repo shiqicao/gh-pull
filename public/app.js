@@ -11,7 +11,7 @@ import { createIssuePopover } from './issues.js';
 import { createLifecycleControls } from './lifecycle.js';
 import { createReviewControls } from './reviews.js';
 import { element, icon, clipboardFeedback } from './ui.js';
-import { assignNameColors, dependencyLanes, groupPulls, labels, isOwn } from './model.js';
+import { assignNameColors, dependencyLanes, groupPulls, labels, isOwn, mergeLabels, mergeMethodLabels } from './model.js';
 import { queryFromParams, queryPresets, setQueryPreset, normalizeQuery, queryError, matchesQueryState } from './query.js';
 
 const $ = id => document.getElementById(id);
@@ -116,24 +116,23 @@ function createMergeAction(pr, prUrl) {
   if (pr.hasConflicts) return prUrl ? html`<a class="badge review_required conflict-action" href=${githubUrl(prUrl, 'conflicts')}
     target="_blank" rel="noopener noreferrer" data-view-pr title="Resolve merge conflicts on GitHub (opens in a new tab)">Resolve conflict</a>` : nothing;
   if (!pr.canMerge) return nothing;
-  const names = { MERGE: 'Merge', SQUASH: 'Squash and merge', REBASE: 'Rebase and merge' };
-  const methods = (pr.mergeMethods ?? [pr.mergeMethod]).filter(method => names[method]);
+  const methods = (pr.mergeMethods ?? [pr.mergeMethod]).filter(method => mergeLabels[method]);
   if (!methods.length) return nothing;
   if (!methods.includes(mergeSelections.get(pr.id))) mergeSelections.delete(pr.id);
   const selected = mergeSelections.get(pr.id) ?? (methods.includes(pr.mergeMethod) ? pr.mergeMethod : methods[0]);
   const blocked = authMode === 'github-app' && !pr.mergeAccess?.allowed;
   const disabled = blocked || Boolean(pendingChanges.isMergeBusy(pr.id));
   const controls = html`<span class=${`merge-controls${methods.length > 1 ? ' merge-split' : ''}`}>
-    ${actionButton({ className: 'badge open merge-action', label: `${names[selected]} ${pr.repo} #${pr.number}`, disabled,
-      onClick: () => mergePull(pr, selected), content: merges.get(pr.id)?.saving ? 'Merging…' : names[selected] })}
+    ${actionButton({ className: 'badge open merge-action', label: `${mergeLabels[selected]} ${pr.repo} #${pr.number}`, disabled,
+      onClick: () => mergePull(pr, selected), content: merges.get(pr.id)?.saving ? 'Merging…' : mergeLabels[selected] })}
     ${methods.length > 1 ? html`<span class="merge-method-trigger open"><select class="merge-method" title="Merge method"
       aria-label=${`Merge method for ${pr.repo} #${pr.number}`} ?disabled=${disabled}
       @change=${event => { mergeSelections.set(pr.id, event.target.value); render(); }}>
-      ${methods.map(method => html`<option value=${method} .selected=${method === selected}>${{ MERGE: 'Merge commit', SQUASH: 'Squash', REBASE: 'Rebase' }[method]}</option>`)}
+      ${methods.map(method => html`<option value=${method} .selected=${method === selected}>${mergeMethodLabels[method]}</option>`)}
     </select></span>` : nothing}
   </span>`;
   const message = pr.mergeAccess?.message || 'Could not verify app access. Refresh to try again.';
-  return blocked ? html`<span class="merge-access-blocked" role="group" title=${message} tabindex="0" aria-label=${`${names[selected]} unavailable. ${message}`}>${controls}</span>
+  return blocked ? html`<span class="merge-access-blocked" role="group" title=${message} tabindex="0" aria-label=${`${mergeLabels[selected]} unavailable. ${message}`}>${controls}</span>
     ${pr.mergeAccess?.url ? html`<a class="merge-access-link" href=${pr.mergeAccess.url} target="_blank" rel="noopener noreferrer"
       title="Complete setup on GitHub, then refresh this page. Organization access may require owner approval.">${pr.mergeAccess.action}</a>` : nothing}` : controls;
 }

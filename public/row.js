@@ -1,13 +1,8 @@
 import { iconButton, formError } from './controls.js';
 import { html, nothing, repeat } from './vendor/lit-html.js';
-import { labels, relativeTime, NAME_COLOR_COUNT, isOwn } from './model.js';
+import { labels, reviewLabels, reviewStates, relativeTime, NAME_COLOR_COUNT, isOwn } from './model.js';
 import { iconTemplate as icon, badge, githubUrl, usernameLink, repositoryLink, copyFeedback, reviewStatus } from './templates.js';
 
-const reviewLabels = { APPROVED: 'Approved', CHANGES_REQUESTED: 'Changes requested', REVIEW_REQUIRED: 'Review required', REVIEW_BYPASS_AVAILABLE: 'Review bypass available' };
-const reviewStates = {
-  REQUESTED: ['Awaiting review', 'review_required', '◷'], APPROVED: ['Approved', 'approved', '✓'],
-  CHANGES_REQUESTED: ['Changes requested', 'changes_requested', '!'], COMMENTED: ['Commented', 'commented', '⋯'], DISMISSED: ['Review dismissed', 'dismissed', '−'],
-};
 function dependency(node) {
   const pr = node.mergedParent ?? node.externalParent ?? (node.lane > 3 ? node.parent?.pr : null);
   if (pr) {
