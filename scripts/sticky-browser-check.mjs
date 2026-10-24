@@ -18,11 +18,11 @@ test('title and filters stay pinned; group headings hand off below the responsiv
   const { page, origin, errors } = await browserFixture(t, { list, savedViews: { list: async () => [] } });
   await page.goto(origin);
   await page.locator('.pr-row').first().waitFor();
-  const initialPositions = await page.locator('h1, #filters').evaluateAll(nodes => nodes.map(node => node.getBoundingClientRect().top));
-  for (const y of [1, 8, 20, 250]) {
+  const initialPositions = await page.locator('h1, #filters, #summary, .pr-group:first-child > summary').evaluateAll(nodes => nodes.map(node => node.getBoundingClientRect().top));
+  for (const y of [1, 8, 20, 250, 20, 8, 1, 0]) {
     await page.evaluate(y => { window.scrollTo(0, y); }, y);
-    const positions = await page.locator('h1, #filters').evaluateAll(nodes => nodes.map(node => node.getBoundingClientRect().top));
-    assert.deepEqual(positions, initialPositions, 'Title and controls must not move before pinning');
+    const positions = await page.locator('h1, #filters, #summary, .pr-group:first-child > summary').evaluateAll(nodes => nodes.map(node => node.getBoundingClientRect().top));
+    assert.deepEqual(positions, initialPositions, 'Title, controls, counts, and first group heading stay fixed in both scroll directions');
   }
   for (const [width, height, zoom] of [[1280, 900, 1], [375, 1000, 1], [1280, 900, 1.5], [1000, 1000, 2], [375, 600, 1]]) {
     await page.setViewportSize({ width, height });
@@ -33,7 +33,7 @@ test('title and filters stay pinned; group headings hand off below the responsiv
       await page.waitForFunction(index => {
         const top = document.querySelector('#sticky-top').getBoundingClientRect();
         const heading = document.querySelectorAll('.pr-group > summary')[index].getBoundingClientRect();
-        return Math.abs(heading.top - top.bottom) < 2;
+        return Math.abs(heading.top - top.bottom - Number(getComputedStyle(document.documentElement).zoom)) < 1;
       }, index);
       if (process.env.GH_PULL_SCREENSHOTS && index === 0) await page.screenshot({ path: `/tmp/gh-pull-sticky-${width}-${height}-${zoom}.png` });
       const bounds = await page.evaluate(index => {

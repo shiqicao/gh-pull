@@ -274,6 +274,10 @@ button, .pr-group > summary {
   font-size: var(--font-size-body);
 }
 
+#summary {
+  margin: 12px 0 0;
+}
+
 .dashboard-footer {
   display: flex;
   align-items: baseline;
@@ -334,10 +338,16 @@ button, .pr-group > summary {
   border-radius: var(--radius-panel);
 }
 
+.pr-group:first-child {
+  margin-top: 0;
+}
+
 .pr-group > summary {
   position: sticky;
-  top: calc(var(--sticky-top-height) + var(--sticky-top-offset));
+  /* Keep the initial border offset, and cover it when rows scroll underneath. */
+  top: calc(var(--sticky-top-height) + var(--sticky-top-offset) + 1px);
   z-index: 2;
+  box-shadow: 0 -1px 0 var(--color-border);
   padding: 10px 14px;
   font-size: var(--font-size-body);
   background: var(--color-surface);

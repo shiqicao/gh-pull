@@ -19,6 +19,7 @@ observeStickyTop($('sticky-top'));
 function showDashboard(visible) {
   $('dashboard').hidden = !visible;
   $('dashboard-controls').hidden = !visible;
+  $('summary').hidden = !visible;
 }
 const params = new URLSearchParams(location.search);
 if ([...$('group').options].some(option => option.value === params.get('group'))) $('group').value = params.get('group');
