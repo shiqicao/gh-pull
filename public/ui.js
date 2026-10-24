@@ -1,4 +1,25 @@
 // Small DOM helpers shared by dashboard controls. No application state lives here.
+export function observeStickyTop(top) {
+  // Measure in CSS pixels so wrapped controls, notices, and zoom all share the
+  // same offset. No scroll handler: CSS handles pinning and group handoff.
+  let height = 0;
+  const update = () => {
+    // Browser zoom already uses CSS pixels; this ratio additionally handles
+    // CSS `zoom` (used by our layout tests), not visual-viewport pinch zoom.
+    const scale = height ? top.getBoundingClientRect().height / height : 1;
+    const style = document.documentElement.style;
+    style.setProperty('--sticky-top-height', `${height}px`);
+    style.setProperty('--sticky-viewport-height', `${window.innerHeight / (scale || 1)}px`);
+  };
+  const observer = new ResizeObserver(([entry]) => {
+    height = entry.borderBoxSize[0].blockSize;
+    update();
+  });
+  observer.observe(top);
+  window.addEventListener('resize', update);
+  return () => { observer.disconnect(); window.removeEventListener('resize', update); };
+}
+
 export function element(tag, text, className) {
   const node = document.createElement(tag);
   if (text !== undefined) node.textContent = text;

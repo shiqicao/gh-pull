@@ -10,11 +10,17 @@ import { createViewedStore, createLatestRequest, mergePullPages, createMergedSto
 import { createIssuePopover } from './issues.js';
 import { createLifecycleControls } from './lifecycle.js';
 import { createReviewControls } from './reviews.js';
-import { element, icon, clipboardFeedback } from './ui.js';
+import { element, icon, clipboardFeedback, observeStickyTop } from './ui.js';
 import { assignNameColors, dependencyLanes, groupPulls, labels, isOwn, mergeLabels, mergeMethodLabels } from './model.js';
 import { queryFromParams, queryPresets, setQueryPreset, normalizeQuery, queryError, matchesQueryState } from './query.js';
 
 const $ = id => document.getElementById(id);
+observeStickyTop($('sticky-top'));
+function showDashboard(visible) {
+  $('dashboard').hidden = !visible;
+  $('dashboard-controls').hidden = !visible;
+  $('summary').hidden = !visible;
+}
 const params = new URLSearchParams(location.search);
 if ([...$('group').options].some(option => option.value === params.get('group'))) $('group').value = params.get('group');
 let appliedQuery = queryFromParams(params);
@@ -64,7 +70,7 @@ async function apiFetch(url, options) {
     authenticated = false; reviewCountsLoader.clear(); savedViews?.reset();
     items = []; pendingChanges.clear(); mergeSelections.clear();
     $('results').replaceChildren();
-    $('dashboard').hidden = true;
+    showDashboard(false);
     location.replace('/?auth_error=expired');
   }
   return response;
@@ -593,7 +599,7 @@ async function initializeSession() {
     authMode = session.mode;
     authenticated = session.authenticated;
     $('signin').hidden = authenticated;
-    $('dashboard').hidden = true;
+    showDashboard(false);
     $('links-hint').hidden = !authenticated;
     $('refresh').hidden = !authenticated;
     $('logout').hidden = authMode !== 'github-app' || !authenticated;
@@ -606,13 +612,13 @@ async function initializeSession() {
     $('session-status').hidden = true;
     if (authenticated) {
       await initializeQueryEditor();
-      $('dashboard').hidden = false;
+      showDashboard(true);
       await load();
       syncActivity();
     }
   } catch {
     authenticated = false; reviewCountsLoader.clear(); savedViews?.reset();
-    $('dashboard').hidden = true;
+    showDashboard(false);
     $('refresh').hidden = true;
     $('session-status').hidden = false;
     $('session-status').textContent = 'Could not connect. Please retry.';

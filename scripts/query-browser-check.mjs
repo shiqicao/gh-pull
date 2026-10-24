@@ -132,7 +132,9 @@ test('autocomplete keyboard, mid-query replacements, escaped input, undo and foc
 
   await editor.fill('label:');
   await editor.press('End'); await editor.press('Control+Space');
-  await page.getByRole('option', { name: '"good first issue"', exact: true }).click();
+  // Visible options can briefly be disabled while a new completion is fetched.
+  await page.locator('.cm-tooltip-autocomplete:not(.cm-tooltip-autocomplete-disabled)')
+    .getByRole('option', { name: '"good first issue"', exact: true }).click();
   assert.equal(await editor.innerText(), 'label:"good first issue"');
   await editor.press('Control+z');
   assert.equal(await editor.innerText(), 'label:');
@@ -277,6 +279,7 @@ test('hosted login skips the editor bundle and an invalid bookmarked query can b
   await page.getByRole('link', { name: 'Sign in with GitHub' }).waitFor();
   assert.deepEqual(bundles, []);
   assert.equal(await page.locator('#dashboard').isVisible(), false);
+  assert.equal(await page.locator('#dashboard-controls').isVisible(), false);
   await page.unroute(`${origin}/api/session`);
   await page.goto(`${origin}/?${new URLSearchParams({ q: 'label:"unfinished' })}`);
   await editor.waitFor();

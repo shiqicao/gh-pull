@@ -16,6 +16,21 @@ body {
   max-width: 1400px;
   margin: 0 auto;
   padding: 24px;
+  padding-top: 0;
+}
+
+:root {
+  --sticky-top-height: 0px;
+  --sticky-top-offset: min(0px, calc(var(--sticky-viewport-height, 100dvh) - var(--sticky-top-height) - 120px));
+  scroll-padding-top: calc(var(--sticky-top-height) + var(--sticky-top-offset) + 56px);
+}
+
+#sticky-top {
+  position: sticky;
+  top: var(--sticky-top-offset);
+  z-index: 3;
+  padding-block: 24px 16px;
+  background: var(--color-page);
 }
 
 header {
@@ -259,6 +274,10 @@ button, .pr-group > summary {
   font-size: var(--font-size-body);
 }
 
+#summary {
+  margin: 12px 0 0;
+}
+
 .dashboard-footer {
   display: flex;
   align-items: baseline;
@@ -319,7 +338,16 @@ button, .pr-group > summary {
   border-radius: var(--radius-panel);
 }
 
+.pr-group:first-child {
+  margin-top: 0;
+}
+
 .pr-group > summary {
+  position: sticky;
+  /* Keep the initial border offset, and cover it when rows scroll underneath. */
+  top: calc(var(--sticky-top-height) + var(--sticky-top-offset) + 1px);
+  z-index: 2;
+  box-shadow: 0 -1px 0 var(--color-border);
   padding: 10px 14px;
   font-size: var(--font-size-body);
   background: var(--color-surface);
