@@ -1,3 +1,4 @@
+import { publicAssets } from './public-assets.js';
 import { createSavedViewsStore, rankSavedViews } from './saved-views.js';
 import { isSea, getAsset } from 'node:sea';
 import { createServer } from 'node:http';
@@ -12,38 +13,8 @@ import { authConfig, createAuth } from './auth.js';
 import { createMarketplaceWebhook } from './marketplace.js';
 import { createUpdateCheck } from './extension-updates.js';
 
-const assets = new Map([
-  ['/', ['index.html', 'text/html']],
-  ['/saved-views.js', ['saved-views.js', 'text/javascript']],
-  ['/app.js', ['app.js', 'text/javascript']],
-  ['/row.js', ['row.js', 'text/javascript']],
-  ['/templates.js', ['templates.js', 'text/javascript']],
-  ['/vendor/lit-html.js', ['vendor/lit-html.js', 'text/javascript']],
-  ['/vendor/lit-html.LICENSE.txt', ['vendor/lit-html.LICENSE.txt', 'text/plain']],
-  ['/model.js', ['model.js', 'text/javascript']],
-  ['/dependencies.js', ['dependencies.js', 'text/javascript']],
-  ['/vendor/svg.js', ['vendor/svg.js', 'text/javascript']],
-  ['/vendor/svg.LICENSE.txt', ['vendor/svg.LICENSE.txt', 'text/plain']],
-  ['/controls.js', ['controls.js', 'text/javascript']],
-  ['/popover.js', ['popover.js', 'text/javascript']],
-  ['/lifecycle.js', ['lifecycle.js', 'text/javascript']],
-  ['/review-counts.js', ['review-counts.js', 'text/javascript']],
-  ['/reviews.js', ['reviews.js', 'text/javascript']],
-  ['/issues.js', ['issues.js', 'text/javascript']],
-  ['/ui.js', ['ui.js', 'text/javascript']],
-  ['/polling.js', ['polling.js', 'text/javascript']],
-  ['/state.js', ['state.js', 'text/javascript']],
-  ['/query.js', ['query.js', 'text/javascript']],
-  ['/query-editor.js', ['query-editor.js', 'text/javascript']],
-  ['/vendor/codemirror.js', ['vendor/codemirror.js', 'text/javascript']],
-  ['/vendor/codemirror.LICENSE.txt', ['vendor/codemirror.LICENSE.txt', 'text/plain']],
-  ['/style.css', ['style.css', 'text/css']],
-  ['/theme.css', ['theme.css', 'text/css']],
-  ['/query-editor.css', ['query-editor.css', 'text/css']],
-  ['/fonts/InterVariable-4.1.woff2', ['fonts/InterVariable-4.1.woff2', 'font/woff2']],
-  ['/fonts/Inter-LICENSE.txt', ['fonts/Inter-LICENSE.txt', 'text/plain']],
-  ['/favicon.svg', ['favicon.svg', 'image/svg+xml']],
-]);
+const assets = new Map(publicAssets.filter(([, type]) => type).map(([file, type]) =>
+  [file === 'index.html' ? '/' : `/${file}`, [file, type]]));
 
 const mutations = new Map([
   ['/api/pulls/close', { method: 'closePull', validate: validateClose, unavailable: 'Closing PRs is unavailable.' }],
