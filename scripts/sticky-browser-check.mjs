@@ -18,6 +18,12 @@ test('title and filters stay pinned; group headings hand off below the responsiv
   const { page, origin, errors } = await browserFixture(t, { list, savedViews: { list: async () => [] } });
   await page.goto(origin);
   await page.locator('.pr-row').first().waitFor();
+  const initialPositions = await page.locator('h1, #filters').evaluateAll(nodes => nodes.map(node => node.getBoundingClientRect().top));
+  for (const y of [1, 8, 20, 250]) {
+    await page.evaluate(y => { window.scrollTo(0, y); }, y);
+    const positions = await page.locator('h1, #filters').evaluateAll(nodes => nodes.map(node => node.getBoundingClientRect().top));
+    assert.deepEqual(positions, initialPositions, 'Title and controls must not move before pinning');
+  }
   for (const [width, height, zoom] of [[1280, 900, 1], [375, 1000, 1], [1280, 900, 1.5], [1000, 1000, 2], [375, 600, 1]]) {
     await page.setViewportSize({ width, height });
     await page.evaluate(zoom => { document.documentElement.style.zoom = zoom; window.scrollTo(0, 0); }, zoom);
