@@ -279,6 +279,7 @@ test('hosted login skips the editor bundle and an invalid bookmarked query can b
   await page.getByRole('link', { name: 'Sign in with GitHub' }).waitFor();
   assert.deepEqual(bundles, []);
   assert.equal(await page.locator('#dashboard').isVisible(), false);
+  assert.equal(await page.locator('#dashboard-controls').isVisible(), false);
   await page.unroute(`${origin}/api/session`);
   await page.goto(`${origin}/?${new URLSearchParams({ q: 'label:"unfinished' })}`);
   await editor.waitFor();

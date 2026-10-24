@@ -29,7 +29,7 @@ test('title and filters stay pinned; group headings hand off below the responsiv
         const heading = document.querySelectorAll('.pr-group > summary')[index].getBoundingClientRect();
         return Math.abs(heading.top - top.bottom) < 2;
       }, index);
-      if (index === 0) await page.screenshot({ path: `/tmp/gh-pull-sticky-${width}-${height}-${zoom}.png` });
+      if (process.env.GH_PULL_SCREENSHOTS && index === 0) await page.screenshot({ path: `/tmp/gh-pull-sticky-${width}-${height}-${zoom}.png` });
       const bounds = await page.evaluate(index => {
         const top = document.querySelector('#sticky-top').getBoundingClientRect();
         const heading = document.querySelectorAll('.pr-group > summary')[index].getBoundingClientRect();
@@ -53,7 +53,7 @@ test('title and filters stay pinned; group headings hand off below the responsiv
   await page.locator('.pr-group > summary').nth(1).click();
   await page.evaluate(() => { document.querySelector('#auth-notice').hidden = true; });
   await page.locator('.pr-group').first().evaluate(group => window.scrollTo(0, window.scrollY + group.getBoundingClientRect().top + 160));
-  await page.screenshot({ path: '/tmp/gh-pull-sticky-preview.png' });
+  if (process.env.GH_PULL_SCREENSHOTS) await page.screenshot({ path: '/tmp/gh-pull-sticky-preview.png' });
   await page.locator('#group').selectOption('none');
   assert.equal(await page.locator('.pr-group').count(), 1);
   assert.match(await page.locator('.pr-group > summary').innerText(), /All pull requests/);

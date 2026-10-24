@@ -4,6 +4,8 @@ export function observeStickyTop(top) {
   // same offset. No scroll handler: CSS handles pinning and group handoff.
   let height = 0;
   const update = () => {
+    // Browser zoom already uses CSS pixels; this ratio additionally handles
+    // CSS `zoom` (used by our layout tests), not visual-viewport pinch zoom.
     const scale = height ? top.getBoundingClientRect().height / height : 1;
     const style = document.documentElement.style;
     style.setProperty('--sticky-top-height', `${height}px`);
