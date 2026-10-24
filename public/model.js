@@ -4,6 +4,14 @@ export const labels = {
   PENDING: 'Checks pending', EXPECTED: 'Checks expected', NONE: 'No checks',
 };
 
+export const reviewLabels = { APPROVED: 'Approved', CHANGES_REQUESTED: 'Changes requested', REVIEW_REQUIRED: 'Review required', REVIEW_BYPASS_AVAILABLE: 'Review bypass available' };
+export const reviewStates = {
+  REQUESTED: ['Awaiting review', 'review_required', '◷'], APPROVED: ['Approved', 'approved', '✓'],
+  CHANGES_REQUESTED: ['Changes requested', 'changes_requested', '!'], COMMENTED: ['Commented', 'commented', '⋯'], DISMISSED: ['Review dismissed', 'dismissed', '−'],
+};
+export const mergeLabels = { MERGE: 'Merge', SQUASH: 'Squash and merge', REBASE: 'Rebase and merge' };
+export const mergeMethodLabels = { MERGE: 'Merge commit', SQUASH: 'Squash', REBASE: 'Rebase' };
+
 export const NAME_COLOR_COUNT = 12;
 
 export function normalizeViewedUpdates(value) {
@@ -170,3 +178,5 @@ export function dependencyLanes(items, options) {
   const visible = rows.filter(n => n.lane !== null && n.lane <= 3);
   return { rows, gutter: visible.length ? 32 + 20 * Math.max(...visible.map(n => n.lane)) : 0 };
 }
+
+export const isOwn = (pr, viewerLogin) => pr.author.toLowerCase() === viewerLogin.toLowerCase();

@@ -97,3 +97,15 @@ export function createMergedStore() {
     },
   };
 }
+
+export function createPendingChanges() {
+  const titleEdits = new Map(), draftChanges = new Map(), merges = new Map(), lifecycleChanges = new Map(), reviewChanges = new Map();
+  const maps = [lifecycleChanges, reviewChanges, titleEdits, draftChanges, merges];
+  return {
+    titleEdits, draftChanges, merges, lifecycleChanges, reviewChanges,
+    clear() { for (const changes of maps) changes.clear(); },
+    isSaving(id) { return maps.some(changes => changes.get(id)?.saving); },
+    isProtected(id) { return lifecycleChanges.has(id) || reviewChanges.has(id) || titleEdits.has(id) || draftChanges.get(id)?.saving || merges.get(id)?.saving; },
+    isMergeBusy(id) { return merges.get(id)?.saving || draftChanges.get(id)?.saving || titleEdits.has(id) || lifecycleChanges.has(id); },
+  };
+}

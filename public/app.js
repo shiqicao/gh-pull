@@ -5,13 +5,13 @@ import { html, render as renderTemplate, repeat, nothing } from './vendor/lit-ht
 import { githubUrl, usernameLink, repositoryLink } from './templates.js';
 import { renderRow } from './row.js';
 import { drawDependencies } from './dependencies.js';
-import { createPollingSchedule, pendingPulls } from './polling.js';
-import { createViewedStore, createLatestRequest, mergePullPages, createMergedStore } from './state.js';
+import { createPollingSchedule, createBackgroundRefresh, pendingPulls } from './polling.js';
+import { createViewedStore, createLatestRequest, mergePullPages, createMergedStore, createPendingChanges } from './state.js';
 import { createIssuePopover } from './issues.js';
 import { createLifecycleControls } from './lifecycle.js';
 import { createReviewControls } from './reviews.js';
 import { element, icon, clipboardFeedback } from './ui.js';
-import { assignNameColors, dependencyLanes, groupPulls, labels } from './model.js';
+import { assignNameColors, dependencyLanes, groupPulls, labels, isOwn, mergeLabels, mergeMethodLabels } from './model.js';
 import { queryFromParams, queryPresets, setQueryPreset, normalizeQuery, queryError, matchesQueryState } from './query.js';
 
 const $ = id => document.getElementById(id);
@@ -20,15 +20,28 @@ if ([...$('group').options].some(option => option.value === params.get('group'))
 let appliedQuery = queryFromParams(params);
 if (!queryError(appliedQuery)) appliedQuery = normalizeQuery(appliedQuery);
 let items = [], total = 0, cursor = null, more = false, limited = false, loading = false;
+const collapsed = new Set();
+const pendingChanges = createPendingChanges();
+const { titleEdits, draftChanges, merges, lifecycleChanges, reviewChanges } = pendingChanges;
+let viewerLogin = '', queryEditor, savedViews;
 const loads = createLatestRequest();
 const mergedStore = createMergedStore();
 const mergeSelections = new Map();
 const polling = createPollingSchedule();
 const issuePopover = createIssuePopover({ onClose: () => polling.invalidate() });
-let statusLoading = false, statusController, statusOffset = 0, loadedPages = 1;
-let events;
+let loadedPages = 1;
 let authMode = 'local', authenticated = false;
-let readinessTimer, readinessController;
+const backgroundRefresh = createBackgroundRefresh({
+  state: {
+    get items() { return items; }, set items(value) { items = value; },
+    get total() { return total; }, set total(value) { total = value; },
+    get authenticated() { return authenticated; }, get loading() { return loading; },
+    get appliedQuery() { return appliedQuery; }, get queryReady() { return Boolean(queryEditor); },
+  },
+  polling, loads, mergedStore, apiFetch, responseError, savingPull, render, load, updateRefreshButton,
+  onUpdate: text => { $('updated').textContent = text; },
+});
+const { scheduleMergeReadiness, cancelBackgroundRequests, poll, syncActivity } = backgroundRefresh;
 
 const reviewCountsLoader = createReviewCountsLoader({
   async fetchCounts(id, signal) {
@@ -45,44 +58,11 @@ const reviewCountsLoader = createReviewCountsLoader({
   },
 });
 
-function scheduleMergeReadiness(attempt = 0) {
-  clearTimeout(readinessTimer);
-  readinessController?.abort();
-  if (polling.backingOff || document.hidden || !navigator.onLine || !authenticated || attempt >= 5 || !items.some(pr => pr.mergePending && pr.status === 'OPEN')) return;
-  const version = loads.revision;
-  readinessTimer = setTimeout(async () => {
-    if (polling.backingOff || statusLoading || document.hidden || !navigator.onLine || loading) {
-      scheduleMergeReadiness(attempt);
-      return;
-    }
-    const pending = items.filter(pr => pr.mergePending && pr.status === 'OPEN').slice(0, 50);
-    const query = new URLSearchParams(pending.map(pr => ['id', pr.id]));
-    const requestController = new AbortController();
-    readinessController = requestController;
-    try {
-      const response = await apiFetch(`/api/pulls/readiness?${query}`, { signal: requestController.signal });
-      if (!response.ok) throw responseError(response, await response.json(), 'Could not check merge readiness.');
-      const data = await response.json();
-      if (version !== loads.revision || requestController.signal.aborted || !authenticated) return;
-      for (const update of data.items) {
-        const pr = items.find(item => item.id === update.id);
-        // Never offer a merge against a commit that is not the displayed version.
-        if (pr?.status === 'OPEN' && !savingPull(pr.id) && pr.headOid === update.headOid) Object.assign(pr, update);
-      }
-      render();
-    } catch (error) {
-      if (error.retryAfter) polling.failed(error.retryAfter);
-      // Normal polling retries unresolved merge readiness.
-    }
-    if (version === loads.revision && !requestController.signal.aborted) scheduleMergeReadiness(attempt + 1);
-  }, 2000);
-}
-
 async function apiFetch(url, options) {
   const response = await fetch(url, options);
   if (response.status === 401 && authMode === 'github-app') {
     authenticated = false; reviewCountsLoader.clear(); savedViews?.reset();
-    items = []; titleEdits.clear(); reviewChanges.clear(); lifecycleChanges.clear(); draftChanges.clear(); merges.clear(); mergeSelections.clear();
+    items = []; pendingChanges.clear(); mergeSelections.clear();
     $('results').replaceChildren();
     $('dashboard').hidden = true;
     location.replace('/?auth_error=expired');
@@ -91,7 +71,7 @@ async function apiFetch(url, options) {
 }
 
 function updateRefreshButton() {
-  const busy = loading || statusLoading;
+  const busy = loading || backgroundRefresh.statusLoading;
   $('refresh').disabled = busy;
   const paused = document.hidden || !navigator.onLine;
   const seconds = Math.max(0, Math.ceil((polling.nextAt(pendingPulls(items).length > 0) - Date.now()) / 1000));
@@ -102,92 +82,14 @@ function updateRefreshButton() {
   $('refresh').setAttribute('aria-busy', String(busy));
 }
 
-function savingPull(id) { return lifecycleChanges.get(id)?.saving || reviewChanges.get(id)?.saving || titleEdits.get(id)?.saving || draftChanges.get(id)?.saving || merges.get(id)?.saving; }
-function protectedPull(id) {
-  return lifecycleChanges.has(id) || reviewChanges.has(id) || titleEdits.has(id) || issuePopover.pullId === id || draftChanges.get(id)?.saving || merges.get(id)?.saving;
-}
+function savingPull(id) { return pendingChanges.isSaving(id); }
+function protectedPull(id) { return pendingChanges.isProtected(id) || issuePopover.pullId === id; }
 function responseError(response, data, fallback) {
   const error = new Error(data.error || fallback);
   error.retryAfter = Number(response.headers.get('Retry-After')) || 0;
   return error;
 }
 
-async function refreshStatus() {
-  const pending = pendingPulls(items);
-  if (!pending.length) return;
-  // Rotate batches so large dashboards do not starve later PRs.
-  statusOffset %= pending.length;
-  const selected = [...pending.slice(statusOffset), ...pending.slice(0, statusOffset)].slice(0, 50);
-  statusOffset += selected.length;
-  const version = loads.revision;
-  const controller = new AbortController(); statusController = controller;
-  statusLoading = true; updateRefreshButton();
-  clearTimeout(readinessTimer); readinessController?.abort();
-  try {
-    const query = new URLSearchParams(selected.map(pr => ['id', pr.id]));
-    const response = await apiFetch(`/api/pulls/status?${query}`, { signal: AbortSignal.any([controller.signal, AbortSignal.timeout(35_000)]) });
-    const data = await response.json();
-    if (!response.ok) throw responseError(response, data, 'Could not refresh running checks.');
-    if (version !== loads.revision || controller.signal.aborted || !authenticated) return;
-    polling.succeeded('status');
-    let changed = false, reconcile = false;
-    for (const incoming of data.items) {
-      const update = mergedStore.reconcile(incoming);
-      const current = items.find(pr => pr.id === update.id);
-      if (!current || savingPull(current.id) || Date.parse(update.updatedAt) < Date.parse(current.updatedAt)) continue;
-      if (JSON.stringify(current) !== JSON.stringify(update)) {
-        reconcile ||= ['status', 'checks', 'review'].some(key => current[key] !== update[key]);
-        Object.assign(current, update); changed = true;
-      }
-    }
-    if (reconcile) polling.invalidate();
-    if (changed) {
-      const count = items.length;
-      items = items.filter(pr => matchesQueryState(pr, appliedQuery));
-      total = Math.max(0, total - (count - items.length));
-      render();
-    }
-    $('updated').textContent = `Checked ${new Date().toLocaleTimeString()}.`;
-  } catch (error) {
-    if (controller.signal.aborted || version !== loads.revision) return;
-    polling.failed(error.retryAfter);
-    $('updated').textContent = 'Background refresh failed. Retrying automatically.';
-  } finally {
-    if (statusController === controller) { statusLoading = false; updateRefreshButton(); }
-  }
-}
-
-function poll() {
-  if (!authenticated || !queryEditor || queryError(appliedQuery)) return;
-  const kind = polling.due({ visible: !document.hidden, online: navigator.onLine,
-    busy: loading || statusLoading, pending: pendingPulls(items).length > 0 });
-  if (kind === 'list') load({ refresh: true, background: true });
-  else if (kind === 'status') refreshStatus();
-  updateRefreshButton();
-}
-
-function syncActivity() {
-  if (document.hidden || !navigator.onLine || !authenticated) {
-    events?.close(); events = null;
-    clearTimeout(readinessTimer); readinessController?.abort();
-    statusController?.abort();
-  } else {
-    if (!events) {
-      events = new EventSource('/api/events');
-      events.addEventListener('invalidate', () => { polling.invalidate(); poll(); });
-    }
-    poll();
-  }
-  updateRefreshButton();
-}
-
-const collapsed = new Set();
-const lifecycleChanges = new Map();
-const reviewChanges = new Map();
-const titleEdits = new Map();
-const draftChanges = new Map();
-const merges = new Map();
-let viewerLogin = '';
 const nameColorKey = 'gh-pull.name-colors.v1';
 let nameColors = assignNameColors([]);
 try { nameColors = assignNameColors([], JSON.parse(localStorage.getItem(nameColorKey))); } catch { /* Session colors still work if storage is unavailable. */ }
@@ -210,28 +112,27 @@ window.addEventListener('storage', event => {
 
 // Keep conflict resolution, merge availability, and app-access messaging together.
 function createMergeAction(pr, prUrl) {
-  if (pr.status !== 'OPEN' || pr.author.toLowerCase() !== viewerLogin.toLowerCase()) return nothing;
+  if (pr.status !== 'OPEN' || !isOwn(pr, viewerLogin)) return nothing;
   if (pr.hasConflicts) return prUrl ? html`<a class="badge review_required conflict-action" href=${githubUrl(prUrl, 'conflicts')}
     target="_blank" rel="noopener noreferrer" data-view-pr title="Resolve merge conflicts on GitHub (opens in a new tab)">Resolve conflict</a>` : nothing;
   if (!pr.canMerge) return nothing;
-  const names = { MERGE: 'Merge', SQUASH: 'Squash and merge', REBASE: 'Rebase and merge' };
-  const methods = (pr.mergeMethods ?? [pr.mergeMethod]).filter(method => names[method]);
+  const methods = (pr.mergeMethods ?? [pr.mergeMethod]).filter(method => mergeLabels[method]);
   if (!methods.length) return nothing;
   if (!methods.includes(mergeSelections.get(pr.id))) mergeSelections.delete(pr.id);
   const selected = mergeSelections.get(pr.id) ?? (methods.includes(pr.mergeMethod) ? pr.mergeMethod : methods[0]);
   const blocked = authMode === 'github-app' && !pr.mergeAccess?.allowed;
-  const disabled = blocked || Boolean(merges.get(pr.id)?.saving || draftChanges.get(pr.id)?.saving || titleEdits.has(pr.id) || lifecycleChanges.has(pr.id));
+  const disabled = blocked || Boolean(pendingChanges.isMergeBusy(pr.id));
   const controls = html`<span class=${`merge-controls${methods.length > 1 ? ' merge-split' : ''}`}>
-    ${actionButton({ className: 'badge open merge-action', label: `${names[selected]} ${pr.repo} #${pr.number}`, disabled,
-      onClick: () => mergePull(pr, selected), content: merges.get(pr.id)?.saving ? 'Merging…' : names[selected] })}
+    ${actionButton({ className: 'badge open merge-action', label: `${mergeLabels[selected]} ${pr.repo} #${pr.number}`, disabled,
+      onClick: () => mergePull(pr, selected), content: merges.get(pr.id)?.saving ? 'Merging…' : mergeLabels[selected] })}
     ${methods.length > 1 ? html`<span class="merge-method-trigger open"><select class="merge-method" title="Merge method"
       aria-label=${`Merge method for ${pr.repo} #${pr.number}`} ?disabled=${disabled}
       @change=${event => { mergeSelections.set(pr.id, event.target.value); render(); }}>
-      ${methods.map(method => html`<option value=${method} .selected=${method === selected}>${{ MERGE: 'Merge commit', SQUASH: 'Squash', REBASE: 'Rebase' }[method]}</option>`)}
+      ${methods.map(method => html`<option value=${method} .selected=${method === selected}>${mergeMethodLabels[method]}</option>`)}
     </select></span>` : nothing}
   </span>`;
   const message = pr.mergeAccess?.message || 'Could not verify app access. Refresh to try again.';
-  return blocked ? html`<span class="merge-access-blocked" role="group" title=${message} tabindex="0" aria-label=${`${names[selected]} unavailable. ${message}`}>${controls}</span>
+  return blocked ? html`<span class="merge-access-blocked" role="group" title=${message} tabindex="0" aria-label=${`${mergeLabels[selected]} unavailable. ${message}`}>${controls}</span>
     ${pr.mergeAccess?.url ? html`<a class="merge-access-link" href=${pr.mergeAccess.url} target="_blank" rel="noopener noreferrer"
       title="Complete setup on GitHub, then refresh this page. Organization access may require owner approval.">${pr.mergeAccess.action}</a>` : nothing}` : controls;
 }
@@ -249,8 +150,7 @@ async function changePull(pr, changes, { action, input = {}, apply, message, onS
   if (change.saving) return;
   // An older read must not overwrite the mutation's confirmed result.
   loads.cancel(); loading = false;
-  statusController?.abort(); statusLoading = false;
-  clearTimeout(readinessTimer); readinessController?.abort();
+  cancelBackgroundRequests(true);
   change.saving = true; change.error = '';
   reviewCountsLoader.clear();
   changes.set(pr.id, change); render();
@@ -476,8 +376,7 @@ async function load({ append = false, refresh = false, background = false } = {}
     updateRefreshButton();
     return;
   }
-  clearTimeout(readinessTimer); readinessController?.abort();
-  statusController?.abort(); statusLoading = false;
+  cancelBackgroundRequests(true);
   const mergeErrorsToClear = new Map(refresh && !background ? [...merges].filter(([, change]) => !change.saving) : []);
   const request = loads.start();
   const pollRevision = polling.revision;
@@ -510,9 +409,7 @@ async function load({ append = false, refresh = false, background = false } = {}
       issuePopover.close(); reviewControls.reset(); lifecycleControls.reset();
       mergedStore.clear();
       $('mutation-notice').hidden = true; $('mutation-notice').textContent = '';
-      titleEdits.clear(); reviewChanges.clear(); lifecycleChanges.clear();
-      draftChanges.clear();
-      merges.clear(); mergeSelections.clear();
+      pendingChanges.clear(); mergeSelections.clear();
     }
     polling.succeeded('list', pollRevision);
     // Preserve confirmed mutations if search indexing briefly returns an older version.
@@ -569,7 +466,6 @@ function saveFilters() {
   const query = new URLSearchParams({ q: appliedQuery, group: $('group').value });
   history.replaceState(null, '', `?${query}`);
 }
-let queryEditor, savedViews;
 async function initializeQueryEditor() {
   if (queryEditor) return;
   const { createQueryEditor } = await import('./query-editor.js');
@@ -636,7 +532,7 @@ window.addEventListener('focus', poll);
 document.addEventListener('click', event => {
   if (event.detail > 0) event.target.closest('a[target="_blank"]')?.blur();
 });
-window.addEventListener('pagehide', () => { events?.close(); events = null; });
+window.addEventListener('pagehide', backgroundRefresh.closeEvents);
 window.addEventListener('pageshow', syncActivity);
 
 $('update-copy-symbol').append(icon('copy', 14));

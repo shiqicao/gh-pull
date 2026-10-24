@@ -1,3 +1,4 @@
+import { publicAssets } from './public-assets.js';
 import { createSavedViewsStore, rankSavedViews } from './saved-views.js';
 import { isSea, getAsset } from 'node:sea';
 import { createServer } from 'node:http';
@@ -12,38 +13,8 @@ import { authConfig, createAuth } from './auth.js';
 import { createMarketplaceWebhook } from './marketplace.js';
 import { createUpdateCheck } from './extension-updates.js';
 
-const assets = new Map([
-  ['/', ['index.html', 'text/html']],
-  ['/saved-views.js', ['saved-views.js', 'text/javascript']],
-  ['/app.js', ['app.js', 'text/javascript']],
-  ['/row.js', ['row.js', 'text/javascript']],
-  ['/templates.js', ['templates.js', 'text/javascript']],
-  ['/vendor/lit-html.js', ['vendor/lit-html.js', 'text/javascript']],
-  ['/vendor/lit-html.LICENSE.txt', ['vendor/lit-html.LICENSE.txt', 'text/plain']],
-  ['/model.js', ['model.js', 'text/javascript']],
-  ['/dependencies.js', ['dependencies.js', 'text/javascript']],
-  ['/vendor/svg.js', ['vendor/svg.js', 'text/javascript']],
-  ['/vendor/svg.LICENSE.txt', ['vendor/svg.LICENSE.txt', 'text/plain']],
-  ['/controls.js', ['controls.js', 'text/javascript']],
-  ['/popover.js', ['popover.js', 'text/javascript']],
-  ['/lifecycle.js', ['lifecycle.js', 'text/javascript']],
-  ['/review-counts.js', ['review-counts.js', 'text/javascript']],
-  ['/reviews.js', ['reviews.js', 'text/javascript']],
-  ['/issues.js', ['issues.js', 'text/javascript']],
-  ['/ui.js', ['ui.js', 'text/javascript']],
-  ['/polling.js', ['polling.js', 'text/javascript']],
-  ['/state.js', ['state.js', 'text/javascript']],
-  ['/query.js', ['query.js', 'text/javascript']],
-  ['/query-editor.js', ['query-editor.js', 'text/javascript']],
-  ['/vendor/codemirror.js', ['vendor/codemirror.js', 'text/javascript']],
-  ['/vendor/codemirror.LICENSE.txt', ['vendor/codemirror.LICENSE.txt', 'text/plain']],
-  ['/style.css', ['style.css', 'text/css']],
-  ['/theme.css', ['theme.css', 'text/css']],
-  ['/query-editor.css', ['query-editor.css', 'text/css']],
-  ['/fonts/InterVariable-4.1.woff2', ['fonts/InterVariable-4.1.woff2', 'font/woff2']],
-  ['/fonts/Inter-LICENSE.txt', ['fonts/Inter-LICENSE.txt', 'text/plain']],
-  ['/favicon.svg', ['favicon.svg', 'image/svg+xml']],
-]);
+const assets = new Map(publicAssets.filter(([, type]) => type).map(([file, type]) =>
+  [file === 'index.html' ? '/' : `/${file}`, [file, type]]));
 
 const mutations = new Map([
   ['/api/pulls/close', { method: 'closePull', validate: validateClose, unavailable: 'Closing PRs is unavailable.' }],
@@ -56,19 +27,9 @@ const mutations = new Map([
 ]);
 
 export function createApp({ savedViews = createSavedViewsStore(), list = createGitHub(), updateTitle = list.updateTitle, convertToDraft = list.convertToDraft, markReadyForReview = list.markReadyForReview, merge = list.merge, dismissReview = list.dismissReview, closePull = list.closePull, reopenPull = list.reopenPull, config = { mode: 'local' }, localControl, authOptions, deploymentEnv = process.env } = {}) {
-  const sha = deploymentEnv.RAILWAY_GIT_COMMIT_SHA;
-  const owner = deploymentEnv.RAILWAY_GIT_REPO_OWNER;
-  const repo = deploymentEnv.RAILWAY_GIT_REPO_NAME;
   const build = config.mode === 'local' ? localControl?.version : null;
   const checkUpdate = createUpdateCheck(build);
-  const version = build ? {
-    label: build,
-    url: build.startsWith('v') ? `https://github.com/shiqicao/gh-pull/releases/tag/${encodeURIComponent(build)}` : null,
-  } : /^[a-f0-9]{40}$/i.test(sha ?? '') ? {
-    sha,
-    url: /^[a-z0-9-]+$/i.test(owner ?? '') && /^[a-z0-9_.-]+$/i.test(repo ?? '')
-      ? `https://github.com/${owner}/${repo}/commit/${sha}` : null,
-  } : null;
+  const version = deploymentVersion(deploymentEnv, build);
   const localCache = new Map();
   const subscribers = new Map();
   const auth = config.mode === 'github-app' ? createAuth(config, authOptions) : null;
@@ -146,87 +107,115 @@ export function createApp({ savedViews = createSavedViewsStore(), list = createG
         try { input = JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { throw new ApiError('Invalid JSON body.', 400); }
         input = mutation.validate(input);
         const actions = session ? session.list : { merge, convertToDraft, markReadyForReview, updateTitle, dismissReview, closePull, reopenPull };
-        const mutate = actions[mutation.method];
-        if (!mutate) throw new ApiError(mutation.unavailable, 503);
-        const result = await mutate(input);
-        cache.clear();
-        for (const stream of subscribers.get(cache) ?? []) stream.write('event: invalidate\ndata: {}\n\n');
-        return send(200, result);
+        return await handleMutation(input, mutation, actions, cache, subscribers, send);
       }
       if (req.method !== 'GET') return send(405, { error: 'Method not allowed.' });
       if (url.pathname === '/api/events') {
-        res.writeHead(200, { 'Content-Type': 'text/event-stream', 'X-Accel-Buffering': 'no' });
-        res.write(': connected\n\n');
-        const streams = subscribers.get(cache) ?? new Set();
-        subscribers.set(cache, streams); streams.add(res);
-        const heartbeat = setInterval(() => res.write(': heartbeat\n\n'), 25_000);
-        res.on('close', () => {
-          clearInterval(heartbeat); streams.delete(res);
-          if (!streams.size) subscribers.delete(cache);
-        });
-        return;
+        return handleEvents(res, cache, subscribers);
       }
       if (url.pathname === '/api/repositories') {
         let scope;
         try { scope = repositoryScope(url.searchParams.get('q') ?? ''); }
         catch (error) { return send(400, { error: error.message }); }
         if (!activeList.repositories) return send(200, { repositories: [], limited: false });
-        return send(200, await cachedRequest(cache, JSON.stringify(['repositories', scope]),
+        return send(200, await cachedRequest(cache, `repositories:${JSON.stringify(scope)}`,
           () => activeList.repositories(scope), { ttl: 5 * 60_000 }));
       }
       if (['/api/pulls/readiness', '/api/pulls/status', '/api/pulls/review-counts'].includes(url.pathname)) {
-        const ids = url.searchParams.getAll('id');
-        if (!ids.length || ids.length > 50 || ids.some(id => !id.trim() || id.length > 200)) return send(400, { error: 'Provide 1–50 valid PR IDs.' });
-        const kind = url.pathname.endsWith('/review-counts') ? 'reviewCounts' : url.pathname.endsWith('/status') ? 'status' : 'mergeReadiness';
-        if (!activeList[kind]) return send(200, { items: [] });
-        const key = JSON.stringify([kind, [...new Set(ids)].sort()]);
-        return send(200, await cachedRequest(cache, key, async () => {
-          const result = await activeList[kind](ids);
-          // A node refresh can reveal changes before search's cached page expires.
-          // Reconcile query membership through a fresh search on the next list read.
-          if (kind === 'status') for (const cachedKey of cache.keys()) {
-            if (!['status', 'mergeReadiness', 'repositories', 'reviewCounts'].includes(JSON.parse(cachedKey)[0])) cache.delete(cachedKey);
-          }
-          return result;
-        }, { ttl: kind === 'reviewCounts' ? 60_000 : kind === 'status' ? 10_000 : 1000 }));
+        return await handleStatus(url, activeList, cache, send);
       }
       if (url.pathname === '/api/pulls') {
-        const scope = url.searchParams.get('scope') ?? 'authored';
-        const state = url.searchParams.get('state') ?? 'open';
-        const cursor = url.searchParams.get('cursor') || null;
-        if (!['authored', 'involved', 'review'].includes(scope) || !['open', 'all', 'merged', 'closed'].includes(state) || (cursor?.length ?? 0) > 1000) {
-          return send(400, { error: 'Invalid filter or cursor.' });
-        }
-        let query;
-        if (url.searchParams.has('q')) {
-          try { query = toGitHubQuery(url.searchParams.get('q')); }
-          catch (error) { return send(400, { error: error.message }); }
-        }
-        const key = JSON.stringify(query === undefined ? [scope, state, cursor] : ['query', query, cursor]);
-        return send(200, await cachedRequest(cache, key,
-          () => activeList(query === undefined ? { scope, state, cursor } : { query, cursor }),
-          { ttl: 25_000, force: url.searchParams.get('refresh') === '1' }));
+        return await handleList(url, activeList, cache, send);
       }
-      const asset = assets.get(url.pathname);
-      if (!asset) return send(404, { error: 'Not found.' });
-      let body = isSea() ? Buffer.from(getAsset(`public/${asset[0]}`)) : await readFile(new URL(`./public/${asset[0]}`, import.meta.url));
-      if (url.pathname === '/') {
-        // CodeMirror mounts nonce-authorized style sheets. Browsers also copy
-        // token colors into style attributes while editing contenteditable text.
-        // Allow those attributes only; scripts and style sheets stay restricted.
-        const nonce = randomBytes(18).toString('base64');
-        res.setHeader('Content-Security-Policy', res.getHeader('Content-Security-Policy').replace("style-src 'self'", `style-src 'self' 'nonce-${nonce}'; style-src-attr 'unsafe-inline'`));
-        body = body.toString('utf8').replace('STYLE_NONCE', nonce);
-      }
-      if (asset[1].startsWith('font/')) res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
-      res.writeHead(200, { 'Content-Type': asset[1].startsWith('font/') ? asset[1] : `${asset[1]}; charset=utf-8` });
-      res.end(body);
+      return await serveAsset(url, res, send);
     } catch (error) {
       if (auth && error.status === 401) auth.invalidate(req, res);
       if (error.retryAfter) res.setHeader('Retry-After', String(error.retryAfter));
       send(error instanceof ApiError ? error.status : 500, { error: error instanceof ApiError ? error.message : 'Something went wrong. Please retry.' });
     }
   });
+}
+
+function deploymentVersion(env, build) {
+  if (build) return { label: build,
+    url: build.startsWith('v') ? `https://github.com/shiqicao/gh-pull/releases/tag/${encodeURIComponent(build)}` : null };
+  const sha = env.RAILWAY_GIT_COMMIT_SHA, owner = env.RAILWAY_GIT_REPO_OWNER, repo = env.RAILWAY_GIT_REPO_NAME;
+  if (!/^[a-f0-9]{40}$/i.test(sha ?? '')) return null;
+  return { sha, url: /^[a-z0-9-]+$/i.test(owner ?? '') && /^[a-z0-9_.-]+$/i.test(repo ?? '')
+    ? `https://github.com/${owner}/${repo}/commit/${sha}` : null };
+}
+
+async function handleMutation(input, mutation, actions, cache, subscribers, send) {
+  const mutate = actions[mutation.method];
+  if (!mutate) throw new ApiError(mutation.unavailable, 503);
+  const result = await mutate(input);
+  cache.clear();
+  for (const stream of subscribers.get(cache) ?? []) stream.write('event: invalidate\ndata: {}\n\n');
+  return send(200, result);
+}
+
+function handleEvents(res, cache, subscribers) {
+  res.writeHead(200, { 'Content-Type': 'text/event-stream', 'X-Accel-Buffering': 'no' });
+  res.write(': connected\n\n');
+  const streams = subscribers.get(cache) ?? new Set();
+  subscribers.set(cache, streams); streams.add(res);
+  const heartbeat = setInterval(() => res.write(': heartbeat\n\n'), 25_000);
+  res.on('close', () => {
+    clearInterval(heartbeat); streams.delete(res);
+    if (!streams.size) subscribers.delete(cache);
+  });
+}
+
+async function handleStatus(url, activeList, cache, send) {
+  const ids = url.searchParams.getAll('id');
+  if (!ids.length || ids.length > 50 || ids.some(id => !id.trim() || id.length > 200)) return send(400, { error: 'Provide 1–50 valid PR IDs.' });
+  const kind = url.pathname.endsWith('/review-counts') ? 'reviewCounts' : url.pathname.endsWith('/status') ? 'status' : 'mergeReadiness';
+  if (!activeList[kind]) return send(200, { items: [] });
+  const key = `${kind}:${JSON.stringify([...new Set(ids)].sort())}`;
+  return send(200, await cachedRequest(cache, key, async () => {
+    const result = await activeList[kind](ids);
+    // A node refresh can reveal changes before search's cached page expires.
+    // Reconcile query membership through a fresh search on the next list read.
+    if (kind === 'status') for (const cachedKey of cache.keys()) {
+      if (cachedKey.startsWith('list:')) cache.delete(cachedKey);
+    }
+    return result;
+  }, { ttl: kind === 'reviewCounts' ? 60_000 : kind === 'status' ? 10_000 : 1000 }));
+}
+
+async function handleList(url, activeList, cache, send) {
+  const scope = url.searchParams.get('scope') ?? 'authored';
+  const state = url.searchParams.get('state') ?? 'open';
+  const cursor = url.searchParams.get('cursor') || null;
+  if (!['authored', 'involved', 'review'].includes(scope) || !['open', 'all', 'merged', 'closed'].includes(state) || (cursor?.length ?? 0) > 1000) {
+    return send(400, { error: 'Invalid filter or cursor.' });
+  }
+  let query;
+  if (url.searchParams.has('q')) {
+    try { query = toGitHubQuery(url.searchParams.get('q')); }
+    catch (error) { return send(400, { error: error.message }); }
+  }
+  const key = `list:${JSON.stringify(query === undefined ? [scope, state, cursor] : ['query', query, cursor])}`;
+  return send(200, await cachedRequest(cache, key,
+    () => activeList(query === undefined ? { scope, state, cursor } : { query, cursor }),
+    { ttl: 25_000, force: url.searchParams.get('refresh') === '1' }));
+}
+
+async function serveAsset(url, res, send) {
+  const asset = assets.get(url.pathname);
+  if (!asset) return send(404, { error: 'Not found.' });
+  let body = isSea() ? Buffer.from(getAsset(`public/${asset[0]}`)) : await readFile(new URL(`./public/${asset[0]}`, import.meta.url));
+  if (url.pathname === '/') {
+    // CodeMirror mounts nonce-authorized style sheets. Browsers also copy
+    // token colors into style attributes while editing contenteditable text.
+    // Allow those attributes only; scripts and style sheets stay restricted.
+    const nonce = randomBytes(18).toString('base64');
+    res.setHeader('Content-Security-Policy', res.getHeader('Content-Security-Policy').replace("style-src 'self'", `style-src 'self' 'nonce-${nonce}'; style-src-attr 'unsafe-inline'`));
+    body = body.toString('utf8').replace('STYLE_NONCE', nonce);
+  }
+  if (asset[1].startsWith('font/')) res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+  res.writeHead(200, { 'Content-Type': asset[1].startsWith('font/') ? asset[1] : `${asset[1]}; charset=utf-8` });
+  res.end(body);
 }
 
 if (!isSea() && process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

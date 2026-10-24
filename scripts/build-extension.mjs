@@ -1,6 +1,7 @@
+import { publicAssets } from '../public-assets.js';
 import { build } from 'esbuild';
 import { inject } from 'postject';
-import { mkdir, readFile, writeFile, readdir, copyFile, chmod } from 'node:fs/promises';
+import { mkdir, readFile, writeFile, copyFile, chmod } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import { resolve, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -18,15 +19,7 @@ await build({
   define: { CLI_VERSION: JSON.stringify(version), 'import.meta.url': '__bundleMetaUrl' },
   banner: { js: "const __bundleMetaUrl = require('node:url').pathToFileURL(__filename).href;" },
 });
-const assets = {};
-async function collect(dir, prefix) {
-  for (const entry of await readdir(dir, { withFileTypes: true })) {
-    const key = `${prefix}/${entry.name}`, path = join(dir, entry.name);
-    if (entry.isDirectory()) await collect(path, key);
-    else assets[key] = path;
-  }
-}
-await collect(join(root, 'public'), 'public');
+const assets = Object.fromEntries(publicAssets.map(([file]) => [`public/${file}`, join(root, 'public', file)]));
 const notices = ['LICENSE', 'THIRD_PARTY_NOTICES', 'public/fonts/Inter-LICENSE.txt', 'public/vendor/codemirror.LICENSE.txt', 'public/vendor/svg.LICENSE.txt', 'public/vendor/lit-html.LICENSE.txt',
   'node_modules/proper-lockfile/LICENSE', 'node_modules/graceful-fs/LICENSE', 'node_modules/retry/License', 'node_modules/signal-exit/LICENSE.txt'];
 let licenses = '';

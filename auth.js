@@ -168,6 +168,8 @@ export function createAuth(config, { fetchImpl = fetch, now = Date.now, githubFa
               return checkAccess(repos);
             },
             authError: 'GitHub authorization expired or was revoked. Please sign in again.' });
+          // Track listed owners and reject cancelled in-flight list results.
+          // Copied methods retain tokenFor's cancellation check before each request.
           entry.list = Object.assign(async options => {
             const result = await github(options);
             for (const pr of result.items ?? []) entry.owners.add(pr.repo.split('/')[0].toLowerCase());

@@ -50,7 +50,11 @@ test('merge rechecks GitHub and pins mutation to displayed head and method', asy
   const { github, calls } = client();
   assert.equal((await github.merge(input)).status, 'MERGED');
   assert.deepEqual(calls[1].variables.input, { pullRequestId: ready.id, expectedHeadOid: headOid, mergeMethod: 'SQUASH' });
-  assert.match(calls[0].query, /mergeStateStatus/);
+  for (const field of ['author', 'state', 'isDraft', 'headRefOid', 'mergeable', 'mergeStateStatus', 'mergeQueue', 'stackEntry',
+    'viewerPermission', 'mergeCommitAllowed', 'squashMergeAllowed', 'rebaseMergeAllowed', 'statusCheckRollup']) {
+    assert.match(calls[0].query, new RegExp(field));
+  }
+  assert.doesNotMatch(calls[0].query, /latestReviews|reviewRequests|closingIssuesReferences|labels/);
 });
 
 test('nonblocking review decisions do not override GitHub’s clean merge status', async () => {
