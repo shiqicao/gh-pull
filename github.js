@@ -9,14 +9,6 @@ export { mergeOptions, reviewersFor } from './pull-request.js';
 const mergeFields = `viewerCanMergeAsAdmin headRefOid mergeable mergeStateStatus mergeQueue { id } stackEntry { id }
   repository { nameWithOwner viewerPermission viewerDefaultMergeMethod mergeCommitAllowed squashMergeAllowed rebaseMergeAllowed }`;
 
-export function validateMerge(input) {
-  const { id } = validateDraftUpdate(input);
-  if (!/^[a-f0-9]{40}$/i.test(input.headOid ?? '') || !['MERGE', 'SQUASH', 'REBASE'].includes(input.mergeMethod)) {
-    throw new ApiError('Provide the displayed commit and merge method.', 400);
-  }
-  return { id, headOid: input.headOid, mergeMethod: input.mergeMethod };
-}
-
 const fields = `viewerCanClose viewerCanReopen id number title url state isDraft createdAt updatedAt headRefName baseRefName
   headRepository { nameWithOwner }
   author { login } repository { nameWithOwner defaultBranchRef { name } }
@@ -47,6 +39,14 @@ const fields = `viewerCanClose viewerCanReopen id number title url state isDraft
       statusContextCountsByState { state count }
     }
   } } } }`;
+
+export function validateMerge(input) {
+  const { id } = validateDraftUpdate(input);
+  if (!/^[a-f0-9]{40}$/i.test(input.headOid ?? '') || !['MERGE', 'SQUASH', 'REBASE'].includes(input.mergeMethod)) {
+    throw new ApiError('Provide the displayed commit and merge method.', 400);
+  }
+  return { id, headOid: input.headOid, mergeMethod: input.mergeMethod };
+}
 
 export function validateClose(input) {
   const { id } = validateDraftUpdate(input);
