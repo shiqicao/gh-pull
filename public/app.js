@@ -5,7 +5,7 @@ import { html, render as renderTemplate, repeat, nothing } from './vendor/lit-ht
 import { githubUrl, usernameLink, repositoryLink } from './templates.js';
 import { renderRow } from './row.js';
 import { drawDependencies } from './dependencies.js';
-import { createPollingSchedule, pendingPulls } from './polling.js';
+import { createPollingSchedule, createBackgroundRefresh, pendingPulls } from './polling.js';
 import { createViewedStore, createLatestRequest, mergePullPages, createMergedStore, createPendingChanges } from './state.js';
 import { createIssuePopover } from './issues.js';
 import { createLifecycleControls } from './lifecycle.js';
@@ -29,10 +29,19 @@ const mergedStore = createMergedStore();
 const mergeSelections = new Map();
 const polling = createPollingSchedule();
 const issuePopover = createIssuePopover({ onClose: () => polling.invalidate() });
-let statusLoading = false, statusController, statusOffset = 0, loadedPages = 1;
-let events;
+let loadedPages = 1;
 let authMode = 'local', authenticated = false;
-let readinessTimer, readinessController;
+const background = createBackgroundRefresh({
+  state: {
+    get items() { return items; }, set items(value) { items = value; },
+    get total() { return total; }, set total(value) { total = value; },
+    get authenticated() { return authenticated; }, get loading() { return loading; },
+    get appliedQuery() { return appliedQuery; }, get queryReady() { return Boolean(queryEditor); },
+  },
+  polling, loads, mergedStore, apiFetch, responseError, savingPull, render, load, updateRefreshButton,
+  onUpdate: text => { $('updated').textContent = text; },
+});
+const { scheduleMergeReadiness, cancelBackgroundRequests, poll, syncActivity } = background;
 
 const reviewCountsLoader = createReviewCountsLoader({
   async fetchCounts(id, signal) {
@@ -49,44 +58,6 @@ const reviewCountsLoader = createReviewCountsLoader({
   },
 });
 
-function cancelBackgroundRequests() {
-  clearTimeout(readinessTimer); readinessController?.abort();
-  statusController?.abort();
-}
-
-function scheduleMergeReadiness(attempt = 0) {
-  clearTimeout(readinessTimer);
-  readinessController?.abort();
-  if (polling.backingOff || document.hidden || !navigator.onLine || !authenticated || attempt >= 5 || !items.some(pr => pr.mergePending && pr.status === 'OPEN')) return;
-  const version = loads.revision;
-  readinessTimer = setTimeout(async () => {
-    if (polling.backingOff || statusLoading || document.hidden || !navigator.onLine || loading) {
-      scheduleMergeReadiness(attempt);
-      return;
-    }
-    const pending = items.filter(pr => pr.mergePending && pr.status === 'OPEN').slice(0, 50);
-    const query = new URLSearchParams(pending.map(pr => ['id', pr.id]));
-    const requestController = new AbortController();
-    readinessController = requestController;
-    try {
-      const response = await apiFetch(`/api/pulls/readiness?${query}`, { signal: requestController.signal });
-      if (!response.ok) throw responseError(response, await response.json(), 'Could not check merge readiness.');
-      const data = await response.json();
-      if (version !== loads.revision || requestController.signal.aborted || !authenticated) return;
-      for (const update of data.items) {
-        const pr = items.find(item => item.id === update.id);
-        // Never offer a merge against a commit that is not the displayed version.
-        if (pr?.status === 'OPEN' && !savingPull(pr.id) && pr.headOid === update.headOid) Object.assign(pr, update);
-      }
-      render();
-    } catch (error) {
-      if (error.retryAfter) polling.failed(error.retryAfter);
-      // Normal polling retries unresolved merge readiness.
-    }
-    if (version === loads.revision && !requestController.signal.aborted) scheduleMergeReadiness(attempt + 1);
-  }, 2000);
-}
-
 async function apiFetch(url, options) {
   const response = await fetch(url, options);
   if (response.status === 401 && authMode === 'github-app') {
@@ -100,7 +71,7 @@ async function apiFetch(url, options) {
 }
 
 function updateRefreshButton() {
-  const busy = loading || statusLoading;
+  const busy = loading || background.statusLoading;
   $('refresh').disabled = busy;
   const paused = document.hidden || !navigator.onLine;
   const seconds = Math.max(0, Math.ceil((polling.nextAt(pendingPulls(items).length > 0) - Date.now()) / 1000));
@@ -117,74 +88,6 @@ function responseError(response, data, fallback) {
   const error = new Error(data.error || fallback);
   error.retryAfter = Number(response.headers.get('Retry-After')) || 0;
   return error;
-}
-
-async function refreshStatus() {
-  const pending = pendingPulls(items);
-  if (!pending.length) return;
-  // Rotate batches so large dashboards do not starve later PRs.
-  statusOffset %= pending.length;
-  const selected = [...pending.slice(statusOffset), ...pending.slice(0, statusOffset)].slice(0, 50);
-  statusOffset += selected.length;
-  const version = loads.revision;
-  const controller = new AbortController(); statusController = controller;
-  statusLoading = true; updateRefreshButton();
-  clearTimeout(readinessTimer); readinessController?.abort();
-  try {
-    const query = new URLSearchParams(selected.map(pr => ['id', pr.id]));
-    const response = await apiFetch(`/api/pulls/status?${query}`, { signal: AbortSignal.any([controller.signal, AbortSignal.timeout(35_000)]) });
-    const data = await response.json();
-    if (!response.ok) throw responseError(response, data, 'Could not refresh running checks.');
-    if (version !== loads.revision || controller.signal.aborted || !authenticated) return;
-    polling.succeeded('status');
-    let changed = false, reconcile = false;
-    for (const incoming of data.items) {
-      const update = mergedStore.reconcile(incoming);
-      const current = items.find(pr => pr.id === update.id);
-      if (!current || savingPull(current.id) || Date.parse(update.updatedAt) < Date.parse(current.updatedAt)) continue;
-      if (JSON.stringify(current) !== JSON.stringify(update)) {
-        reconcile ||= ['status', 'checks', 'review'].some(key => current[key] !== update[key]);
-        Object.assign(current, update); changed = true;
-      }
-    }
-    if (reconcile) polling.invalidate();
-    if (changed) {
-      const count = items.length;
-      items = items.filter(pr => matchesQueryState(pr, appliedQuery));
-      total = Math.max(0, total - (count - items.length));
-      render();
-    }
-    $('updated').textContent = `Checked ${new Date().toLocaleTimeString()}.`;
-  } catch (error) {
-    if (controller.signal.aborted || version !== loads.revision) return;
-    polling.failed(error.retryAfter);
-    $('updated').textContent = 'Background refresh failed. Retrying automatically.';
-  } finally {
-    if (statusController === controller) { statusLoading = false; updateRefreshButton(); }
-  }
-}
-
-function poll() {
-  if (!authenticated || !queryEditor || queryError(appliedQuery)) return;
-  const kind = polling.due({ visible: !document.hidden, online: navigator.onLine,
-    busy: loading || statusLoading, pending: pendingPulls(items).length > 0 });
-  if (kind === 'list') load({ refresh: true, background: true });
-  else if (kind === 'status') refreshStatus();
-  updateRefreshButton();
-}
-
-function syncActivity() {
-  if (document.hidden || !navigator.onLine || !authenticated) {
-    events?.close(); events = null;
-    cancelBackgroundRequests();
-  } else {
-    if (!events) {
-      events = new EventSource('/api/events');
-      events.addEventListener('invalidate', () => { polling.invalidate(); poll(); });
-    }
-    poll();
-  }
-  updateRefreshButton();
 }
 
 const nameColorKey = 'gh-pull.name-colors.v1';
@@ -248,7 +151,7 @@ async function changePull(pr, changes, { action, input = {}, apply, message, onS
   if (change.saving) return;
   // An older read must not overwrite the mutation's confirmed result.
   loads.cancel(); loading = false;
-  cancelBackgroundRequests(); statusLoading = false;
+  cancelBackgroundRequests(true);
   change.saving = true; change.error = '';
   reviewCountsLoader.clear();
   changes.set(pr.id, change); render();
@@ -474,7 +377,7 @@ async function load({ append = false, refresh = false, background = false } = {}
     updateRefreshButton();
     return;
   }
-  cancelBackgroundRequests(); statusLoading = false;
+  cancelBackgroundRequests(true);
   const mergeErrorsToClear = new Map(refresh && !background ? [...merges].filter(([, change]) => !change.saving) : []);
   const request = loads.start();
   const pollRevision = polling.revision;
@@ -630,7 +533,7 @@ window.addEventListener('focus', poll);
 document.addEventListener('click', event => {
   if (event.detail > 0) event.target.closest('a[target="_blank"]')?.blur();
 });
-window.addEventListener('pagehide', () => { events?.close(); events = null; });
+window.addEventListener('pagehide', background.closeEvents);
 window.addEventListener('pageshow', syncActivity);
 
 $('update-copy-symbol').append(icon('copy', 14));
