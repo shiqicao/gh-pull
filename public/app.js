@@ -11,7 +11,7 @@ import { createIssuePopover } from './issues.js';
 import { createLifecycleControls } from './lifecycle.js';
 import { createReviewControls } from './reviews.js';
 import { element, icon, clipboardFeedback } from './ui.js';
-import { assignNameColors, dependencyLanes, groupPulls, labels } from './model.js';
+import { assignNameColors, dependencyLanes, groupPulls, labels, isOwn } from './model.js';
 import { queryFromParams, queryPresets, setQueryPreset, normalizeQuery, queryError, matchesQueryState } from './query.js';
 
 const $ = id => document.getElementById(id);
@@ -44,6 +44,11 @@ const reviewCountsLoader = createReviewCountsLoader({
     renderEditorRow(id);
   },
 });
+
+function cancelBackgroundRequests() {
+  clearTimeout(readinessTimer); readinessController?.abort();
+  statusController?.abort();
+}
 
 function scheduleMergeReadiness(attempt = 0) {
   clearTimeout(readinessTimer);
@@ -169,8 +174,7 @@ function poll() {
 function syncActivity() {
   if (document.hidden || !navigator.onLine || !authenticated) {
     events?.close(); events = null;
-    clearTimeout(readinessTimer); readinessController?.abort();
-    statusController?.abort();
+    cancelBackgroundRequests();
   } else {
     if (!events) {
       events = new EventSource('/api/events');
@@ -210,7 +214,7 @@ window.addEventListener('storage', event => {
 
 // Keep conflict resolution, merge availability, and app-access messaging together.
 function createMergeAction(pr, prUrl) {
-  if (pr.status !== 'OPEN' || pr.author.toLowerCase() !== viewerLogin.toLowerCase()) return nothing;
+  if (pr.status !== 'OPEN' || !isOwn(pr, viewerLogin)) return nothing;
   if (pr.hasConflicts) return prUrl ? html`<a class="badge review_required conflict-action" href=${githubUrl(prUrl, 'conflicts')}
     target="_blank" rel="noopener noreferrer" data-view-pr title="Resolve merge conflicts on GitHub (opens in a new tab)">Resolve conflict</a>` : nothing;
   if (!pr.canMerge) return nothing;
@@ -249,8 +253,7 @@ async function changePull(pr, changes, { action, input = {}, apply, message, onS
   if (change.saving) return;
   // An older read must not overwrite the mutation's confirmed result.
   loads.cancel(); loading = false;
-  statusController?.abort(); statusLoading = false;
-  clearTimeout(readinessTimer); readinessController?.abort();
+  cancelBackgroundRequests(); statusLoading = false;
   change.saving = true; change.error = '';
   reviewCountsLoader.clear();
   changes.set(pr.id, change); render();
@@ -476,8 +479,7 @@ async function load({ append = false, refresh = false, background = false } = {}
     updateRefreshButton();
     return;
   }
-  clearTimeout(readinessTimer); readinessController?.abort();
-  statusController?.abort(); statusLoading = false;
+  cancelBackgroundRequests(); statusLoading = false;
   const mergeErrorsToClear = new Map(refresh && !background ? [...merges].filter(([, change]) => !change.saving) : []);
   const request = loads.start();
   const pollRevision = polling.revision;

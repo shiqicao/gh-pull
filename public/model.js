@@ -170,3 +170,5 @@ export function dependencyLanes(items, options) {
   const visible = rows.filter(n => n.lane !== null && n.lane <= 3);
   return { rows, gutter: visible.length ? 32 + 20 * Math.max(...visible.map(n => n.lane)) : 0 };
 }
+
+export const isOwn = (pr, viewerLogin) => pr.author.toLowerCase() === viewerLogin.toLowerCase();

@@ -1,6 +1,6 @@
 import { iconButton, formError } from './controls.js';
 import { html, nothing, repeat } from './vendor/lit-html.js';
-import { labels, relativeTime, NAME_COLOR_COUNT } from './model.js';
+import { labels, relativeTime, NAME_COLOR_COUNT, isOwn } from './model.js';
 import { iconTemplate as icon, badge, githubUrl, usernameLink, repositoryLink, copyFeedback, reviewStatus } from './templates.js';
 
 const reviewLabels = { APPROVED: 'Approved', CHANGES_REQUESTED: 'Changes requested', REVIEW_REQUIRED: 'Review required', REVIEW_BYPASS_AVAILABLE: 'Review bypass available' };
@@ -32,7 +32,7 @@ export function renderRow(node, gutter, ctx) {
   const { pr } = node;
   const { viewedStore, markViewed, viewerLogin, draftChanges, merges, titleEdits,
     render, focusTitleControl, createMergeAction, issuePopover, titleEditor, reviewControl, lifecycleControl, savingPull, nameColors } = ctx;
-  const hasUpdates = viewedStore.hasUpdates(pr), own = pr.author.toLowerCase() === viewerLogin.toLowerCase();
+  const hasUpdates = viewedStore.hasUpdates(pr), own = isOwn(pr, viewerLogin);
   const url = githubUrl(pr.url), hasUrl = url !== nothing;
   const author = name => usernameLink(name, 'badge author', nameColors[name.toLowerCase()] * 360 / NAME_COLOR_COUNT);
   const onOpen = event => {
