@@ -6,7 +6,7 @@ import { githubUrl, usernameLink, repositoryLink } from './templates.js';
 import { renderRow } from './row.js';
 import { drawDependencies } from './dependencies.js';
 import { createPollingSchedule, pendingPulls } from './polling.js';
-import { createViewedStore, createLatestRequest, mergePullPages, createMergedStore } from './state.js';
+import { createViewedStore, createLatestRequest, mergePullPages, createMergedStore, createPendingChanges } from './state.js';
 import { createIssuePopover } from './issues.js';
 import { createLifecycleControls } from './lifecycle.js';
 import { createReviewControls } from './reviews.js';
@@ -20,6 +20,10 @@ if ([...$('group').options].some(option => option.value === params.get('group'))
 let appliedQuery = queryFromParams(params);
 if (!queryError(appliedQuery)) appliedQuery = normalizeQuery(appliedQuery);
 let items = [], total = 0, cursor = null, more = false, limited = false, loading = false;
+const collapsed = new Set();
+const pendingChanges = createPendingChanges();
+const { titleEdits, draftChanges, merges, lifecycleChanges, reviewChanges } = pendingChanges;
+let viewerLogin = '', queryEditor, savedViews;
 const loads = createLatestRequest();
 const mergedStore = createMergedStore();
 const mergeSelections = new Map();
@@ -87,7 +91,7 @@ async function apiFetch(url, options) {
   const response = await fetch(url, options);
   if (response.status === 401 && authMode === 'github-app') {
     authenticated = false; reviewCountsLoader.clear(); savedViews?.reset();
-    items = []; titleEdits.clear(); reviewChanges.clear(); lifecycleChanges.clear(); draftChanges.clear(); merges.clear(); mergeSelections.clear();
+    items = []; pendingChanges.clear(); mergeSelections.clear();
     $('results').replaceChildren();
     $('dashboard').hidden = true;
     location.replace('/?auth_error=expired');
@@ -107,10 +111,8 @@ function updateRefreshButton() {
   $('refresh').setAttribute('aria-busy', String(busy));
 }
 
-function savingPull(id) { return lifecycleChanges.get(id)?.saving || reviewChanges.get(id)?.saving || titleEdits.get(id)?.saving || draftChanges.get(id)?.saving || merges.get(id)?.saving; }
-function protectedPull(id) {
-  return lifecycleChanges.has(id) || reviewChanges.has(id) || titleEdits.has(id) || issuePopover.pullId === id || draftChanges.get(id)?.saving || merges.get(id)?.saving;
-}
+function savingPull(id) { return pendingChanges.isSaving(id); }
+function protectedPull(id) { return pendingChanges.isProtected(id) || issuePopover.pullId === id; }
 function responseError(response, data, fallback) {
   const error = new Error(data.error || fallback);
   error.retryAfter = Number(response.headers.get('Retry-After')) || 0;
@@ -185,13 +187,6 @@ function syncActivity() {
   updateRefreshButton();
 }
 
-const collapsed = new Set();
-const lifecycleChanges = new Map();
-const reviewChanges = new Map();
-const titleEdits = new Map();
-const draftChanges = new Map();
-const merges = new Map();
-let viewerLogin = '';
 const nameColorKey = 'gh-pull.name-colors.v1';
 let nameColors = assignNameColors([]);
 try { nameColors = assignNameColors([], JSON.parse(localStorage.getItem(nameColorKey))); } catch { /* Session colors still work if storage is unavailable. */ }
@@ -224,7 +219,7 @@ function createMergeAction(pr, prUrl) {
   if (!methods.includes(mergeSelections.get(pr.id))) mergeSelections.delete(pr.id);
   const selected = mergeSelections.get(pr.id) ?? (methods.includes(pr.mergeMethod) ? pr.mergeMethod : methods[0]);
   const blocked = authMode === 'github-app' && !pr.mergeAccess?.allowed;
-  const disabled = blocked || Boolean(merges.get(pr.id)?.saving || draftChanges.get(pr.id)?.saving || titleEdits.has(pr.id) || lifecycleChanges.has(pr.id));
+  const disabled = blocked || Boolean(pendingChanges.isMergeBusy(pr.id));
   const controls = html`<span class=${`merge-controls${methods.length > 1 ? ' merge-split' : ''}`}>
     ${actionButton({ className: 'badge open merge-action', label: `${names[selected]} ${pr.repo} #${pr.number}`, disabled,
       onClick: () => mergePull(pr, selected), content: merges.get(pr.id)?.saving ? 'Merging…' : names[selected] })}
@@ -512,9 +507,7 @@ async function load({ append = false, refresh = false, background = false } = {}
       issuePopover.close(); reviewControls.reset(); lifecycleControls.reset();
       mergedStore.clear();
       $('mutation-notice').hidden = true; $('mutation-notice').textContent = '';
-      titleEdits.clear(); reviewChanges.clear(); lifecycleChanges.clear();
-      draftChanges.clear();
-      merges.clear(); mergeSelections.clear();
+      pendingChanges.clear(); mergeSelections.clear();
     }
     polling.succeeded('list', pollRevision);
     // Preserve confirmed mutations if search indexing briefly returns an older version.
@@ -571,7 +564,6 @@ function saveFilters() {
   const query = new URLSearchParams({ q: appliedQuery, group: $('group').value });
   history.replaceState(null, '', `?${query}`);
 }
-let queryEditor, savedViews;
 async function initializeQueryEditor() {
   if (queryEditor) return;
   const { createQueryEditor } = await import('./query-editor.js');
