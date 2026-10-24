@@ -18,6 +18,21 @@ body {
   padding: 24px;
 }
 
+:root {
+  --sticky-top-height: 0px;
+  --sticky-top-offset: min(0px, calc(var(--sticky-viewport-height, 100dvh) - var(--sticky-top-height) - 120px));
+  scroll-padding-top: calc(var(--sticky-top-height) + var(--sticky-top-offset) + 56px);
+}
+
+#sticky-top {
+  position: sticky;
+  top: var(--sticky-top-offset);
+  z-index: 3;
+  margin-top: -16px;
+  padding-block: 16px;
+  background: var(--color-page);
+}
+
 header {
   display: flex;
   align-items: center;
@@ -320,6 +335,9 @@ button, .pr-group > summary {
 }
 
 .pr-group > summary {
+  position: sticky;
+  top: calc(var(--sticky-top-height) + var(--sticky-top-offset));
+  z-index: 2;
   padding: 10px 14px;
   font-size: var(--font-size-body);
   background: var(--color-surface);
