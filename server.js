@@ -1,3 +1,4 @@
+import { validateReviewerChange } from './reviewer-management.js';
 import { publicAssets } from './public-assets.js';
 import { createSavedViewsStore, rankSavedViews } from './saved-views.js';
 import { isSea, getAsset } from 'node:sea';
@@ -17,6 +18,7 @@ const assets = new Map(publicAssets.filter(([, type]) => type).map(([file, type]
   [file === 'index.html' ? '/' : `/${file}`, [file, type]]));
 
 const mutations = new Map([
+  ['/api/pulls/reviewers', { method: 'changeReviewer', validate: validateReviewerChange, unavailable: 'Reviewer management is unavailable.' }],
   ['/api/pulls/close', { method: 'closePull', validate: validateClose, unavailable: 'Closing PRs is unavailable.' }],
   ['/api/pulls/reopen', { method: 'reopenPull', validate: validateDraftUpdate, unavailable: 'Reopening PRs is unavailable.' }],
   ['/api/pulls/revoke', { method: 'dismissReview', validate: validateReviewDismissal, unavailable: 'Review revocation is unavailable.' }],
@@ -26,7 +28,7 @@ const mutations = new Map([
   ['/api/pulls/merge', { method: 'merge', validate: validateMerge, unavailable: 'Status changes are unavailable.' }],
 ]);
 
-export function createApp({ savedViews = createSavedViewsStore(), list = createGitHub(), updateTitle = list.updateTitle, convertToDraft = list.convertToDraft, markReadyForReview = list.markReadyForReview, merge = list.merge, dismissReview = list.dismissReview, closePull = list.closePull, reopenPull = list.reopenPull, config = { mode: 'local' }, localControl, authOptions, deploymentEnv = process.env } = {}) {
+export function createApp({ savedViews = createSavedViewsStore(), list = createGitHub(), updateTitle = list.updateTitle, convertToDraft = list.convertToDraft, markReadyForReview = list.markReadyForReview, merge = list.merge, dismissReview = list.dismissReview, closePull = list.closePull, reopenPull = list.reopenPull, changeReviewer = list.changeReviewer, config = { mode: 'local' }, localControl, authOptions, deploymentEnv = process.env } = {}) {
   const build = config.mode === 'local' ? localControl?.version : null;
   const checkUpdate = createUpdateCheck(build);
   const version = deploymentVersion(deploymentEnv, build);
@@ -106,12 +108,16 @@ export function createApp({ savedViews = createSavedViewsStore(), list = createG
         let input;
         try { input = JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { throw new ApiError('Invalid JSON body.', 400); }
         input = mutation.validate(input);
-        const actions = session ? session.list : { merge, convertToDraft, markReadyForReview, updateTitle, dismissReview, closePull, reopenPull };
+        const actions = session ? session.list : { merge, convertToDraft, markReadyForReview, updateTitle, dismissReview, closePull, reopenPull, changeReviewer };
         return await handleMutation(input, mutation, actions, cache, subscribers, send);
       }
       if (req.method !== 'GET') return send(405, { error: 'Method not allowed.' });
       if (url.pathname === '/api/events') {
         return handleEvents(res, cache, subscribers);
+      }
+      if (url.pathname === '/api/pulls/reviewers') {
+        if (!activeList.reviewerSuggestions) throw new ApiError('Reviewer search is unavailable.', 503);
+        return send(200, await activeList.reviewerSuggestions(url.searchParams.get('id'), url.searchParams.get('q') ?? ''));
       }
       if (url.pathname === '/api/repositories') {
         let scope;

@@ -51,9 +51,10 @@ function metaRow(pr, node, author, issuePopover) {
       </div>`;
 }
 
-function reviewerList(pr, author, reviewControl) {
+function reviewerList(pr, author, reviewControl, manage) {
   const url = githubUrl(pr.url), hasUrl = url !== nothing;
-  return html`${pr.reviewers?.length || pr.reviewersTruncated ? html`<div class="reviewers" role="group" aria-label="Reviewers">
+  return html`${pr.reviewers?.length || pr.reviewersTruncated || manage !== nothing ? html`<div class="reviewers" role="group" aria-label="Reviewers">
+    ${manage}
     ${repeat(pr.reviewers ?? [], reviewer => reviewer.name, reviewer => {
       const [description, kind, symbol] = reviewStates[reviewer.state] ?? [reviewer.state, 'none', '·'];
       return html`<span class="reviewer" title=${`${reviewer.name}: ${description}`} aria-label=${`${reviewer.name}: ${description}`}>${author(reviewer.name)}${reviewer.canRevoke ? reviewControl(pr, reviewer) : reviewStatus(symbol, kind)}</span>`;
@@ -65,7 +66,7 @@ function reviewerList(pr, author, reviewControl) {
 export function renderRow(node, gutter, ctx) {
   const { pr } = node;
   const { viewedStore, markViewed, viewerLogin, draftChanges, merges, titleEdits,
-    render, focusTitleControl, createMergeAction, issuePopover, titleEditor, reviewControl, lifecycleControl, savingPull, nameColors } = ctx;
+    render, focusTitleControl, createMergeAction, issuePopover, titleEditor, reviewControl, reviewerManager, lifecycleControl, savingPull, nameColors } = ctx;
   const hasUpdates = viewedStore.hasUpdates(pr), own = isOwn(pr, viewerLogin);
   const url = githubUrl(pr.url), hasUrl = url !== nothing;
   const author = name => usernameLink(name, 'badge author', nameColors[name.toLowerCase()] * 360 / NAME_COLOR_COUNT);
@@ -91,6 +92,6 @@ export function renderRow(node, gutter, ctx) {
       ${formError(draftChanges.get(pr.id)?.error, 'draft-error')}
       ${titleEdits.has(pr.id) && own ? titleEditor(pr) : nothing}
       ${metaRow(pr, node, author, issuePopover)}<span class="sr-only" role="status"></span></div>
-      ${reviewerList(pr, author, reviewControl)}
+      ${reviewerList(pr, author, reviewControl, own && ['OPEN', 'DRAFT'].includes(pr.status) && reviewerManager ? reviewerManager(pr, Boolean(savingPull(pr.id))) : nothing)}
     </div>`;
 }

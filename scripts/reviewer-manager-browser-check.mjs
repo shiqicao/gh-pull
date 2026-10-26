@@ -1,0 +1,67 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { browserFixture } from './browser-fixture.mjs';
+import { ApiError } from '../github.js';
+
+test('manage own reviewers: lazy search, errors, re-request, team, remove, dismissal', async t => {
+  let pr = { id: 'P1', number: 1, title: 'Make reviewer management easier', repo: 'example/dashboard', author: 'alice', status: 'OPEN', checks: 'SUCCESS', review: 'APPROVED', labels: [], additions: 12, deletions: 3,
+    url: 'https://github.com/example/dashboard/pull/1', createdAt: '2026-10-20T00:00:00Z', updatedAt: '2026-10-20T00:00:00Z', reviewers: [{ name: 'bob', state: 'APPROVED' }, { name: 'carol', state: 'REQUESTED' }] };
+  const list = async () => ({ viewer: 'alice', items: [pr, { ...pr, id: 'P2', author: 'other' }, { ...pr, id: 'P3', status: 'DRAFT' }], total: 3, pageInfo: { hasNextPage: false } });
+  let searches = 0, calls = 0;
+  list.reviewerSuggestions = async (id, q) => { searches++; return { reviewers: q ? [] : [{ name: 'dana', displayName: 'Dana', kind: 'user' }], limited: false }; };
+  list.changeReviewer = async input => {
+    calls++;
+    if (calls === 1) throw new ApiError('GitHub denied reviewer access.', 403);
+    pr = { ...pr, updatedAt: new Date().toISOString(), reviewers: input.action === 'remove' ? pr.reviewers.filter(r => r.name !== input.name) : [...pr.reviewers.filter(r => r.name !== input.name), { name: input.name, state: 'REQUESTED' }] };
+    return pr;
+  };
+  const { page, origin, errors } = await browserFixture(t, { list });
+  await page.goto(origin);
+  const trigger = page.locator('[data-pr-id=P1]').getByRole('button', { name: /Manage reviewers/ });
+  await trigger.waitFor(); assert.equal(searches, 0);
+  assert.equal(await page.locator('[data-pr-id=P2]').getByRole('button', { name: /Manage reviewers/ }).count(), 0);
+  assert.equal(await page.locator('[data-pr-id=P3]').getByRole('button', { name: /Manage reviewers/ }).isDisabled(), true);
+  await trigger.click();
+  const panel = page.getByRole('dialog', { name: 'Manage reviewers', exact: true });
+  await panel.getByRole('button', { name: 'Request review from dana', exact: true }).waitFor();
+  await panel.getByRole('button', { name: 'Re-request review from bob' }).click();
+  await panel.getByRole('alert').filter({ hasText: 'denied' }).waitFor();
+  await panel.getByRole('button', { name: 'Re-request review from bob' }).click();
+  await panel.getByRole('button', { name: 'Remove request for bob' }).waitFor();
+  await panel.getByRole('button', { name: 'Remove request for carol' }).click();
+  await page.waitForFunction(() => !document.querySelector('#manage-reviewers button[aria-label="Remove request for carol"]'));
+  await panel.getByRole('textbox').fill('example/core');
+  await panel.getByRole('button', { name: 'Request review from example/core' }).click();
+  await panel.getByRole('button', { name: 'Remove request for example/core' }).waitFor();
+  assert.equal(calls, 4);
+  await page.setViewportSize({ width: 375, height: 650 });
+  await page.waitForFunction(() => { const r = document.querySelector('#manage-reviewers').getBoundingClientRect(); return r.left >= 7 && r.right <= innerWidth - 7 && r.top >= 7 && r.bottom <= innerHeight - 7; });
+  if (process.env.GH_PULL_SCREENSHOTS) await page.screenshot({ path: '/tmp/gh-pull-reviewer-manager.png' });
+  await page.keyboard.press('Escape');
+  await panel.waitFor({ state: 'hidden' });
+  await trigger.click(); await panel.waitFor(); await trigger.click(); await panel.waitFor({ state: 'hidden' });
+  assert.deepEqual(errors, []);
+});
+
+test('late reviewer searches cannot overwrite a newer query or reopen dismissed popover', async t => {
+  const pr = { id: 'P1', number: 1, title: 'Search race', repo: 'example/dashboard', author: 'alice', status: 'OPEN', checks: 'NONE', review: 'NONE', labels: [], reviewers: [], additions: 0, deletions: 0, createdAt: '2026-10-20', updatedAt: '2026-10-20' };
+  const list = async () => ({ viewer: 'alice', items: [pr], total: 1, pageInfo: { hasNextPage: false } });
+  list.reviewerSuggestions = async () => ({ reviewers: [], limited: false });
+  const { page, origin } = await browserFixture(t, { list });
+  let release, started;
+  const waiting = new Promise(resolve => { started = resolve; });
+  await page.route('**/api/pulls/reviewers?*', async route => {
+    if (new URL(route.request().url()).searchParams.get('q') === 'slow') {
+      started(); await new Promise(resolve => { release = resolve; });
+      await route.fulfill({ json: { reviewers: [{ name: 'stale', kind: 'user' }] } }).catch(() => {});
+    } else await route.fulfill({ json: { reviewers: [{ name: 'fresh', kind: 'user' }] } });
+  });
+  await page.goto(origin); await page.getByRole('button', { name: /Manage reviewers/ }).click();
+  const panel = page.getByRole('dialog', { name: 'Manage reviewers', exact: true });
+  await panel.getByRole('textbox').fill('slow'); await waiting;
+  await panel.getByRole('textbox').fill('new');
+  await panel.getByRole('button', { name: 'Request review from fresh' }).waitFor();
+  release();
+  assert.equal(await panel.getByRole('button', { name: 'Request review from stale' }).count(), 0);
+  await page.keyboard.press('Escape'); await panel.waitFor({ state: 'hidden' });
+});

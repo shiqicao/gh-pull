@@ -14,6 +14,7 @@ export const publicAssets = [
   ['popover.js', 'text/javascript'],
   ['lifecycle.js', 'text/javascript'],
   ['review-counts.js', 'text/javascript'],
+  ['reviewer-manager.js', 'text/javascript'],
   ['reviews.js', 'text/javascript'],
   ['issues.js', 'text/javascript'],
   ['ui.js', 'text/javascript'],

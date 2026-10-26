@@ -1,3 +1,4 @@
+import { createReviewerManager } from './reviewer-manager.js';
 import { createSavedViews } from './saved-views.js';
 import { createReviewCountsLoader } from './review-counts.js';
 import { actionButton, formField, formError, formActions } from './controls.js';
@@ -28,7 +29,7 @@ if (!queryError(appliedQuery)) appliedQuery = normalizeQuery(appliedQuery);
 let items = [], total = 0, cursor = null, more = false, limited = false, loading = false;
 const collapsed = new Set();
 const pendingChanges = createPendingChanges();
-const { titleEdits, draftChanges, merges, lifecycleChanges, reviewChanges } = pendingChanges;
+const { titleEdits, draftChanges, merges, lifecycleChanges, reviewChanges, reviewerChanges } = pendingChanges;
 let viewerLogin = '', queryEditor, savedViews;
 const loads = createLatestRequest();
 const mergedStore = createMergedStore();
@@ -145,6 +146,7 @@ function createMergeAction(pr, prUrl) {
 
 const changeMessages = {
   title: { failure: 'Could not update the title. Please retry.', timeout: 'The save timed out. Retry to check and save the title.' },
+  reviewers: { failure: 'Could not update reviewers. Refresh to check the current requests.', timeout: 'Reviewer update timed out. Refresh to check whether it succeeded before retrying.' },
   status: { failure: 'Could not change the PR status. Please retry.', timeout: 'Status change timed out. Click the status badge to retry or refresh to check its status.' },
   merge: { failure: 'Merge failed. Refresh to check its status.', timeout: 'Merge timed out. Refresh to check whether GitHub merged it.' },
 };
@@ -153,7 +155,7 @@ const changeMessages = {
 // as read. Action callbacks handle the few differences in visible state and focus.
 async function changePull(pr, changes, { action, input = {}, apply, message, onSuccess, onError }) {
   const change = changes.get(pr.id) ?? {};
-  if (change.saving) return;
+  if (savingPull(pr.id)) return;
   // An older read must not overwrite the mutation's confirmed result.
   loads.cancel(); loading = false;
   cancelBackgroundRequests(true);
@@ -248,6 +250,25 @@ const reviewControls = createReviewControls({
   },
 });
 
+const reviewerManager = createReviewerManager({
+  changes: reviewerChanges,
+  onClose(id) { renderEditorRow(id); polling.invalidate(); },
+  async search(id, query, signal) {
+    const response = await apiFetch(`/api/pulls/reviewers?${new URLSearchParams({ id, q: query })}`, { signal });
+    const data = await response.json();
+    if (!response.ok) throw responseError(response, data, 'Could not search reviewers.');
+    return data;
+  },
+  async submit(pr, input) {
+    await changePull(pr, reviewerChanges, {
+      action: 'reviewers', input, message: input.action === 'remove' ? 'Review request removed' : 'Review requested',
+      apply(current, data) { if (current) Object.assign(current, data); },
+      onSuccess() { reviewerManager.updated(items.find(item => item.id === pr.id) ?? pr); scheduleMergeReadiness(); },
+      onError: reviewerManager.recover,
+    });
+  },
+});
+
 function focusTitleControl(id, selector) {
   [...$('results').querySelectorAll('.pr-row')].find(row => row.dataset.prId === id)?.querySelector(selector)?.focus();
 }
@@ -282,7 +303,7 @@ function titleEditor(pr) {
 const rowElements = new Map();
 const groupCache = new Map();
 const rowContext = () => ({ viewedStore, markViewed, viewerLogin, draftChanges, merges, titleEdits,
-  changeDraftStatus, render, focusTitleControl, createMergeAction, issuePopover, titleEditor, reviewControl: reviewControls.button, lifecycleControl: lifecycleControls.button, savingPull, nameColors });
+  changeDraftStatus, render, focusTitleControl, createMergeAction, issuePopover, titleEditor, reviewControl: reviewControls.button, reviewerManager: reviewerManager.button, lifecycleControl: lifecycleControls.button, savingPull, nameColors });
 function renderEditorRow(id) {
   const row = rowElements.get(id);
   if (row) renderTemplate(renderRow(row.node, row.gutter, rowContext()), row.entry);
@@ -364,7 +385,7 @@ function render() {
     if (selection) focused.setSelectionRange(...selection);
   }
   issuePopover.reposition();
-  reviewControls.reconcile(activeRows); lifecycleControls.reconcile(activeRows);
+  reviewerManager.reconcile(activeRows, items); reviewControls.reconcile(activeRows); lifecycleControls.reconcile(activeRows);
   results.querySelector('.empty')?.remove();
   if (!count && !loading) results.append(element('p', 'No pull requests found for this query.', 'empty'));
   results.setAttribute('aria-busy', String(loading));
@@ -412,7 +433,7 @@ async function load({ append = false, refresh = false, background = false } = {}
     if (!loads.isCurrent(request)) return;
     if (viewedStore.selectAccount(data.viewer)) {
       queryEditor?.clearRepositoryCache();
-      issuePopover.close(); reviewControls.reset(); lifecycleControls.reset();
+      issuePopover.close(); reviewerManager.reset(); reviewControls.reset(); lifecycleControls.reset();
       mergedStore.clear();
       $('mutation-notice').hidden = true; $('mutation-notice').textContent = '';
       pendingChanges.clear(); mergeSelections.clear();

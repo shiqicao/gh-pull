@@ -99,13 +99,13 @@ export function createMergedStore() {
 }
 
 export function createPendingChanges() {
-  const titleEdits = new Map(), draftChanges = new Map(), merges = new Map(), lifecycleChanges = new Map(), reviewChanges = new Map();
-  const maps = [lifecycleChanges, reviewChanges, titleEdits, draftChanges, merges];
+  const titleEdits = new Map(), draftChanges = new Map(), merges = new Map(), lifecycleChanges = new Map(), reviewChanges = new Map(), reviewerChanges = new Map();
+  const maps = [reviewerChanges, lifecycleChanges, reviewChanges, titleEdits, draftChanges, merges];
   return {
-    titleEdits, draftChanges, merges, lifecycleChanges, reviewChanges,
+    titleEdits, draftChanges, merges, lifecycleChanges, reviewChanges, reviewerChanges,
     clear() { for (const changes of maps) changes.clear(); },
     isSaving(id) { return maps.some(changes => changes.get(id)?.saving); },
-    isProtected(id) { return lifecycleChanges.has(id) || reviewChanges.has(id) || titleEdits.has(id) || draftChanges.get(id)?.saving || merges.get(id)?.saving; },
-    isMergeBusy(id) { return merges.get(id)?.saving || draftChanges.get(id)?.saving || titleEdits.has(id) || lifecycleChanges.has(id); },
+    isProtected(id) { return reviewerChanges.has(id) || lifecycleChanges.has(id) || reviewChanges.has(id) || titleEdits.has(id) || draftChanges.get(id)?.saving || merges.get(id)?.saving; },
+    isMergeBusy(id) { return reviewerChanges.has(id) || merges.get(id)?.saving || draftChanges.get(id)?.saving || titleEdits.has(id) || lifecycleChanges.has(id); },
   };
 }
