@@ -153,7 +153,7 @@ const changeMessages = {
 
 // All mutations share pending/error handling and mark only the confirmed version
 // as read. Action callbacks handle the few differences in visible state and focus.
-async function changePull(pr, changes, { action, input = {}, apply, message, onSuccess, onError }) {
+async function changePull(pr, changes, { action, input = {}, apply, message, onSuccess, onError, execute }) {
   const change = changes.get(pr.id) ?? {};
   if (savingPull(pr.id)) return;
   // An older read must not overwrite the mutation's confirmed result.
@@ -164,12 +164,15 @@ async function changePull(pr, changes, { action, input = {}, apply, message, onS
   changes.set(pr.id, change); render();
   const messages = changeMessages[action] ?? changeMessages.status;
   try {
-    const response = await apiFetch(`/api/pulls/${action}`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: pr.id, ...input }), signal: AbortSignal.timeout(65_000),
-    });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || messages.failure);
+    const data = execute ? await execute() : await (async () => {
+      const response = await apiFetch(`/api/pulls/${action}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: pr.id, ...input }), signal: AbortSignal.timeout(65_000),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || messages.failure);
+      return result;
+    })();
     mergedStore.reconcile({ ...pr, ...data });
     apply(items.find(item => item.id === pr.id), data);
     changes.delete(pr.id); render();
@@ -266,9 +269,26 @@ const reviewerManager = createReviewerManager({
     if (!response.ok) throw responseError(response, data, 'Could not search reviewers.');
     return data;
   },
-  async submit(pr, input) {
+  async submit(pr, pending) {
     await changePull(pr, reviewerChanges, {
-      action: 'reviewers', input, message: input.action === 'remove' ? 'Review request removed' : 'Review requested',
+      action: 'reviewers', message: 'Reviewers updated',
+      async execute() {
+        let data;
+        for (const [key, input] of [...pending]) {
+          const response = await apiFetch('/api/pulls/reviewers', {
+            method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: pr.id, action: input.action, name: input.name, kind: input.kind }),
+            signal: AbortSignal.timeout(65_000),
+          });
+          data = await response.json();
+          if (!response.ok) throw new Error(data.error || 'Could not update reviewers.');
+          // Keep confirmed changes if a later request fails; retry only the remainder.
+          const current = items.find(item => item.id === pr.id);
+          if (current) Object.assign(current, data);
+          pending.delete(key);
+        }
+        return data;
+      },
       apply(current, data) { if (current) Object.assign(current, data); },
       onSuccess() { reviewerManager.updated(items.find(item => item.id === pr.id) ?? pr); scheduleMergeReadiness(); },
       onError: reviewerManager.recover,

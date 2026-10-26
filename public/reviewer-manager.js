@@ -15,12 +15,14 @@ export function createReviewerManager({ changes, search, submit, onClose, render
       }
     },
   });
-  const initial = () => ({ query: '', results: [], loading: true, saving: false, error: '', searchError: '', limited: false });
+  const initial = () => ({ query: '', results: [], loading: true, saving: false, error: '', searchError: '', limited: false, pending: new Map() });
   function change(reviewer, action) {
     const draft = changes.get(active.id);
     if (draft.saving) return;
-    cancelSearch(); draft.loading = false;
-    void submit(active, { action, name: reviewer.name, kind: reviewer.kind ?? (reviewer.name.includes('/') ? 'team' : 'user') });
+    const key = reviewer.name.toLowerCase();
+    if (draft.pending.has(key)) draft.pending.delete(key);
+    else draft.pending.set(key, { ...reviewer, action, kind: reviewer.kind ?? (reviewer.name.includes('/') ? 'team' : 'user') });
+    draft.error = ''; content();
   }
   async function load() {
     if (!active) return;
@@ -40,13 +42,14 @@ export function createReviewerManager({ changes, search, submit, onClose, render
   }
   function row(reviewer, current = false) {
     const draft = changes.get(active.id), pending = reviewer.state === 'REQUESTED';
+    const staged = draft.pending.get(reviewer.name.toLowerCase());
     const [label, kind, symbol] = reviewStates[reviewer.state] ?? ['Not requested', 'none', '·'];
     return html`<li class="reviewer-choice"><span class="reviewer-choice-name">${renderName(reviewer.name)}
-      <small>${current ? label : reviewer.displayName || (reviewer.kind === 'team' ? 'Team' : 'User')}</small></span>
+      <small>${staged ? (staged.action === 'remove' ? 'Will remove request' : 'Will request review') : current ? label : reviewer.displayName || (reviewer.kind === 'team' ? 'Team' : 'User')}</small></span>
       ${current ? reviewStatus(symbol, kind) : nothing}
       <button type="button" class=${pending ? 'reviewer-remove' : ''} ?disabled=${draft.saving}
-        aria-label=${`${pending ? 'Remove request for' : current ? 'Re-request review from' : 'Request review from'} ${reviewer.name}`}
-        @click=${() => change(reviewer, pending ? 'remove' : 'request')}>${pending ? 'Remove' : current ? 'Re-request' : 'Request'}</button></li>`;
+        aria-label=${`${staged ? 'Undo change for' : pending ? 'Remove request for' : current ? 'Re-request review from' : 'Request review from'} ${reviewer.name}`}
+        @click=${() => change(reviewer, pending ? 'remove' : 'request')}>${staged ? 'Undo' : pending ? 'Remove' : current ? 'Re-request' : 'Request'}</button></li>`;
   }
   function content() {
     if (!active) return;
@@ -54,10 +57,12 @@ export function createReviewerManager({ changes, search, submit, onClose, render
     if (!draft) return;
     const current = active.reviewers ?? [], existing = new Set(current.map(r => r.name.toLowerCase()));
     const query = draft.query.trim().replace(/^@/, '');
-    const results = draft.results.filter(r => !existing.has(r.name.toLowerCase()));
+    const added = [...draft.pending.values()].filter(r => !existing.has(r.name.toLowerCase()));
+    const shown = new Set([...existing, ...added.map(r => r.name.toLowerCase())]);
+    const results = draft.results.filter(r => !shown.has(r.name.toLowerCase()));
     // Allow exact GitHub logins and org/team slugs beyond the suggestion window.
     const exact = /^[a-z0-9][a-z0-9-]{0,99}(\/[a-z0-9][a-z0-9-]{0,99})?$/i.test(query) &&
-      query.toLowerCase() !== active.author.toLowerCase() && !existing.has(query.toLowerCase()) && !results.some(r => r.name.toLowerCase() === query.toLowerCase());
+      query.toLowerCase() !== active.author.toLowerCase() && !shown.has(query.toLowerCase()) && !results.some(r => r.name.toLowerCase() === query.toLowerCase());
     render(html`<div class="reviewer-manager-heading"><h2>Reviewers</h2><button type="button" class="icon-button" aria-label="Close reviewer manager" @click=${popover.close}>×</button></div>
       <p class="form-description">Request a review from a person or an organization team.</p>
       <label class="form-label">Search people or enter org/team
@@ -67,6 +72,7 @@ export function createReviewerManager({ changes, search, submit, onClose, render
       ${draft.saving ? html`<p role="status">Updating reviewers…</p>` : nothing}
       ${current.length ? html`<h3>Current reviewers</h3><ul class="reviewer-choices">${repeat(current, r => r.name, r => row(r, true))}</ul>` : html`<p class="form-description">No reviewers yet.</p>`}
       ${active.reviewersTruncated ? html`<p class="form-description">Some reviewers are not shown. <a href=${githubUrl(active.url)} target="_blank" rel="noopener noreferrer">View all on GitHub ↗</a></p>` : nothing}
+      ${added.length ? html`<h3>Pending requests</h3><ul class="reviewer-choices">${repeat(added, r => r.name, r => row(r))}</ul>` : nothing}
       <h3>${query ? 'Search results' : 'Suggested reviewers'}</h3>
       ${draft.loading ? html`<p role="status">Searching reviewers…</p>` : nothing}
       ${formError(draft.searchError)}
@@ -74,7 +80,13 @@ export function createReviewerManager({ changes, search, submit, onClose, render
         ${exact ? row({ name: query, kind: query.includes('/') ? 'team' : 'user', displayName: 'Exact name · GitHub will check access' }) : nothing}</ul>
       ${!draft.loading && !draft.searchError && !results.length && !exact ? html`<p class="form-description">${query ? 'No matching reviewers.' : 'No suggestions. Enter a GitHub username or org/team.'}</p>` : nothing}
       ${draft.limited ? html`<p class="form-description">More results available. Narrow your search.</p>` : nothing}
-      <p class="reviewer-manager-note">Removing a request keeps existing reviews and comments.</p>`, popover.panel);
+      <p class="reviewer-manager-note">Removing a request keeps existing reviews and comments.</p>
+      <div class="form-actions reviewer-manager-actions">
+        <button type="button" ?disabled=${draft.saving} @click=${popover.close}>Cancel</button>
+        <button type="button" ?disabled=${draft.saving || !draft.pending.size}
+          @click=${() => { cancelSearch(); draft.loading = false; void submit(active, draft.pending); }}>
+          ${draft.saving ? 'Applying…' : `Apply changes${draft.pending.size ? ` (${draft.pending.size})` : ''}`}</button>
+      </div>`, popover.panel);
   }
   return {
     reset() { cancelSearch(); popover.close(); if (active) changes.delete(active.id); active = null; },

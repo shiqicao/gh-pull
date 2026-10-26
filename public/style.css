@@ -949,3 +949,5 @@ select:not([multiple]):not([size]) {
 .reviewer-choice-name small { display: block; color: var(--color-muted); font-size: 11px; margin-top: 2px; }
 .reviewer-choice button { font-size: 11px; padding: 4px 8px; border-radius: 7px; }
 .reviewer-manager-note { font-size: 11px; color: var(--color-muted); margin: 14px 0 0; }
+
+.reviewer-manager-actions { position: sticky; bottom: -16px; margin: 0 -16px -16px; padding: 12px 16px; background: var(--color-page); }
