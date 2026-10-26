@@ -12,7 +12,7 @@ import { createIssuePopover } from './issues.js';
 import { createLifecycleControls } from './lifecycle.js';
 import { createReviewControls } from './reviews.js';
 import { element, icon, clipboardFeedback, observeStickyTop } from './ui.js';
-import { assignNameColors, dependencyLanes, groupPulls, labels, isOwn, mergeLabels, mergeMethodLabels } from './model.js';
+import { assignNameColors, NAME_COLOR_COUNT, dependencyLanes, groupPulls, labels, isOwn, mergeLabels, mergeMethodLabels } from './model.js';
 import { queryFromParams, queryPresets, setQueryPreset, normalizeQuery, queryError, matchesQueryState } from './query.js';
 
 const $ = id => document.getElementById(id);
@@ -252,6 +252,13 @@ const reviewControls = createReviewControls({
 
 const reviewerManager = createReviewerManager({
   changes: reviewerChanges,
+  renderName(name) {
+    if (nameColors[name.toLowerCase()] === undefined) {
+      nameColors = assignNameColors([name], nameColors);
+      try { localStorage.setItem(nameColorKey, JSON.stringify(nameColors)); } catch { /* Keep session colors. */ }
+    }
+    return usernameLink(name, 'badge author', nameColors[name.toLowerCase()] * 360 / NAME_COLOR_COUNT);
+  },
   onClose(id) { renderEditorRow(id); polling.invalidate(); },
   async search(id, query, signal) {
     const response = await apiFetch(`/api/pulls/reviewers?${new URLSearchParams({ id, q: query })}`, { signal });

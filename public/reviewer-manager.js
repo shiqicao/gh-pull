@@ -4,7 +4,7 @@ import { createPopover } from './popover.js';
 import { githubUrl, iconTemplate, reviewStatus } from './templates.js';
 import { reviewStates } from './model.js';
 
-export function createReviewerManager({ changes, search, submit, onClose }) {
+export function createReviewerManager({ changes, search, submit, onClose, renderName }) {
   let active, timer, controller, generation = 0;
   function cancelSearch() { clearTimeout(timer); controller?.abort(); generation++; }
   const popover = createPopover({ id: 'manage-reviewers', className: 'reviewer-manager', label: 'Manage reviewers', align: 'end',
@@ -41,7 +41,7 @@ export function createReviewerManager({ changes, search, submit, onClose }) {
   function row(reviewer, current = false) {
     const draft = changes.get(active.id), pending = reviewer.state === 'REQUESTED';
     const [label, kind, symbol] = reviewStates[reviewer.state] ?? ['Not requested', 'none', '·'];
-    return html`<li class="reviewer-choice"><span class="reviewer-choice-name">${reviewer.name}
+    return html`<li class="reviewer-choice"><span class="reviewer-choice-name">${renderName(reviewer.name)}
       <small>${current ? label : reviewer.displayName || (reviewer.kind === 'team' ? 'Team' : 'User')}</small></span>
       ${current ? reviewStatus(symbol, kind) : nothing}
       <button type="button" class=${pending ? 'reviewer-remove' : ''} ?disabled=${draft.saving}
@@ -83,10 +83,10 @@ export function createReviewerManager({ changes, search, submit, onClose }) {
     reconcile(ids, items) { if (active && (!ids.has(active.id) || items.find(pr => pr.id === active.id)?.status !== 'OPEN') && !changes.get(active.id)?.saving) this.reset(); },
     button(pr, busy) {
       if (active?.id === pr.id) { active = pr; content(); }
-      return actionButton({ className: 'badge reviewer-manage', label: `Manage reviewers for ${pr.repo} #${pr.number}`,
+      return actionButton({ className: 'icon-button reviewer-manage', label: `Manage reviewers for ${pr.repo} #${pr.number}`,
         title: pr.status === 'DRAFT' ? 'Mark this PR ready before requesting reviews' : 'Manage reviewers',
         popover: popover.panel, expanded: popover.pullId === pr.id, disabled: busy || [...changes.values()].some(draft => draft.saving) || pr.status !== 'OPEN',
-        content: html`Reviewers ${iconTemplate('chevron-down', 12)}`,
+        content: iconTemplate('reviewers'),
         onClick(event) {
           if (active?.id !== pr.id) {
             cancelSearch(); if (active) changes.delete(active.id);

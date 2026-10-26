@@ -23,7 +23,7 @@ const authorHue = directive(class extends AsyncDirective {
 });
 export function usernameLink(name, className = '', hue) {
   const classes = `${className} username-link`;
-  if (name === 'deleted-user' || !/^[a-z\d](?:[a-z\d-]*[a-z\d])?$/i.test(name)) return html`<span class=${classes}>${name}</span>`;
+  if (name === 'deleted-user' || !/^[a-z\d](?:[a-z\d-]*[a-z\d])?$/i.test(name)) return html`<span class=${classes} ${authorHue(hue)}>${name}</span>`;
   return html`<a class=${classes} ${authorHue(hue)}
     href=${`https://github.com/${encodeURIComponent(name)}`} target="_blank" rel="noopener noreferrer"
     aria-label=${`${name}'s GitHub profile (opens in a new tab)`}>${name}</a>`;

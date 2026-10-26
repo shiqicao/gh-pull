@@ -19,11 +19,20 @@ test('manage own reviewers: lazy search, errors, re-request, team, remove, dismi
   await page.goto(origin);
   const trigger = page.locator('[data-pr-id=P1]').getByRole('button', { name: /Manage reviewers/ });
   await trigger.waitFor(); assert.equal(searches, 0);
+  assert.equal((await trigger.innerText()).trim(), '');
+  const offsets = await page.locator('.reviewer-manage').evaluateAll(buttons => buttons.map(button => {
+    const row = button.closest('.pr-row').getBoundingClientRect(), rect = button.getBoundingClientRect();
+    return [row.right - rect.right, rect.top - row.top];
+  }));
+  assert.deepEqual(offsets[0], offsets[1]);
   assert.equal(await page.locator('[data-pr-id=P2]').getByRole('button', { name: /Manage reviewers/ }).count(), 0);
   assert.equal(await page.locator('[data-pr-id=P3]').getByRole('button', { name: /Manage reviewers/ }).isDisabled(), true);
   await trigger.click();
   const panel = page.getByRole('dialog', { name: 'Manage reviewers', exact: true });
   await panel.getByRole('button', { name: 'Request review from dana', exact: true }).waitFor();
+  const rowHue = await page.locator('[data-pr-id=P1] .reviewer .author').first().evaluate(el => el.style.getPropertyValue('--author-hue'));
+  const popupHue = await panel.locator('.reviewer-choice-name .author').first().evaluate(el => el.style.getPropertyValue('--author-hue'));
+  assert.equal(popupHue, rowHue); assert.notEqual(popupHue, '');
   await panel.getByRole('button', { name: 'Re-request review from bob' }).click();
   await panel.getByRole('alert').filter({ hasText: 'denied' }).waitFor();
   await panel.getByRole('button', { name: 'Re-request review from bob' }).click();
@@ -34,6 +43,7 @@ test('manage own reviewers: lazy search, errors, re-request, team, remove, dismi
   await panel.getByRole('button', { name: 'Request review from example/core' }).click();
   await panel.getByRole('button', { name: 'Remove request for example/core' }).waitFor();
   assert.equal(calls, 4);
+  assert.notEqual(await panel.locator('.reviewer-choice-name .author').filter({ hasText: 'example/core' }).evaluate(el => el.style.getPropertyValue('--author-hue')), '');
   await page.setViewportSize({ width: 375, height: 650 });
   await page.waitForFunction(() => { const r = document.querySelector('#manage-reviewers').getBoundingClientRect(); return r.left >= 7 && r.right <= innerWidth - 7 && r.top >= 7 && r.bottom <= innerHeight - 7; });
   if (process.env.GH_PULL_SCREENSHOTS) await page.screenshot({ path: '/tmp/gh-pull-reviewer-manager.png' });

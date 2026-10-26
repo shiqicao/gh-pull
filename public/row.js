@@ -51,10 +51,9 @@ function metaRow(pr, node, author, issuePopover) {
       </div>`;
 }
 
-function reviewerList(pr, author, reviewControl, manage) {
+function reviewerList(pr, author, reviewControl) {
   const url = githubUrl(pr.url), hasUrl = url !== nothing;
-  return html`${pr.reviewers?.length || pr.reviewersTruncated || manage !== nothing ? html`<div class="reviewers" role="group" aria-label="Reviewers">
-    ${manage}
+  return html`${pr.reviewers?.length || pr.reviewersTruncated ? html`<div class="reviewers" role="group" aria-label="Reviewers">
     ${repeat(pr.reviewers ?? [], reviewer => reviewer.name, reviewer => {
       const [description, kind, symbol] = reviewStates[reviewer.state] ?? [reviewer.state, 'none', '·'];
       return html`<span class="reviewer" title=${`${reviewer.name}: ${description}`} aria-label=${`${reviewer.name}: ${description}`}>${author(reviewer.name)}${reviewer.canRevoke ? reviewControl(pr, reviewer) : reviewStatus(symbol, kind)}</span>`;
@@ -68,6 +67,7 @@ export function renderRow(node, gutter, ctx) {
   const { viewedStore, markViewed, viewerLogin, draftChanges, merges, titleEdits,
     render, focusTitleControl, createMergeAction, issuePopover, titleEditor, reviewControl, reviewerManager, lifecycleControl, savingPull, nameColors } = ctx;
   const hasUpdates = viewedStore.hasUpdates(pr), own = isOwn(pr, viewerLogin);
+  const canManageReviewers = own && ['OPEN', 'DRAFT'].includes(pr.status) && reviewerManager;
   const url = githubUrl(pr.url), hasUrl = url !== nothing;
   const author = name => usernameLink(name, 'badge author', nameColors[name.toLowerCase()] * 360 / NAME_COLOR_COUNT);
   const onOpen = event => {
@@ -78,8 +78,8 @@ export function renderRow(node, gutter, ctx) {
     render(); focusTitleControl(pr.id, '.title-editor input');
   };
   return html`${gutter ? html`<div class="dependency-gutter" aria-hidden="true"></div>` : nothing}
-    <div class=${`pr-row${hasUpdates ? ' has-updates' : ''}`} data-pr-id=${pr.id} @click=${onOpen} @auxclick=${onOpen}>
-      <div class="pr-content"><div class="title-line">
+    <div class=${`pr-row${hasUpdates ? ' has-updates' : ''}${canManageReviewers ? ' has-reviewer-manager' : ''}`} data-pr-id=${pr.id} @click=${onOpen} @auxclick=${onOpen}>
+      <div class="pr-content">${canManageReviewers ? reviewerManager(pr, Boolean(savingPull(pr.id))) : nothing}<div class="title-line">
         ${node.parent ? html`<span class="sr-only">Merges into #${node.parent.pr.number}: ${node.parent.pr.title}</span>` : nothing}
         ${own && (['OPEN', 'DRAFT'].includes(pr.status) || pr.canReopen) ? lifecycleControl(pr, Boolean(savingPull(pr.id))) : badge(labels[pr.status], pr.status)}
         ${prLinks(pr)}
@@ -92,6 +92,6 @@ export function renderRow(node, gutter, ctx) {
       ${formError(draftChanges.get(pr.id)?.error, 'draft-error')}
       ${titleEdits.has(pr.id) && own ? titleEditor(pr) : nothing}
       ${metaRow(pr, node, author, issuePopover)}<span class="sr-only" role="status"></span></div>
-      ${reviewerList(pr, author, reviewControl, own && ['OPEN', 'DRAFT'].includes(pr.status) && reviewerManager ? reviewerManager(pr, Boolean(savingPull(pr.id))) : nothing)}
+      ${reviewerList(pr, author, reviewControl)}
     </div>`;
 }
