@@ -1,6 +1,7 @@
 import { createReviewThreadCounts } from './review-thread-counts.js';
+import { createReviewerManagement } from './reviewer-management.js';
 import { repositoryScope } from './public/query.js';
-import { ApiError, createGraphQLClient } from './github-client.js';
+import { ApiError, createGraphQLClient, createGitHubTransport } from './github-client.js';
 import { mergeOptions, normalizePullRequest, reviewState } from './pull-request.js';
 
 // Preserve the service API used by the server and existing integrations.
@@ -97,7 +98,8 @@ function dependencyQuery(batch) {
 
 export function createGitHub(options = {}) {
   const { getMergeAccess } = options;
-  const graphql = createGraphQLClient(options);
+  const request = createGitHubTransport(options);
+  const graphql = createGraphQLClient({ ...options, request });
   const withReviewThreadCounts = createReviewThreadCounts(graphql);
 
   async function ownedPullRequest(id, selection, deniedMessage) {
@@ -373,5 +375,6 @@ export function createGitHub(options = {}) {
   }
   list.convertToDraft = input => setDraftState(input, true);
   list.markReadyForReview = input => setDraftState(input, false);
+  Object.assign(list, createReviewerManagement({ graphql, request, ownedPullRequest, fields }));
   return list;
 }

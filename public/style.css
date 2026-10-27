@@ -932,3 +932,22 @@ select:not([multiple]):not([size]) {
 @media (forced-colors: active) {
   select:not([multiple]):not([size]) { appearance: auto; background-image: none; }
 }
+
+.pr-row { position: relative; }
+.pr-row.has-reviewer-manager { padding-right: 46px; }
+.reviewer-manage { position: absolute; top: 12px; right: 14px; width: 24px; height: 24px; }
+.reviewer-choice-name .badge { display: inline-block; max-width: 100%; white-space: normal; text-align: left; }
+.reviewer-manager { width: 370px; padding: 16px; max-height: min(560px, calc(100dvh - 16px)); }
+.reviewer-manager .form-description { font-size: 12px; color: var(--color-muted); }
+.reviewer-manager-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.reviewer-manager h2 { font-size: 14px; margin: 0; }
+.reviewer-manager h3 { font-size: 11px; font-weight: 600; color: var(--color-muted); margin: 16px 0 6px; }
+.reviewer-manager .form-input { width: 100%; box-sizing: border-box; }
+.reviewer-choices { list-style: none; padding: 0; margin: 0; }
+.reviewer-choice { display: flex; align-items: center; gap: 8px; padding: 8px 0; }
+.reviewer-choice-name { flex: 1; min-width: 0; overflow-wrap: anywhere; font-size: 12px; }
+.reviewer-choice-name small { display: block; color: var(--color-muted); font-size: 11px; margin-top: 2px; }
+.reviewer-choice button { font-size: 11px; padding: 4px 8px; border-radius: 7px; }
+.reviewer-manager-note { font-size: 11px; color: var(--color-muted); margin: 14px 0 0; }
+
+.reviewer-manager-actions { position: sticky; bottom: -16px; margin: 0 -16px -16px; padding: 12px 16px; background: var(--color-page); }

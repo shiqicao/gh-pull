@@ -1,3 +1,4 @@
+import { createReviewerManager } from './reviewer-manager.js';
 import { createSavedViews } from './saved-views.js';
 import { createReviewCountsLoader } from './review-counts.js';
 import { actionButton, formField, formError, formActions } from './controls.js';
@@ -11,7 +12,7 @@ import { createIssuePopover } from './issues.js';
 import { createLifecycleControls } from './lifecycle.js';
 import { createReviewControls } from './reviews.js';
 import { element, icon, clipboardFeedback, observeStickyTop } from './ui.js';
-import { assignNameColors, dependencyLanes, groupPulls, labels, isOwn, mergeLabels, mergeMethodLabels } from './model.js';
+import { assignNameColors, NAME_COLOR_COUNT, dependencyLanes, groupPulls, labels, isOwn, mergeLabels, mergeMethodLabels } from './model.js';
 import { queryFromParams, queryPresets, setQueryPreset, normalizeQuery, queryError, matchesQueryState } from './query.js';
 
 const $ = id => document.getElementById(id);
@@ -28,7 +29,7 @@ if (!queryError(appliedQuery)) appliedQuery = normalizeQuery(appliedQuery);
 let items = [], total = 0, cursor = null, more = false, limited = false, loading = false;
 const collapsed = new Set();
 const pendingChanges = createPendingChanges();
-const { titleEdits, draftChanges, merges, lifecycleChanges, reviewChanges } = pendingChanges;
+const { titleEdits, draftChanges, merges, lifecycleChanges, reviewChanges, reviewerChanges } = pendingChanges;
 let viewerLogin = '', queryEditor, savedViews;
 const loads = createLatestRequest();
 const mergedStore = createMergedStore();
@@ -145,15 +146,16 @@ function createMergeAction(pr, prUrl) {
 
 const changeMessages = {
   title: { failure: 'Could not update the title. Please retry.', timeout: 'The save timed out. Retry to check and save the title.' },
+  reviewers: { failure: 'Could not update reviewers. Refresh to check the current requests.', timeout: 'Reviewer update timed out. Refresh to check whether it succeeded before retrying.' },
   status: { failure: 'Could not change the PR status. Please retry.', timeout: 'Status change timed out. Click the status badge to retry or refresh to check its status.' },
   merge: { failure: 'Merge failed. Refresh to check its status.', timeout: 'Merge timed out. Refresh to check whether GitHub merged it.' },
 };
 
 // All mutations share pending/error handling and mark only the confirmed version
 // as read. Action callbacks handle the few differences in visible state and focus.
-async function changePull(pr, changes, { action, input = {}, apply, message, onSuccess, onError }) {
+async function changePull(pr, changes, { action, input = {}, apply, message, onSuccess, onError, execute }) {
   const change = changes.get(pr.id) ?? {};
-  if (change.saving) return;
+  if (savingPull(pr.id)) return;
   // An older read must not overwrite the mutation's confirmed result.
   loads.cancel(); loading = false;
   cancelBackgroundRequests(true);
@@ -162,12 +164,15 @@ async function changePull(pr, changes, { action, input = {}, apply, message, onS
   changes.set(pr.id, change); render();
   const messages = changeMessages[action] ?? changeMessages.status;
   try {
-    const response = await apiFetch(`/api/pulls/${action}`, {
-      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ id: pr.id, ...input }), signal: AbortSignal.timeout(65_000),
-    });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || messages.failure);
+    const data = execute ? await execute() : await (async () => {
+      const response = await apiFetch(`/api/pulls/${action}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: pr.id, ...input }), signal: AbortSignal.timeout(65_000),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error || messages.failure);
+      return result;
+    })();
     mergedStore.reconcile({ ...pr, ...data });
     apply(items.find(item => item.id === pr.id), data);
     changes.delete(pr.id); render();
@@ -248,6 +253,49 @@ const reviewControls = createReviewControls({
   },
 });
 
+const reviewerManager = createReviewerManager({
+  changes: reviewerChanges,
+  renderName(name) {
+    if (nameColors[name.toLowerCase()] === undefined) {
+      nameColors = assignNameColors([name], nameColors);
+      try { localStorage.setItem(nameColorKey, JSON.stringify(nameColors)); } catch { /* Keep session colors. */ }
+    }
+    return usernameLink(name, 'badge author', nameColors[name.toLowerCase()] * 360 / NAME_COLOR_COUNT);
+  },
+  onClose(id) { renderEditorRow(id); polling.invalidate(); },
+  async search(id, query, signal) {
+    const response = await apiFetch(`/api/pulls/reviewers?${new URLSearchParams({ id, q: query })}`, { signal });
+    const data = await response.json();
+    if (!response.ok) throw responseError(response, data, 'Could not search reviewers.');
+    return data;
+  },
+  async submit(pr, pending) {
+    await changePull(pr, reviewerChanges, {
+      action: 'reviewers', message: 'Reviewers updated',
+      async execute() {
+        let data;
+        for (const [key, input] of [...pending]) {
+          const response = await apiFetch('/api/pulls/reviewers', {
+            method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: pr.id, action: input.action, name: input.name, kind: input.kind }),
+            signal: AbortSignal.timeout(65_000),
+          });
+          data = await response.json();
+          if (!response.ok) throw new Error(data.error || 'Could not update reviewers.');
+          // Keep confirmed changes if a later request fails; retry only the remainder.
+          const current = items.find(item => item.id === pr.id);
+          if (current) Object.assign(current, mergedStore.reconcile({ ...current, ...data }));
+          pending.delete(key);
+        }
+        return data;
+      },
+      apply(current, data) { if (current) Object.assign(current, data); },
+      onSuccess() { reviewerManager.updated(items.find(item => item.id === pr.id) ?? pr); scheduleMergeReadiness(); },
+      onError: reviewerManager.recover,
+    });
+  },
+});
+
 function focusTitleControl(id, selector) {
   [...$('results').querySelectorAll('.pr-row')].find(row => row.dataset.prId === id)?.querySelector(selector)?.focus();
 }
@@ -282,7 +330,7 @@ function titleEditor(pr) {
 const rowElements = new Map();
 const groupCache = new Map();
 const rowContext = () => ({ viewedStore, markViewed, viewerLogin, draftChanges, merges, titleEdits,
-  changeDraftStatus, render, focusTitleControl, createMergeAction, issuePopover, titleEditor, reviewControl: reviewControls.button, lifecycleControl: lifecycleControls.button, savingPull, nameColors });
+  changeDraftStatus, render, focusTitleControl, createMergeAction, issuePopover, titleEditor, reviewControl: reviewControls.button, reviewerManager: reviewerManager.button, lifecycleControl: lifecycleControls.button, savingPull, nameColors });
 function renderEditorRow(id) {
   const row = rowElements.get(id);
   if (row) renderTemplate(renderRow(row.node, row.gutter, rowContext()), row.entry);
@@ -364,7 +412,7 @@ function render() {
     if (selection) focused.setSelectionRange(...selection);
   }
   issuePopover.reposition();
-  reviewControls.reconcile(activeRows); lifecycleControls.reconcile(activeRows);
+  reviewerManager.reconcile(activeRows, items); reviewControls.reconcile(activeRows); lifecycleControls.reconcile(activeRows);
   results.querySelector('.empty')?.remove();
   if (!count && !loading) results.append(element('p', 'No pull requests found for this query.', 'empty'));
   results.setAttribute('aria-busy', String(loading));
@@ -412,7 +460,7 @@ async function load({ append = false, refresh = false, background = false } = {}
     if (!loads.isCurrent(request)) return;
     if (viewedStore.selectAccount(data.viewer)) {
       queryEditor?.clearRepositoryCache();
-      issuePopover.close(); reviewControls.reset(); lifecycleControls.reset();
+      issuePopover.close(); reviewerManager.reset(); reviewControls.reset(); lifecycleControls.reset();
       mergedStore.clear();
       $('mutation-notice').hidden = true; $('mutation-notice').textContent = '';
       pendingChanges.clear(); mergeSelections.clear();
