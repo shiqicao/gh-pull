@@ -2,7 +2,10 @@
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
 import { createApp } from '../server.js';
-import { copyFile } from 'node:fs/promises';
+import { copyFile, mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { createSavedViewsStore } from '../saved-views.js';
 
 const now = Date.UTC(2026, 9, 14, 22, 30);
 const repo = 'orbit-demo/web';
@@ -37,11 +40,19 @@ const items = [
     review: 'NONE', additions: 60, deletions: 44, dependencyParent: { id: 'not-loaded', number: 240, status: 'OPEN' },
     reviewers: [{ name: 'riley', state: 'COMMENTED' }] }),
 ];
-const server = createApp({ localControl: { version: 'v1.0.0' }, list: async () => ({ viewer: 'alex', total: items.length, items, pageInfo: { hasNextPage: false } }) });
+const list = async () => ({ viewer: 'alex', total: items.length, items, pageInfo: { hasNextPage: false } });
+list.viewer = async () => 'alex';
+// Fictional saved views in a throwaway store; never touch the real config directory.
+const viewsDir = await mkdtemp(join(tmpdir(), 'gh-pull-capture-'));
+const savedViews = createSavedViewsStore(join(viewsDir, 'views.json'), () => new Date(now).toISOString());
+await savedViews.change('alex', { action: 'save', name: 'Involving me', query: 'is:open involves:@me sort:updated-desc', group: 'repo' });
+await savedViews.change('alex', { action: 'save', name: 'To review', query: 'is:open review-requested:@me', group: 'repo' });
+await savedViews.change('alex', { action: 'save', name: 'My drafts', query: 'is:open is:draft author:@me', group: 'status' });
+const server = createApp({ localControl: { version: 'v1.0.0' }, list, savedViews });
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
 const browser = await chromium.launch({ executablePath: process.env.CHROME_BIN || undefined });
 try {
-  const context = await browser.newContext({ viewport: { width: 1600, height: 1100 }, deviceScaleFactor: 2, colorScheme: 'dark' });
+  const context = await browser.newContext({ viewport: { width: 1600, height: 1240 }, deviceScaleFactor: 2, colorScheme: 'dark' });
   const page = await context.newPage();
   await page.clock.install({ time: now });
   const origin = `http://127.0.0.1:${server.address().port}`;
@@ -57,17 +68,20 @@ try {
   await page.locator('.dependency-dot').first().waitFor();
   // The reminder ships independently of the lanes; capture it when available.
   if (await page.locator('#update-notice').count()) await page.locator('#update-notice').waitFor();
+  await page.getByRole('button', { name: 'To review' }).waitFor();
   await page.evaluate(() => document.fonts.ready);
   await page.waitForFunction(() => Number(document.querySelector('.dependency-connector').getAttribute('height')) === document.querySelector('.has-dependency-lanes').offsetHeight);
   assert.equal(await page.locator('.pr-row').count(), 8);
   assert.equal(await page.locator('.dependency-connector').getAttribute('width'), '92');
   assert.equal(await page.locator('.dependency-chip').innerText(), '↑ #240 · not loaded');
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth && document.documentElement.scrollHeight <= innerHeight), true);
+  assert.doesNotMatch(await page.locator('#dashboard-controls').innerText(), /Could not/);
   assert.deepEqual(errors, []);
   await page.screenshot({ path: new URL('../docs/marketplace-dashboard.png', import.meta.url).pathname });
   await copyFile(new URL('../docs/marketplace-dashboard.png', import.meta.url), new URL('../docs/demo.png', import.meta.url));
-  console.log('Updated docs/marketplace-dashboard.png and docs/demo.png (3200 × 2200).');
+  console.log('Updated docs/marketplace-dashboard.png and docs/demo.png (3200 × 2480).');
 } finally {
   await browser.close();
   await new Promise(resolve => { server.close(resolve); server.closeAllConnections(); });
+  await rm(viewsDir, { recursive: true, force: true });
 }
