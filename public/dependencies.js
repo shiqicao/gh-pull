@@ -40,7 +40,6 @@ export function drawDependencies(groups) {
         } else if (node.externalParent || node.unloadedBase) {
           canvas.path(`M${cx} ${cy - 16} V${cy - 5}`).fill('none')
             .stroke({ ...stroke, dasharray: '3 2' }).addClass('dependency-external');
-          arrow(cx, cy - 22);
         }
       });
       // Paint nodes last so horizontal branch lines terminate behind their rings.
