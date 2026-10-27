@@ -635,6 +635,9 @@ button, .pr-group > summary {
   overflow-wrap: anywhere;
 }
 
+.group-author {
+  color: light-dark(oklch(42% 0.12 var(--author-hue)), oklch(82% 0.12 var(--author-hue)));
+}
 .badge.author {
   color: light-dark(oklch(42% 0.12 var(--author-hue)), oklch(82% 0.12 var(--author-hue)));
   background: light-dark(oklch(96% 0.03 var(--author-hue)), oklch(25% 0.05 var(--author-hue)));

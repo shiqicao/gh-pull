@@ -377,7 +377,7 @@ function render() {
     place(results, section, nextSection);
     nextSection = section.nextElementSibling;
     renderTemplate(html`${$('group').value === 'repo' ? repositoryLink(name)
-      : $('group').value === 'author' ? usernameLink(name) : labels[name] ?? name} (${prs.length})`, heading);
+      : $('group').value === 'author' ? usernameLink(name, 'group-author', nameColors[name.toLowerCase()] * 360 / NAME_COLOR_COUNT) : labels[name] ?? name} (${prs.length})`, heading);
     const graph = dependencyLanes(prs, { allItems: items, sort: queryPresets(appliedQuery).sort });
     list.classList.toggle('has-dependency-lanes', Boolean(graph.gutter));
     if (graph.gutter) list.style.setProperty('--lane-gutter', `${graph.gutter}px`);
