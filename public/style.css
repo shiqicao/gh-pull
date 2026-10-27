@@ -1048,7 +1048,7 @@ select:not([multiple]):not([size]) {
 .reviewer-approved { --reviewer-ring: var(--color-success-text); }
 .reviewer-changes_requested { --reviewer-ring: var(--color-danger-text); }
 .reviewer-requested { --reviewer-ring: var(--color-warning-text); }
-.pr-row .reviewer .review-action { padding: 0; border: 0; background: transparent; border-radius: 50%; }
+.pr-row .reviewer .review-action { height: auto; gap: 7px; padding: 0 2px 0 0; border: 0; background: transparent; border-radius: 999px; }
 .pr-row .reviewer-manage { position: static; margin-left: auto; flex: none; width: 24px; height: 24px; }
 .reviewers-more { flex: none; }
 .empty-value { color: var(--color-muted); }
