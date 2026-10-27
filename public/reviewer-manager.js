@@ -91,7 +91,6 @@ export function createReviewerManager({ changes, search, submit, onClose, render
   return {
     reset() { cancelSearch(); popover.close(); if (active) changes.delete(active.id); active = null; },
     recover() { content(); if (active && !popover.isOpen) popover.panel.showPopover(); },
-    updated(pr) { if (!active || active.id !== pr.id) return; active = pr; changes.set(pr.id, initial()); content(); if (!popover.isOpen) { changes.delete(pr.id); active = null; return; } void load(); },
     reconcile(ids, items) { if (active && (!ids.has(active.id) || items.find(pr => pr.id === active.id)?.status !== 'OPEN') && !changes.get(active.id)?.saving) this.reset(); },
     button(pr, busy) {
       if (active?.id === pr.id) { active = pr; content(); }

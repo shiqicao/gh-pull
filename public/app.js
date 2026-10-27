@@ -290,7 +290,7 @@ const reviewerManager = createReviewerManager({
         return data;
       },
       apply(current, data) { if (current) Object.assign(current, data); },
-      onSuccess() { reviewerManager.updated(items.find(item => item.id === pr.id) ?? pr); scheduleMergeReadiness(); },
+      onSuccess() { reviewerManager.reset(); focusTitleControl(pr.id, '.reviewer-manage'); scheduleMergeReadiness(); },
       onError: reviewerManager.recover,
     });
   },
