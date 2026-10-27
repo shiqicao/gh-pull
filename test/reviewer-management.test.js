@@ -3,11 +3,12 @@ import assert from 'node:assert/strict';
 import { createGitHub } from '../github.js';
 import { validateReviewerChange } from '../reviewer-management.js';
 const base = { __typename: 'PullRequest', id: 'P1', number: 1, state: 'OPEN', isDraft: false, author: { login: 'alice' }, repository: { nameWithOwner: 'org/repo' }, commits: { nodes: [] }, labels: { nodes: [] } };
-function fixture({ pr = base, requests = { users: [], teams: [] }, fail = false } = {}) {
+function fixture({ pr = base, requests = { users: [], teams: [] }, fail = false, missing = false } = {}) {
   const calls = [];
   const list = createGitHub({ getToken: async () => 'mock', fetchImpl: async (url, options) => {
     const body = options.body && JSON.parse(options.body); calls.push({ url, method: options.method, body });
     if (url.endsWith('/graphql')) return Response.json({ data: { viewer: { login: 'alice' }, node: { ...pr, suggestedReviewerActors: { pageInfo: { hasNextPage: true }, nodes: [{ reviewer: { id: 'U1', login: 'alice' } }, { reviewer: { id: 'U2', login: 'bob', name: 'Bob' } }] } } } });
+    if (missing) return Response.json({ message: 'Not Found' }, { status: 404 });
     if (options.method === 'GET') return Response.json(requests);
     return fail ? Response.json({}, { status: 422 }) : Response.json({});
   } });
@@ -65,4 +66,20 @@ test('reviewer HTTP mutation enforces same-origin and validates input', async t 
   assert.equal(calls, 0);
   assert.equal((await fetch(url, { method: 'PATCH', headers: { 'Content-Type': 'application/json', Origin: origin }, body })).status, 200);
   assert.equal(calls, 1);
+});
+
+
+test('reviewer errors distinguish removal failures and inaccessible repositories', async () => {
+  await assert.rejects(fixture({ fail: true, requests: { users: [{ login: 'bob' }], teams: [] } }).list.changeReviewer({ id: 'P1', kind: 'user', name: 'bob', action: 'remove' }), error => error.status === 422 && /could not remove/.test(error.message));
+  await assert.rejects(fixture({ missing: true }).list.changeReviewer({ id: 'P1', kind: 'user', name: 'bob', action: 'request' }), error => error.status === 404 && /repository access and token permissions/.test(error.message));
+});
+
+test('shared transport keeps validation errors generic and preserves GitHub messages', async () => {
+  const { createGitHubTransport } = await import('../github-client.js');
+  for (const status of [404, 422]) {
+    const request = createGitHubTransport({ getToken: async () => 'mock', fetchImpl: async () => Response.json({ message: 'Generic failure' }, { status }) });
+    await assert.rejects(request('/unrelated'), error => error.status === status && error.message === 'GitHub: Generic failure');
+  }
+  const request = createGitHubTransport({ getToken: async () => 'mock', fetchImpl: async () => new Response('', { status: 422 }) });
+  await assert.rejects(request('/unrelated'), error => error.status === 422 && error.message === 'GitHub returned HTTP 422.');
 });

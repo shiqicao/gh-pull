@@ -284,7 +284,7 @@ const reviewerManager = createReviewerManager({
           if (!response.ok) throw new Error(data.error || 'Could not update reviewers.');
           // Keep confirmed changes if a later request fails; retry only the remainder.
           const current = items.find(item => item.id === pr.id);
-          if (current) Object.assign(current, data);
+          if (current) Object.assign(current, mergedStore.reconcile({ ...current, ...data }));
           pending.delete(key);
         }
         return data;

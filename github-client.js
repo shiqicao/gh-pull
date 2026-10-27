@@ -41,7 +41,10 @@ export function createGitHubTransport({ fetchImpl = fetch, getToken = defaultTok
       if (response.status === 429 || response.headers.has('retry-after') || response.headers.get('x-ratelimit-remaining') === '0') throw rateLimit(response);
       throw new ApiError('GitHub denied the request. Check your token permissions.', 403);
     }
-    if (response.status === 422) throw new ApiError('GitHub could not request this reviewer. Check repository access and reviewer eligibility.', 422);
+    if (response.status === 404 || response.status === 422) {
+      const payload = await response.json().catch(() => null);
+      throw new ApiError(typeof payload?.message === 'string' ? `GitHub: ${payload.message}` : `GitHub returned HTTP ${response.status}.`, response.status);
+    }
     if (!response.ok) throw new ApiError(`GitHub returned HTTP ${response.status}. Retry shortly.`);
     if (response.status === 204) {
       if (response.headers.get('x-ratelimit-remaining') === '0') rateLimit(response);

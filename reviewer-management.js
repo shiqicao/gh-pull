@@ -42,11 +42,19 @@ export function createReviewerManagement({ graphql, request, ownedPullRequest, f
       if (kind === 'team' && name.split('/')[0].toLowerCase() !== owner.toLowerCase()) throw new ApiError('Choose a team from the repository’s organization.', 400);
       const path = `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls/${pr.number}/requested_reviewers`;
       // Check current requests for safe retries; change only the selected reviewer.
-      const current = await request(path);
-      const value = kind === 'team' ? name.split('/')[1] : name;
-      const exists = (kind === 'team' ? current.teams : current.users)?.some(r => (kind === 'team' ? r.slug : r.login).toLowerCase() === value.toLowerCase());
-      if ((action === 'request') !== Boolean(exists)) {
-        await request(path, { method: action === 'request' ? 'POST' : 'DELETE', body: { [kind === 'team' ? 'team_reviewers' : 'reviewers']: [value] } });
+      try {
+        const current = await request(path);
+        const value = kind === 'team' ? name.split('/')[1] : name;
+        const exists = (kind === 'team' ? current.teams : current.users)?.some(r => (kind === 'team' ? r.slug : r.login).toLowerCase() === value.toLowerCase());
+        if ((action === 'request') !== Boolean(exists)) {
+          await request(path, { method: action === 'request' ? 'POST' : 'DELETE', body: { [kind === 'team' ? 'team_reviewers' : 'reviewers']: [value] } });
+        }
+      } catch (error) {
+        if (error.status === 404) throw new ApiError('GitHub could not access this PR’s reviewers. Check repository access and token permissions.', 404);
+        if (error.status === 422) throw new ApiError(action === 'request'
+          ? 'GitHub could not request this reviewer. Check repository access and reviewer eligibility.'
+          : 'GitHub could not remove this review request. Check repository access and the current reviewer requests.', 422);
+        throw error;
       }
       const data = await graphql(`query ReviewerResult($id: ID!) { node(id: $id) { ... on PullRequest { ${fields} } } }`, { id });
       if (!data.node?.id) throw new ApiError('Could not confirm reviewer state. Refresh before trying again.');
