@@ -356,6 +356,20 @@ button, .pr-group > summary {
   overflow-wrap: anywhere;
 }
 
+/* Mask scrolling borders outside the rounded sticky heading corners. */
+.pr-group > summary::after {
+  content: '';
+  position: absolute;
+  inset: -1px -1px auto;
+  height: var(--radius-panel);
+  background:
+    radial-gradient(circle at bottom right, transparent calc(var(--radius-panel) - 1px), var(--color-page) var(--radius-panel)) top left,
+    radial-gradient(circle at bottom left, transparent calc(var(--radius-panel) - 1px), var(--color-page) var(--radius-panel)) top right;
+  background-size: var(--radius-panel) var(--radius-panel);
+  background-repeat: no-repeat;
+  pointer-events: none;
+}
+
 .pr-group[open] > summary {
   border-radius: 8px 8px 0 0;
 }
