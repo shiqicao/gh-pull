@@ -973,7 +973,7 @@ select:not([multiple]):not([size]) {
   padding: 10px 12px;
   border-radius: var(--radius-control);
   background: var(--color-info-bg);
-  color: var(--color-info-text);
+  color: var(--color-accent-strong);
   font-size: 12px;
   font-weight: 600;
 }
