@@ -141,3 +141,18 @@ test('state filters exclude stale search membership while keeping drafts and mer
   assert.deepEqual(filter('-is:merged'), ['OPEN', 'DRAFT', 'CLOSED']);
   assert.deepEqual(filter('repo:example/app'), ['OPEN', 'DRAFT', 'CLOSED', 'MERGED']);
 });
+
+test('review status sort persists in queries and uses supported upstream ordering', () => {
+  const query = setQueryPreset('is:open sort:created-desc', 'sort', 'review');
+  assert.equal(query, 'is:open sort:review-status');
+  assert.equal(queryPresets(query).sort, 'review');
+  assert.equal(toGitHubQuery(query), 'is:pr is:open sort:updated-desc');
+  assert.equal(toGitHubQuery('"sort:review-status"'), 'is:pr "sort:review-status"');
+});
+
+test('review status sort prioritizes action and breaks ties by recency', () => {
+  const items = ['NONE', 'APPROVED', 'REVIEW_REQUIRED', 'CHANGES_REQUESTED', 'REVIEW_REQUIRED'].map((review, i) => ({
+    id: String(i), review, title: '', labels: [], updatedAt: `2026-10-${20+i}T00:00:00Z`,
+  }));
+  assert.deepEqual(groupPulls(items, { group: 'none', sort: 'review' }).groups[0][1].map(p => p.id), ['3', '4', '2', '1', '0']);
+});

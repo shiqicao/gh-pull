@@ -4,7 +4,7 @@ export const DEFAULT_QUERY = 'is:open involves:@me sort:updated-desc';
 export const MAX_QUERY_LENGTH = 2000;
 const scopeValues = { authored: 'author:@me', involved: 'involves:@me', review: 'review-requested:@me', all: '' };
 const stateValues = { open: 'is:open', closed: 'is:closed is:unmerged', merged: 'is:merged', all: '' };
-const sortValues = { updated: 'sort:updated-desc', created: 'sort:created-desc', oldest: 'sort:created-asc', relevance: '' };
+const sortValues = { updated: 'sort:updated-desc', created: 'sort:created-desc', oldest: 'sort:created-asc', review: 'sort:review-status', relevance: '' };
 const presets = { scope: scopeValues, state: stateValues, sort: sortValues };
 
 export function tokenizeQuery(query) {
@@ -49,7 +49,8 @@ export function normalizeQuery(query) {
 
 // The server, not the editable query, owns the mandatory PR-only restriction.
 export function toGitHubQuery(query) {
-  return ['is:pr', normalizeQuery(query)].filter(Boolean).join(' ');
+  const tokens = tokenizeQuery(normalizeQuery(query));
+  return ['is:pr', ...tokens.map(t => !t.negative && t.key === 'sort' && t.value === 'review-status' ? 'sort:updated-desc' : t.raw)].join(' ');
 }
 
 function belongsTo(token, control) {
@@ -124,7 +125,7 @@ const values = {
   is: ['open', 'closed', 'merged', 'unmerged', 'draft', 'public', 'private'],
   draft: ['true', 'false'], review: ['none', 'required', 'approved', 'changes_requested'],
   status: ['pending', 'success', 'failure'], in: ['title', 'body', 'comments'],
-  sort: ['updated-desc', 'updated-asc', 'created-desc', 'created-asc', 'comments-desc', 'comments-asc'],
+  sort: ['updated-desc', 'updated-asc', 'created-desc', 'created-asc', 'comments-desc', 'comments-asc', 'review-status'],
 };
 const userKeys = ['author', 'involves', 'review-requested', 'reviewed-by', 'review-involves', 'assignee', 'mentions', 'commenter'];
 const quoteValue = value => /[\s"\\]/.test(value) ? JSON.stringify(value) : value;

@@ -353,7 +353,7 @@ function place(parent, child, before) {
 }
 
 function render() {
-  const { count, groups } = groupPulls(items, { group: $('group').value, sort: 'query' });
+  const { count, groups } = groupPulls(items, { group: $('group').value, sort: queryPresets(appliedQuery).sort === 'review' ? 'review' : 'query' });
   updateSummary();
   const focused = document.activeElement;
   const selection = typeof focused?.selectionStart === 'number' ? [focused.selectionStart, focused.selectionEnd, focused.selectionDirection] : null;

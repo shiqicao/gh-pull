@@ -92,6 +92,8 @@ Credentials stay in the local backend and are never sent to the browser. Both op
 
 ### Query search
 
+**Review status** sorting (`sort:review-status`) orders loaded PRs by changes requested, review required, approved, then no review, with recently updated PRs first within each category. Dependency stacks stay together and are ordered by their root PR’s review status. This dashboard-specific sort is saved with the query; GitHub fetches pages by recent update.
+
 The default query is `is:open involves:@me sort:updated-desc`. The server always adds `is:pr`; type qualifiers cannot be specified in the editor. Add qualifiers such as `repo:owner/repository`, `author:octocat`, `-label:wip`, or `label:"good first issue"`, and press **Enter** or **Search**. Free text follows GitHub's search semantics (title, body, and comments by default); it no longer filters just the loaded rows.
 
 Type a qualifier or press **Ctrl+Space** for suggestions. Use arrow keys to choose, Enter or Tab to accept, and Escape to dismiss. When a suggestion is selected, Enter accepts it; press Enter again to search. Repository suggestions are fetched from GitHub using the query's people filters (`involves:`, `author:`, `review-requested:`, and similar qualifiers), independently of `repo:` and state filters. With no people filter or no matching repositories, discovery falls back to your account. Loaded repositories appear immediately; fetched repositories are added as they arrive. Results are cached for five minutes and marked as partial when the lookup reaches its page cap or GitHub's 1,000-PR search limit. User, branch, and label suggestions still come from loaded PRs, and you can type values that aren't suggested.
