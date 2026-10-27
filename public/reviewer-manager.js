@@ -73,13 +73,13 @@ export function createReviewerManager({ changes, search, submit, onClose, render
       ${current.length ? html`<h3>Current reviewers</h3><ul class="reviewer-choices">${repeat(current, r => r.name, r => row(r, true))}</ul>` : html`<p class="form-description">No reviewers yet.</p>`}
       ${active.reviewersTruncated ? html`<p class="form-description">Some reviewers are not shown. <a href=${githubUrl(active.url)} target="_blank" rel="noopener noreferrer">View all on GitHub ↗</a></p>` : nothing}
       ${added.length ? html`<h3>Pending requests</h3><ul class="reviewer-choices">${repeat(added, r => r.name, r => row(r))}</ul>` : nothing}
-      <h3>${query ? 'Search results' : 'Suggested reviewers'}</h3>
+      <h3>${query ? 'Search results' : 'Contributors and suggestions'}</h3>
       ${draft.loading ? html`<p role="status">Searching reviewers…</p>` : nothing}
       ${formError(draft.searchError)}
       <ul class="reviewer-choices">${repeat(results, r => r.name, r => row(r))}
         ${exact ? row({ name: query, kind: query.includes('/') ? 'team' : 'user', displayName: 'Exact name · GitHub will check access' }) : nothing}</ul>
-      ${!draft.loading && !draft.searchError && !results.length && !exact ? html`<p class="form-description">${query ? 'No matching reviewers.' : 'No suggestions. Enter a GitHub username or org/team.'}</p>` : nothing}
-      ${draft.limited ? html`<p class="form-description">More results available. Narrow your search.</p>` : nothing}
+      ${!draft.loading && !draft.searchError && !results.length && !exact ? html`<p class="form-description">${query ? 'No matching reviewers.' : 'No contributors or suggestions available. Enter a GitHub username or org/team.'}</p>` : nothing}
+      ${draft.limited ? html`<p class="form-description">Showing a limited list. Search for a reviewer or enter an exact username.</p>` : nothing}
       <p class="reviewer-manager-note">Removing a request keeps existing reviews and comments.</p>
       <div class="form-actions reviewer-manager-actions">
         <button type="button" ?disabled=${draft.saving} @click=${popover.close}>Cancel</button>

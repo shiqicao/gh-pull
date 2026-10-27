@@ -3,11 +3,12 @@ import assert from 'node:assert/strict';
 import { createGitHub } from '../github.js';
 import { validateReviewerChange } from '../reviewer-management.js';
 const base = { __typename: 'PullRequest', id: 'P1', number: 1, state: 'OPEN', isDraft: false, author: { login: 'alice' }, repository: { nameWithOwner: 'org/repo' }, commits: { nodes: [] }, labels: { nodes: [] } };
-function fixture({ pr = base, requests = { users: [], teams: [] }, fail = false, missing = false } = {}) {
+function fixture({ pr = base, requests = { users: [], teams: [] }, fail = false, missing = false, contributors = [], contributorStatus = 404 } = {}) {
   const calls = [];
   const list = createGitHub({ getToken: async () => 'mock', fetchImpl: async (url, options) => {
     const body = options.body && JSON.parse(options.body); calls.push({ url, method: options.method, body });
     if (url.endsWith('/graphql')) return Response.json({ data: { viewer: { login: 'alice' }, node: { ...pr, suggestedReviewerActors: { pageInfo: { hasNextPage: true }, nodes: [{ reviewer: { id: 'U1', login: 'alice' } }, { reviewer: { id: 'U2', login: 'bob', name: 'Bob' } }] } } } });
+    if (url.includes('/contributors?')) return contributors === null ? Response.json({ message: 'Unavailable' }, { status: contributorStatus }) : Response.json(contributors);
     if (missing) return Response.json({ message: 'Not Found' }, { status: 404 });
     if (options.method === 'GET') return Response.json(requests);
     return fail ? Response.json({}, { status: 422 }) : Response.json({});
@@ -82,4 +83,40 @@ test('shared transport keeps validation errors generic and preserves GitHub mess
   }
   const request = createGitHubTransport({ getToken: async () => 'mock', fetchImpl: async () => new Response('', { status: 422 }) });
   await assert.rejects(request('/unrelated'), error => error.status === 422 && error.message === 'GitHub returned HTTP 422.');
+});
+
+
+test('empty reviewer search lists human contributors, excluding author, and caches per repository', async () => {
+  const { list, calls } = fixture({ contributors: [
+    { login: 'alice', type: 'User' }, { login: 'dana', type: 'User' },
+    { login: 'robot', type: 'Bot' }, { name: 'Anonymous', type: 'Anonymous' },
+  ] });
+  assert.deepEqual(await list.reviewerSuggestions('P1'), { reviewers: [{ name: 'bob', displayName: 'Bob', kind: 'user' }, { name: 'dana', displayName: 'Repository contributor', kind: 'user' }], limited: true });
+  assert.equal(calls.filter(c => c.body?.query?.includes('ReviewerSuggestions')).length, 1);
+  const filtered = await list.reviewerSuggestions('P1', 'da');
+  assert.equal(filtered.reviewers[1].name, 'dana');
+  await list.reviewerSuggestions('P1');
+  assert.equal(calls.filter(c => c.url.includes('/contributors?')).length, 1);
+});
+
+test('contributor and GitHub search results deduplicate logins and flag capped lists', async () => {
+  const { list } = fixture({ contributors: Array.from({ length: 100 }, (_, i) => ({ login: i ? `person${i}` : 'BOB', type: 'User' })) });
+  const results = await list.reviewerSuggestions('P1', 'bo');
+  assert.equal(results.reviewers.length, 1);
+  assert.equal(results.reviewers[0].name, 'bob');
+  assert.equal(results.limited, true);
+});
+
+
+test('unavailable contributors do not block typed reviewer search', async () => {
+  const { list } = fixture({ contributors: null });
+  assert.equal((await list.reviewerSuggestions('P1')).reviewers[0].name, 'bob');
+  assert.equal((await list.reviewerSuggestions('P1', 'bob')).reviewers[0].name, 'bob');
+});
+
+
+test('large-repository contributor failures fall back on empty query and cache the failure', async () => {
+  const { list, calls } = fixture({ contributors: null, contributorStatus: 403 });
+  for (let i = 0; i < 2; i++) assert.equal((await list.reviewerSuggestions('P1')).reviewers[0].name, 'bob');
+  assert.equal(calls.filter(c => c.url.includes('/contributors?')).length, 1);
 });

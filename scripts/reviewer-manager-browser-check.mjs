@@ -29,6 +29,8 @@ test('manage own reviewers: lazy search, errors, re-request, team, remove, dismi
   assert.equal(await page.locator('[data-pr-id=P3]').getByRole('button', { name: /Manage reviewers/ }).isDisabled(), true);
   await trigger.click();
   const panel = page.getByRole('dialog', { name: 'Manage reviewers', exact: true });
+  await panel.getByRole('textbox').click();
+  await panel.getByRole('heading', { name: 'Contributors and suggestions' }).waitFor();
   await panel.getByRole('button', { name: 'Request review from dana', exact: true }).waitFor();
   const rowHue = await page.locator('[data-pr-id=P1] .reviewer .author').first().evaluate(el => el.style.getPropertyValue('--author-hue'));
   const popupHue = await panel.locator('.reviewer-choice-name .author').first().evaluate(el => el.style.getPropertyValue('--author-hue'));
