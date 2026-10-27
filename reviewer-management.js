@@ -12,6 +12,17 @@ export function validateReviewerChange(input) {
 }
 
 export function createReviewerManagement({ graphql, request, ownedPullRequest, fields }) {
+  const contributorCache = new Map();
+  async function contributors(repo) {
+    const cached = contributorCache.get(repo);
+    if (cached && cached.expires > Date.now()) return cached.value;
+    const path = repo.split('/').map(encodeURIComponent).join('/');
+    const users = await request(`/repos/${path}/contributors?per_page=100`) ?? [];
+    const value = { users: users.filter(user => user.type === 'User' && user.login), limited: users.length === 100 };
+    if (contributorCache.size >= 100) contributorCache.delete(contributorCache.keys().next().value);
+    contributorCache.set(repo, { value, expires: Date.now() + 5 * 60_000 });
+    return value;
+  }
   const selection = 'id number state isDraft author { login } repository { nameWithOwner }';
   async function owned(id) {
     if (typeof id !== 'string' || !id.trim() || id.length > 200) throw new ApiError('Provide a valid pull request ID.', 400);
@@ -23,16 +34,28 @@ export function createReviewerManagement({ graphql, request, ownedPullRequest, f
     async reviewerSuggestions(id, query = '') {
       if (typeof query !== 'string' || query.length > 100) throw new ApiError('Search must be at most 100 characters.', 400);
       const { pr } = await owned(id);
+      const queryText = query.trim().replace(/^@/, '');
+      const repoContributors = await contributors(pr.repository.nameWithOwner).catch(error => {
+        // Contributor access must not prevent searching eligible reviewers by name.
+        if (!queryText || error.status === 401 || error.status === 429) throw error;
+        return { users: [], limited: false };
+      });
+      const candidates = repoContributors.users
+        .filter(user => user.login.toLowerCase() !== pr.author.login.toLowerCase() && user.login.toLowerCase().includes(queryText.toLowerCase()))
+        .map(user => ({ name: user.login, displayName: 'Repository contributor', kind: 'user' }));
+      if (!queryText) return { reviewers: candidates, limited: repoContributors.limited };
       const data = await graphql(`query ReviewerSuggestions($id: ID!, $query: String!) {
         node(id: $id) { ... on PullRequest {
           suggestedReviewerActors(first: 20, query: $query) {
             pageInfo { hasNextPage } nodes { reviewer { login ... on User { id name } } }
           }
         } }
-      }`, { id, query: query.trim() });
+      }`, { id, query: queryText });
       const connection = data.node?.suggestedReviewerActors;
       const users = (connection?.nodes ?? []).map(n => n?.reviewer).filter(r => r?.id && r.login.toLowerCase() !== pr.author.login.toLowerCase());
-      return { reviewers: users.map(r => ({ name: r.login, displayName: r.name, kind: 'user' })), limited: Boolean(connection?.pageInfo?.hasNextPage) };
+      const combined = new Map(candidates.map(user => [user.name.toLowerCase(), user]));
+      for (const user of users) combined.set(user.login.toLowerCase(), { name: user.login, displayName: user.name, kind: 'user' });
+      return { reviewers: [...combined.values()], limited: repoContributors.limited || Boolean(connection?.pageInfo?.hasNextPage) };
     },
     async changeReviewer(input) {
       const { id, action, kind, name } = validateReviewerChange(input);
