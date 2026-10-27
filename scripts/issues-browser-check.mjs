@@ -31,10 +31,8 @@ test('issue counts open full titles and states, hide empty lists, and support ke
   assert.equal(await page.locator('.issue-count').count(), 2);
   assert.equal(await trigger.textContent(), '2');
   assert.equal(await trigger.getAttribute('title'), 'Closes 2 issues');
-  const styles = await page.locator('.pr-row').first().locator('.comment-count, .issue-count').evaluateAll(nodes => nodes.map(node => {
-    const style = getComputedStyle(node); return [style.padding, style.borderRadius];
-  }));
-  assert.deepEqual(styles[0], styles[1]);
+  assert.equal(await trigger.evaluate(el => Boolean(el.closest('.pr-extras'))), true);
+  assert.equal(await page.locator('.pr-row').first().locator('.comment-count').evaluate(el => getComputedStyle(el).gridColumnStart), '7');
   await trigger.focus(); await page.keyboard.press('Enter'); await panel.waitFor();
   await page.waitForFunction(() => document.querySelector('.issue-count').getAttribute('aria-expanded') === 'true');
   assert.deepEqual(await panel.locator('.issue-title').allTextContents(), issues.map(issue => issue.title));

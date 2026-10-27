@@ -36,7 +36,7 @@ export function createReviewControls({ changes, submit, onClose }) {
     reset() { popover.close(); active = null; },
     recover() { content(); if (active && !popover.isOpen) popover.panel.showPopover(); },
     reconcile(ids) { if (active && !ids.has(active.pr.id) && !changes.get(active.pr.id)?.saving) popover.close(); },
-    button(pr, reviewer) {
+    button(pr, reviewer, avatar) {
       if (active?.pr.id === pr.id) { active = { pr, reviewer }; content(); }
       const busy = [...changes.values()].some(draft => draft.saving);
       return actionButton({ className: 'badge approved review-action', label: 'Your approval options',
@@ -48,7 +48,7 @@ export function createReviewControls({ changes, submit, onClose }) {
             changes.set(pr.id, { reviewId: reviewer.reviewId, value: '', confirm: false, saving: false, error: '' });
           }
           popover.attach(event.currentTarget); content();
-        }, content: html`${reviewStatus('✓', 'approved')}${icon('chevron-down', 12)}` });
+        }, content: avatar ?? html`${reviewStatus('✓', 'approved')}${icon('chevron-down', 12)}` });
     },
   };
 }

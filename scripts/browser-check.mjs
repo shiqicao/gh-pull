@@ -167,10 +167,9 @@ test('clipboard, filters, background refresh, icons and responsive metadata styl
   assert.equal(await page.locator('.diff-counts + .comment-count').textContent(), '12');
   for (const colorScheme of ['light', 'dark']) {
     await page.emulateMedia({ colorScheme });
-    const styles = await page.locator('.branch-copy, .updated-time, .comment-count').evaluateAll(nodes => nodes.map(node => {
-      const s = getComputedStyle(node); return [s.backgroundColor, s.padding, s.borderRadius];
-    }));
-    for (const style of styles.slice(1)) assert.deepEqual(styles[0], style);
+    assert.equal(await page.locator('.pr-ci .ci-indicator').count(), 1);
+    assert.equal(await page.locator('.pr-reference .pr-number').count(), 1);
+    assert.equal(await page.locator('.diff-counts').evaluate(el => getComputedStyle(el).flexDirection), 'column');
     for (const width of [1280, 375, 320]) {
       await page.setViewportSize({ width, height: 800 });
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);

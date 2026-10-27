@@ -17,7 +17,7 @@ export function drawDependencies(groups) {
       // Align with the real row's first status pill, even when the title wraps.
       const centers = entries.map(entry => {
         const row = entry.getBoundingClientRect();
-        const badge = entry.querySelector('.title-line .badge')?.getBoundingClientRect();
+        const badge = entry.querySelector('.title-line > .badge')?.getBoundingClientRect();
         const scale = row.height / entry.offsetHeight;
         return entry.offsetTop + (badge && scale ? (badge.top + badge.height / 2 - row.top) / scale : 22);
       });

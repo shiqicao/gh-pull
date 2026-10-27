@@ -329,7 +329,7 @@ function titleEditor(pr) {
 // Row containers survive regrouping; Lit owns and diffs everything inside.
 const rowElements = new Map();
 const groupCache = new Map();
-const rowContext = () => ({ viewedStore, markViewed, viewerLogin, draftChanges, merges, titleEdits,
+const rowContext = () => ({ groupBy: $('group').value, viewedStore, markViewed, viewerLogin, draftChanges, merges, titleEdits,
   changeDraftStatus, render, focusTitleControl, createMergeAction, issuePopover, titleEditor, reviewControl: reviewControls.button, reviewerManager: reviewerManager.button, lifecycleControl: lifecycleControls.button, savingPull, nameColors });
 function renderEditorRow(id) {
   const row = rowElements.get(id);
