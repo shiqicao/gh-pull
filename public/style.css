@@ -1081,7 +1081,7 @@ select:not([multiple]):not([size]) {
   .pr-row .reviewers { grid-row: 5; }
 }
 
-.reviewer-legend { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 18px; margin: 16px 4px; font-size: 12px; color: var(--color-muted); }
+.reviewer-legend { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 18px; margin: 8px 16px 0; font-size: 11px; color: var(--color-muted); }
 .reviewer-legend > span { display: inline-flex; align-items: center; gap: 6px; }
 .reviewer-legend i { width: 9px; height: 9px; border-radius: 50%; background: var(--color-subtle); }
 .reviewer-legend .legend-approved { background: var(--color-success-text); }
@@ -1090,4 +1090,4 @@ select:not([multiple]):not([size]) {
 .reviewer-legend .legend-note { margin-left: auto; }
 body:has(#results .empty) .pr-column-header, body:has(#results .empty) .reviewer-legend { display: none; }
 
-body:has(#dashboard[hidden]) .pr-column-header { display: none; }
+body:has(#dashboard[hidden]) .pr-column-header, body:has(#dashboard[hidden]) .reviewer-legend { display: none; }
