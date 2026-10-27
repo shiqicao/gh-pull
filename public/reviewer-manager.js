@@ -74,7 +74,7 @@ export function createReviewerManager({ changes, search, submit, onClose, render
       ${active.reviewersTruncated ? html`<p class="form-description">Some reviewers are not shown. <a href=${githubUrl(active.url)} target="_blank" rel="noopener noreferrer">View all on GitHub ↗</a></p>` : nothing}
       ${added.length ? html`<h3>Pending requests</h3><ul class="reviewer-choices">${repeat(added, r => r.name, r => row(r))}</ul>` : nothing}
       <h3>${query ? 'Search results' : 'Contributors and suggestions'}</h3>
-      ${draft.loading ? html`<p role="status">Searching reviewers…</p>` : nothing}
+      ${draft.loading ? html`<p class="reviewer-search-status" role="status"><span class="reviewer-search-spinner" aria-hidden="true"></span>Searching reviewers…</p>` : nothing}
       ${formError(draft.searchError)}
       <ul class="reviewer-choices">${repeat(results, r => r.name, r => row(r))}
         ${exact ? row({ name: query, kind: query.includes('/') ? 'team' : 'user', displayName: 'Exact name · GitHub will check access' }) : nothing}</ul>

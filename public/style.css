@@ -965,3 +965,28 @@ select:not([multiple]):not([size]) {
 .reviewer-manager-note { font-size: 11px; color: var(--color-muted); margin: 14px 0 0; }
 
 .reviewer-manager-actions { position: sticky; bottom: -16px; margin: 0 -16px -16px; padding: 12px 16px; background: var(--color-page); }
+
+.reviewer-search-status {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 12px;
+  border-radius: var(--radius-control);
+  background: var(--color-info-bg);
+  color: var(--color-info-text);
+  font-size: 12px;
+  font-weight: 600;
+}
+.reviewer-search-spinner {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: refresh-spin 1s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .reviewer-search-spinner { animation: none; }
+}
