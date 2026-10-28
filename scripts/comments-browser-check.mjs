@@ -33,7 +33,7 @@ test('quick comments preserve drafts, post explicitly, keep thread counts and re
   await field.press('Control+Enter'); assert.equal(calls, 2);
   release(); await dialog.waitFor({ state: 'hidden' });
   assert.equal(await trigger.textContent(), '1/2');
-  assert.match(await trigger.getAttribute('title'), /4 total comments/);
+  assert.match(await trigger.getAttribute('data-tooltip'), /4 total comments/);
   await trigger.click(); assert.equal(await field.inputValue(), '');
   await page.setViewportSize({ width: 320, height: 700 });
   const box = await dialog.boundingBox(); assert.ok(box.x >= 0 && box.x + box.width <= 320);

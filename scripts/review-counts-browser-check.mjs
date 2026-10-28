@@ -23,6 +23,6 @@ test('review ratios have an accessible explanation and zero/unavailable threads 
   assert.equal(await page.locator('.title-editor input').evaluate(el => el === document.activeElement), true);
   assert.deepEqual(await page.locator('.comment-count').allTextContents(), ['2/3', '7', '7']);
   assert.match(await page.locator('.comment-count').first().getAttribute('aria-label'), /2 of 3 review threads resolved; 7 total comments/);
-  assert.match(await page.locator('.comment-count').last().getAttribute('title'), /unavailable/);
+  assert.match(await page.locator('.comment-count').last().getAttribute('data-tooltip'), /unavailable/);
   assert.deepEqual(errors, []);
 });

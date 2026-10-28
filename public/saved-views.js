@@ -50,7 +50,7 @@ export function createSavedViews({ request, getQuery, getAppliedQuery, getGroup,
             aria-haspopup=${view.id === activeId ? 'dialog' : nothing} aria-controls=${view.id === activeId ? popover.panel.id : nothing}
             aria-expanded=${view.id === activeId ? String(popover.isOpen && popupTrigger?.dataset.viewId === view.id) : nothing}
             popovertarget=${view.id === activeId ? popover.panel.id : nothing}
-            title=${view.id === activeId ? `Rename or delete “${view.name}”` : `${view.query} · Group by: ${groupName(view.group)}`}
+            data-tooltip=${view.id === activeId ? `Rename or delete “${view.name}”` : `${view.query} · Group by: ${groupName(view.group)}`}
             @click=${event => { event.preventDefault(); view.id === activeId ? open('menu', event.currentTarget) : select(view); }}>
             <span>${view.name}</span><span class="saved-view-indicators" aria-hidden="true"><span class=${`saved-view-dot ${view.id === activeId && differs(view) ? 'edited' : ''}`}></span><span class="saved-view-arrow">${view.id === activeId ? icon('chevron-down', 12) : nothing}</span></span>
           </button>`)}
@@ -159,7 +159,7 @@ export function createSavedViews({ request, getQuery, getAppliedQuery, getGroup,
     popover.panel.classList.toggle('saved-views-rename', mode === 'rename');
     popover.panel.classList.toggle('saved-views-overflow', mode === 'more');
     if (popupTrigger) popover.attach(popupTrigger, { anchor: mode === 'save' ? footer : popupTrigger, align: ['save', 'more'].includes(mode) ? 'end' : 'start' });
-    render(mode === 'more' ? html`<div class="popover-menu" aria-label="More saved views">${repeat(overflow, view => view.id, view => html`<button type="button" class="popover-menu-item" title=${`${view.query} · Group by: ${groupName(view.group)}`} @click=${() => select(view)}>${view.name}</button>`)}</div>` : mode === 'menu' ? html`<div class="popover-menu">
+    render(mode === 'more' ? html`<div class="popover-menu" aria-label="More saved views">${repeat(overflow, view => view.id, view => html`<button type="button" class="popover-menu-item" data-tooltip=${`${view.query} · Group by: ${groupName(view.group)}`} @click=${() => select(view)}>${view.name}</button>`)}</div>` : mode === 'menu' ? html`<div class="popover-menu">
       <button type="button" class="popover-menu-item" @click=${() => { mode = 'rename'; name = view.name; content(); popover.panel.querySelector('input').focus(); }}>Rename…</button>
       <button type="button" class="popover-menu-item destructive" @click=${() => { mode = 'delete'; content(); }}>Delete…</button>
     </div>` : html`<form @submit=${event => {

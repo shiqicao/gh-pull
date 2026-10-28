@@ -27,7 +27,7 @@ export function createIssuePopover({ onClose = () => {} } = {}) {
       if (popover.pullId === pr.id) { content(); }
       if (!count) return nothing;
       const title = `Closes ${count} ${count === 1 ? 'issue' : 'issues'}`;
-      return html`<button class="issue-count" type="button" title=${title} aria-label=${`${title} · ${pr.repo} #${pr.number}`}
+      return html`<button class="issue-count" type="button" data-tooltip=${title} aria-label=${`${title} · ${pr.repo} #${pr.number}`}
         aria-haspopup="dialog" aria-controls=${panel.id} .popoverTargetElement=${panel}
         @click=${event => {
           popover.attach(event.currentTarget);

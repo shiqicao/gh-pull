@@ -2,7 +2,7 @@ import { html, nothing, guard, directive, Directive, AsyncDirective } from './ve
 import { icon } from './ui.js';
 
 export const iconTemplate = (name, size = 16) => guard([name, size], () => icon(name, size));
-export const badge = (text, kind, title = nothing) => html`<span class=${`badge ${kind.toLowerCase()}`} title=${title}>${text}</span>`;
+export const badge = (text, kind, title = nothing) => html`<span class=${`badge ${kind.toLowerCase()}`} data-tooltip=${title}>${text}</span>`;
 export function githubUrl(value, suffix = '') {
   try {
     const url = new URL(value);
@@ -78,15 +78,15 @@ class ClipboardDirective extends AsyncDirective {
         const symbol = this.button.querySelector('.copy-symbol');
         const feedback = this.button.closest('.pr-row').querySelector('[role="status"]');
         const indicator = this.button.querySelector('.copy-feedback-symbol');
-        this.reset = () => { symbol.hidden = false; indicator.hidden = true; indicator.textContent = ''; this.button.title = this.title; feedback.textContent = ''; };
+        this.reset = () => { symbol.hidden = false; indicator.hidden = true; indicator.textContent = ''; this.button.dataset.tooltip = this.title; feedback.textContent = ''; };
         let copied = true;
         try { await navigator.clipboard.writeText(this.text); } catch { copied = false; }
         if (revision !== this.revision) return;
         symbol.hidden = true; indicator.hidden = false;
         indicator.textContent = copied ? '✓' : '!';
-        this.button.title = copied ? this.success : 'Could not copy. Allow clipboard access and retry.';
+        this.button.dataset.tooltip = copied ? this.success : 'Could not copy. Allow clipboard access and retry.';
         if (!this.isConnected) { this.restore(); return; }
-        feedback.textContent = this.button.title;
+        feedback.textContent = this.button.dataset.tooltip;
         this.timer = setTimeout(() => this.restore(), 2000);
       };
       this.button.addEventListener('click', this.click);

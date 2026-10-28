@@ -1,7 +1,7 @@
 import { element } from './ui.js';
 
 // Native dismissal and focus behavior, shared positioning and trigger state.
-export function createPopover({ id, className = '', label, labelledBy, align = 'start', role = 'dialog', mode = 'auto', onClose = () => {} }) {
+export function createPopover({ id, className = '', label, labelledBy, align = 'start', role = 'dialog', mode = 'auto', maxWidth = Infinity, onClose = () => {} }) {
   const panel = element('div', undefined, `anchored-popover ${className}`);
   panel.id = id; panel.popover = mode;
   panel.setAttribute('role', role);
@@ -15,7 +15,7 @@ export function createPopover({ id, className = '', label, labelledBy, align = '
     // Client rectangles include CSS zoom; fixed-position coordinates do not.
     const scale = panel.getBoundingClientRect().width / panel.offsetWidth || 1;
     const viewportWidth = innerWidth / scale, viewportHeight = innerHeight / scale;
-    panel.style.maxWidth = `${Math.max(0, viewportWidth - 16)}px`;
+    panel.style.maxWidth = `${Math.min(maxWidth, Math.max(0, viewportWidth - 16))}px`;
     const bounds = anchor.getBoundingClientRect(), width = panel.offsetWidth, height = panel.offsetHeight;
     const rect = { left: bounds.left / scale, right: bounds.right / scale, top: bounds.top / scale, bottom: bounds.bottom / scale };
     const left = alignment === 'end' ? rect.right - width : rect.left;

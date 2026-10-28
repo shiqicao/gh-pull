@@ -1,4 +1,5 @@
 import { createCommentControls } from './comments.js';
+import { installTooltips } from './tooltip.js';
 import { createReviewerManager } from './reviewer-manager.js';
 import { createSavedViews } from './saved-views.js';
 import { createReviewCountsLoader } from './review-counts.js';
@@ -17,6 +18,7 @@ import { assignNameColors, NAME_COLOR_COUNT, dependencyLanes, groupPulls, labels
 import { queryFromParams, queryPresets, setQueryPreset, normalizeQuery, queryError, matchesQueryState } from './query.js';
 
 const $ = id => document.getElementById(id);
+installTooltips();
 observeStickyTop($('sticky-top'));
 function showDashboard(visible) {
   $('dashboard').hidden = !visible;
@@ -85,7 +87,7 @@ function updateRefreshButton() {
   const seconds = Math.max(0, Math.ceil((polling.nextAt(pendingPulls(items).length > 0) - Date.now()) / 1000));
   $('refresh-countdown').textContent = busy ? '…' : paused ? 'Ⅱ' : String(seconds);
   const label = busy ? 'Refreshing…' : paused ? 'Refresh (auto refresh paused)' : `Refresh (auto refresh in ${seconds}s)`;
-  $('refresh').title = label;
+  $('refresh').dataset.tooltip = label;
   $('refresh').setAttribute('aria-label', label);
   $('refresh').setAttribute('aria-busy', String(busy));
 }
@@ -122,7 +124,7 @@ window.addEventListener('storage', event => {
 function createMergeAction(pr, prUrl) {
   if (pr.status !== 'OPEN' || !isOwn(pr, viewerLogin)) return nothing;
   if (pr.hasConflicts) return prUrl ? html`<a class="badge review_required conflict-action" href=${githubUrl(prUrl, 'conflicts')}
-    target="_blank" rel="noopener noreferrer" data-view-pr title="Resolve merge conflicts on GitHub (opens in a new tab)">Resolve conflict</a>` : nothing;
+    target="_blank" rel="noopener noreferrer" data-view-pr data-tooltip="Resolve merge conflicts on GitHub (opens in a new tab)">Resolve conflict</a>` : nothing;
   if (!pr.canMerge) return nothing;
   const methods = (pr.mergeMethods ?? [pr.mergeMethod]).filter(method => mergeLabels[method]);
   if (!methods.length) return nothing;
@@ -133,16 +135,16 @@ function createMergeAction(pr, prUrl) {
   const controls = html`<span class=${`merge-controls${methods.length > 1 ? ' merge-split' : ''}`}>
     ${actionButton({ className: 'badge open merge-action', label: `${mergeLabels[selected]} ${pr.repo} #${pr.number}`, disabled,
       onClick: () => mergePull(pr, selected), content: merges.get(pr.id)?.saving ? 'Merging…' : mergeLabels[selected] })}
-    ${methods.length > 1 ? html`<span class="merge-method-trigger open"><select class="merge-method" title="Merge method"
+    ${methods.length > 1 ? html`<span class="merge-method-trigger open"><select class="merge-method" data-tooltip="Merge method"
       aria-label=${`Merge method for ${pr.repo} #${pr.number}`} ?disabled=${disabled}
       @change=${event => { mergeSelections.set(pr.id, event.target.value); render(); }}>
       ${methods.map(method => html`<option value=${method} .selected=${method === selected}>${mergeMethodLabels[method]}</option>`)}
     </select></span>` : nothing}
   </span>`;
   const message = pr.mergeAccess?.message || 'Could not verify app access. Refresh to try again.';
-  return blocked ? html`<span class="merge-access-blocked" role="group" title=${message} tabindex="0" aria-label=${`${mergeLabels[selected]} unavailable. ${message}`}>${controls}</span>
+  return blocked ? html`<span class="merge-access-blocked" role="group" data-tooltip=${message} tabindex="0" aria-label=${`${mergeLabels[selected]} unavailable. ${message}`}>${controls}</span>
     ${pr.mergeAccess?.url ? html`<a class="merge-access-link" href=${pr.mergeAccess.url} target="_blank" rel="noopener noreferrer"
-      title="Complete setup on GitHub, then refresh this page. Organization access may require owner approval.">${pr.mergeAccess.action}</a>` : nothing}` : controls;
+      data-tooltip="Complete setup on GitHub, then refresh this page. Organization access may require owner approval.">${pr.mergeAccess.action}</a>` : nothing}` : controls;
 }
 
 const changeMessages = {
@@ -650,7 +652,7 @@ async function initializeSession() {
     version.hidden = !session.version;
     if (session.version) {
       const commit = element(session.version.url ? 'a' : 'span', session.version.label ?? session.version.sha.slice(0, 7));
-      commit.title = session.version.label ? `Installed version: ${session.version.label}` : `Deployed commit: ${session.version.sha}`;
+      commit.dataset.tooltip = session.version.label ? `Installed version: ${session.version.label}` : `Deployed commit: ${session.version.sha}`;
       if (session.version.url) {
         commit.href = session.version.url;
         commit.target = '_blank'; commit.rel = 'noopener noreferrer';

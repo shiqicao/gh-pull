@@ -16,11 +16,16 @@ function scheduleHide() {
     hide();
   }, 120);
 }
+function showOnFocus(owner) {
+  cancelTimer();
+  // Native popovers can restore focus during their own show/hide operation.
+  timer = setTimeout(() => { if (owner.element.contains(document.activeElement)) show(owner); }, 0);
+}
 function show(owner) {
   cancelTimer();
   if (!owner.element.isConnected) return;
   if (!popup) {
-    popup = createPopover({ id: 'row-tooltip', className: 'row-tooltip', role: 'tooltip', mode: 'manual', align: 'end' });
+    popup = createPopover({ id: 'row-tooltip', className: 'row-tooltip', role: 'tooltip', mode: 'manual', align: 'end', maxWidth: 384 });
     popup.panel.addEventListener('pointerenter', cancelTimer);
     popup.panel.addEventListener('pointerleave', scheduleHide);
     document.addEventListener('keydown', event => { if (event.key === 'Escape') hide(); });
@@ -28,7 +33,8 @@ function show(owner) {
   }
   if (active !== owner) hide();
   active = owner;
-  described = owner.element.querySelector('a, button, [tabindex]') ?? owner.element;
+  described = owner.element.matches('a, button, input, select, textarea, [tabindex]')
+    ? owner.element : owner.element.querySelector('a, button, [tabindex]') ?? owner.element;
   described.setAttribute('aria-describedby', popup.panel.id);
   render(owner.content, popup.panel);
   popup.attach(owner.element, { align: owner.align });
@@ -46,7 +52,7 @@ export const tooltip = directive(class extends AsyncDirective {
         cancelTimer(); timer = setTimeout(() => show(this), 500);
       });
       this.element.addEventListener('pointerleave', scheduleHide);
-      this.element.addEventListener('focusin', () => show(this));
+      this.element.addEventListener('focusin', () => showOnFocus(this));
       this.element.addEventListener('focusout', scheduleHide);
       this.element.addEventListener('click', hide);
     }
@@ -55,3 +61,40 @@ export const tooltip = directive(class extends AsyncDirective {
   }
   disconnected() { if (active === this) hide(); }
 });
+
+// Plain-text hints share the same renderer as rich title/reviewer tooltips.
+// Delegation covers dynamically added controls without per-element listeners.
+let installed = false;
+export function installTooltips() {
+  if (installed) return;
+  installed = true;
+  const owners = new WeakMap();
+  const find = target => target instanceof Element ? target.closest('[data-tooltip]') : null;
+  function owner(element) {
+    if (!owners.has(element)) owners.set(element, { element, align: 'end', get content() { return element.dataset.tooltip; } });
+    return owners.get(element);
+  }
+  document.addEventListener('pointerover', event => {
+    const element = find(event.target);
+    if (!element?.dataset.tooltip || event.pointerType === 'touch' || element.contains(event.relatedTarget)) return;
+    cancelTimer(); timer = setTimeout(() => show(owner(element)), 500);
+  });
+  document.addEventListener('pointerout', event => {
+    const element = find(event.target);
+    if (element && !element.contains(event.relatedTarget)) scheduleHide();
+  });
+  document.addEventListener('focusin', event => {
+    const element = find(event.target);
+    if (element?.dataset.tooltip) showOnFocus(owner(element));
+  });
+  document.addEventListener('focusout', event => { if (find(event.target)) scheduleHide(); });
+  document.addEventListener('click', hide);
+  new MutationObserver(() => {
+    if (!active) return;
+    if (!active.element.isConnected) hide();
+    else if (owners.has(active.element)) {
+      if (!active.content) hide();
+      else { render(active.content, popup.panel); popup.reposition(); }
+    }
+  }).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-tooltip'] });
+}
