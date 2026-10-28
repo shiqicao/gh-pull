@@ -186,7 +186,6 @@ async function changePull(pr, changes, { action, input = {}, apply, message, onS
   } catch (error) {
     change.saving = false;
     change.error = error.name === 'TimeoutError' ? messages.timeout : error.message;
-    if (action === 'comment' && !/check github/i.test(change.error)) change.error += ' Check GitHub before retrying to avoid a duplicate comment.';
     render(); onError?.();
   }
 }

@@ -326,16 +326,19 @@ export function createGitHub(options = {}) {
 
   list.addComment = async input => {
     const { id, body } = validateComment(input);
-    const data = await graphql(`query($id: ID!) { node(id: $id) { __typename ... on PullRequest { id viewerCanComment } } }`, { id });
+    const data = await graphql(`query($id: ID!) { node(id: $id) { __typename ... on PullRequest { id } } }`, { id });
     if (data.node?.__typename !== 'PullRequest') throw new ApiError('Pull request not found.', 404);
-    if (!data.node.viewerCanComment) throw new ApiError('GitHub does not allow comments on this pull request.', 403);
     // Return the confirmed mutation result; do not risk turning a failed follow-up read into a duplicate post.
-    const result = await graphql(`mutation($input: AddCommentInput!) {
+    let result;
+    try { result = await graphql(`mutation($input: AddCommentInput!) {
       addComment(input: $input) {
         commentEdge { node { id url } }
         subject { ... on PullRequest { id updatedAt totalCommentsCount } }
       }
     }`, { input: { subjectId: id, body } });
+    } catch (error) {
+      throw new ApiError(`${error.message} Check GitHub before retrying to avoid a duplicate comment.`, error.status ?? 502);
+    }
     const posted = result.addComment;
     if (!posted?.commentEdge?.node?.id || posted.subject?.id !== id) throw new ApiError('Comment could not be confirmed. Check GitHub before posting again.');
     return { id, updatedAt: posted.subject.updatedAt, commentCount: posted.subject.totalCommentsCount, commentUrl: posted.commentEdge.node.url };
