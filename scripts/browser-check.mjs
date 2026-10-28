@@ -170,7 +170,8 @@ test('clipboard, filters, background refresh, icons and responsive metadata styl
     const styles = await page.locator('.branch-copy, .updated-time, .comment-count').evaluateAll(nodes => nodes.map(node => {
       const s = getComputedStyle(node); return [s.backgroundColor, s.padding, s.borderRadius];
     }));
-    for (const style of styles.slice(1)) assert.deepEqual(styles[0], style);
+    assert.deepEqual(styles[0], styles[2], 'Neutral metadata badges share styling');
+    assert.deepEqual(styles[0].slice(1), styles[1].slice(1), 'Age coloring preserves badge spacing and shape');
     for (const width of [1280, 375, 320]) {
       await page.setViewportSize({ width, height: 800 });
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
