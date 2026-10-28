@@ -34,7 +34,7 @@ function metadata(pr) {
     <span class="pr-review">${pr.review !== 'NONE' ? badge(reviewLabels[pr.review] ?? pr.review, pr.review, pr.review === 'REVIEW_BYPASS_AVAILABLE' ? 'GitHub requires reviews for this branch, but your account can bypass branch protections.' : reviewLabels[pr.review]) : html`<span class="empty-value" aria-label="No review status">—</span>`}</span>
     <span class="diff-counts" title=${diff} aria-label=${diff}><span class="additions">+${pr.additions}</span><span class="deletions">−${pr.deletions}</span></span>
     <span class="comment-count" title=${commentTitle} aria-label=${commentTitle}>${threads ? `${threads.resolved}/${threads.total}` : Number.isInteger(pr.commentCount) && pr.commentCount > 0 ? html`${icon('comment', 12)}${pr.commentCount}` : '—'}</span>
-    <time class="updated-time" ${ageTint(pr.updatedAt)} datetime=${pr.updatedAt} title=${`Updated ${new Date(pr.updatedAt).toLocaleString()}`} aria-label=${`Updated ${age}`}>${age === 'just now' ? 'now' : age.replace(/ ago$/, '')}</time>
+    <time class="updated-time" ${ageTint(pr.updatedAt)} datetime=${pr.updatedAt} title=${`Updated ${new Date(pr.updatedAt).toLocaleString()}`} aria-label=${`Updated ${age}`}><span class="age-content">${age === 'just now' ? 'now' : age.replace(/ ago$/, '')}</span></time>
   </div>`;
 }
 
