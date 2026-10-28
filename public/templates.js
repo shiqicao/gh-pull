@@ -29,7 +29,9 @@ export function usernameLink(name, className = '', hue) {
     aria-label=${`${name}'s GitHub profile (opens in a new tab)`}>${name}</a>`;
 }
 export function reviewerAvatar(name, state, hue, kind, interactive = true) {
-  const initials = name.replace(/\[bot\]$/i, '').split(/[-_/]+/).filter(Boolean).map(part => part[0]).join('').slice(0, 2).toUpperCase();
+  const label = name.replace(/\[bot\]$/i, '').split('/').at(-1);
+  const parts = label.split(/[-_]+/).filter(Boolean);
+  const initials = (parts.length > 1 ? parts.map(part => part[0]).join('') : label).slice(0, 2).toUpperCase();
   const square = kind === 'bot' || kind === 'team' || name.includes('/') || /\[bot\]$/i.test(name);
   const classes = `author reviewer-avatar reviewer-${state.toLowerCase()}${square ? ' reviewer-square' : ''}`;
   return interactive && /^[a-z\d](?:[a-z\d-]*[a-z\d])?$/i.test(name)

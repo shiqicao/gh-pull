@@ -43,13 +43,14 @@ function reviewerList(pr, ctx) {
   const order = { CHANGES_REQUESTED: 0, REQUESTED: 1, COMMENTED: 2, DISMISSED: 3, APPROVED: 4 };
   const sorted = [...(pr.reviewers ?? [])].sort((a, b) => (order[a.state] ?? 5) - (order[b.state] ?? 5) || a.name.localeCompare(b.name));
   const manage = isOwn(pr, viewerLogin) && ['OPEN', 'DRAFT'].includes(pr.status) && reviewerManager;
-  return html`<div class="reviewers" role="group" aria-label="Reviewers">
+  const hasReviewers = sorted.length > 0 || pr.reviewersTruncated || manage;
+  return html`<div class="reviewers" role=${hasReviewers ? 'group' : nothing} aria-label=${hasReviewers ? 'Reviewers' : nothing}>
     <div class="reviewer-avatars">${repeat(sorted, r => r.name, reviewer => {
       const description = reviewStates[reviewer.state]?.[0] ?? reviewer.state;
       const avatar = reviewerAvatar(reviewer.name, reviewer.state, nameColors[reviewer.name.toLowerCase()] * 360 / NAME_COLOR_COUNT, reviewer.kind, !reviewer.canRevoke);
       return html`<span class="reviewer" title=${`${reviewer.name}: ${description}`} aria-label=${`${reviewer.name}: ${description}`}>${reviewer.canRevoke ? reviewControl(pr, reviewer, avatar) : avatar}</span>`;
     })}</div>
-    ${pr.reviewersTruncated && githubUrl(pr.url) !== nothing ? html`<a class="reviewers-more" href=${githubUrl(pr.url)} target="_blank" rel="noopener noreferrer" data-view-pr title="View all reviewers on GitHub" aria-label="View all reviewers on GitHub">…</a>` : nothing}
+    ${pr.reviewersTruncated && githubUrl(pr.url) !== nothing ? html`<a class="reviewers-more" href=${githubUrl(pr.url)} target="_blank" rel="noopener noreferrer" data-view-pr title="View all reviewers on GitHub" aria-label="View all reviewers on GitHub">All ↗</a>` : nothing}
     ${manage ? reviewerManager(pr, Boolean(savingPull(pr.id))) : nothing}
   </div>`;
 }

@@ -2,7 +2,11 @@
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
 import { createApp } from '../server.js';
-import { copyFile } from 'node:fs/promises';
+import { copyFile, mkdtemp, rm } from 'node:fs/promises';
+
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { createSavedViewsStore } from '../saved-views.js';
 
 const now = Date.UTC(2026, 9, 27, 22, 30);
 const repo = 'orbit-demo/web';
@@ -41,11 +45,16 @@ items.forEach((pr, i) => { pr.reviewThreadCounts = { resolved: i % 4, total: i %
 const list = async () => ({ viewer: 'alex', total: items.length, items, pageInfo: { hasNextPage: false } });
 list.viewer = async () => 'alex';
 list.reviewCounts = async () => ({ items });
-const server = createApp({ list, savedViews: { list: async () => [], change: async () => [] } });
+const viewsDir = await mkdtemp(join(tmpdir(), 'gh-pull-capture-'));
+const savedViews = createSavedViewsStore(join(viewsDir, 'views.json'), () => new Date(now).toISOString());
+await savedViews.change('alex', { action: 'save', name: 'Team reviews', query: 'sort:review-status', group: 'repo' });
+await savedViews.change('alex', { action: 'save', name: 'To review', query: 'is:open review-requested:@me', group: 'repo' });
+await savedViews.change('alex', { action: 'save', name: 'My drafts', query: 'is:open is:draft author:@me', group: 'status' });
+const server = createApp({ list, savedViews });
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
 const browser = await chromium.launch({ executablePath: process.env.CHROME_BIN || undefined });
 try {
-  const context = await browser.newContext({ viewport: { width: 1600, height: 1250 }, deviceScaleFactor: 2, colorScheme: 'dark' });
+  const context = await browser.newContext({ viewport: { width: 1600, height: 1350 }, deviceScaleFactor: 2, colorScheme: 'dark' });
   const page = await context.newPage();
   await page.clock.install({ time: now });
   const origin = `http://127.0.0.1:${server.address().port}`;
@@ -59,6 +68,7 @@ try {
   });
   await page.goto(`${origin}/?q=sort:review-status`);
   await page.locator('.dependency-dot').first().waitFor();
+  await page.getByRole('button', { name: 'Team reviews', exact: true }).waitFor();
   await page.waitForFunction(() => [...document.querySelectorAll('.comment-count')].every(el => el.textContent.includes('/')));
   await page.evaluate(() => document.fonts.ready);
   await page.waitForFunction(() => Number(document.querySelector('.dependency-connector').getAttribute('height')) === document.querySelector('.has-dependency-lanes').offsetHeight);
@@ -70,8 +80,9 @@ try {
   assert.deepEqual(errors, []);
   await page.screenshot({ path: new URL('../docs/marketplace-dashboard.png', import.meta.url).pathname });
   await copyFile(new URL('../docs/marketplace-dashboard.png', import.meta.url), new URL('../docs/demo.png', import.meta.url));
-  console.log('Updated docs/marketplace-dashboard.png and docs/demo.png (3200 × 2500).');
+  console.log('Updated docs/marketplace-dashboard.png and docs/demo.png (3200 × 2700).');
 } finally {
   await browser.close();
   await new Promise(resolve => { server.close(resolve); server.closeAllConnections(); });
+  await rm(viewsDir, { recursive: true, force: true });
 }

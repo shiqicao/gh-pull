@@ -72,7 +72,7 @@ export function assignNameColors(usernames, previous = {}) {
   return colors;
 }
 
-const reviewOrder = { CHANGES_REQUESTED: 0, REVIEW_REQUIRED: 1, APPROVED: 2, NONE: 3 };
+const reviewOrder = { CHANGES_REQUESTED: 0, REVIEW_REQUIRED: 1, REVIEW_BYPASS_AVAILABLE: 1, APPROVED: 2, NONE: 3 };
 function compareReviewStatus(a, b) {
   return (reviewOrder[a.review] ?? 3) - (reviewOrder[b.review] ?? 3)
     || (Date.parse(b.updatedAt) || 0) - (Date.parse(a.updatedAt) || 0);

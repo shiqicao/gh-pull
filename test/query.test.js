@@ -151,8 +151,8 @@ test('review status sort persists in queries and uses supported upstream orderin
 });
 
 test('review status sort prioritizes action and breaks ties by recency', () => {
-  const items = ['NONE', 'APPROVED', 'REVIEW_REQUIRED', 'CHANGES_REQUESTED', 'REVIEW_REQUIRED'].map((review, i) => ({
+  const items = ['NONE', 'APPROVED', 'REVIEW_REQUIRED', 'CHANGES_REQUESTED', 'REVIEW_REQUIRED', 'REVIEW_BYPASS_AVAILABLE'].map((review, i) => ({
     id: String(i), review, title: '', labels: [], updatedAt: `2026-10-${20+i}T00:00:00Z`,
   }));
-  assert.deepEqual(groupPulls(items, { group: 'none', sort: 'review' }).groups[0][1].map(p => p.id), ['3', '4', '2', '1', '0']);
+  assert.deepEqual(groupPulls(items, { group: 'none', sort: 'review' }).groups[0][1].map(p => p.id), ['3', '5', '4', '2', '1', '0']);
 });
