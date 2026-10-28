@@ -12,6 +12,7 @@ permissions:
 
 jobs:
   test:
+    timeout-minutes: 10
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -24,6 +25,7 @@ jobs:
       - run: npm test
       - run: npx playwright install --with-deps chromium
       - run: npm run test:browser
+        timeout-minutes: 5
 
   build:
     strategy:
