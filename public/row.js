@@ -44,7 +44,7 @@ function metaRow(pr, node, author, issuePopover) {
     ${pr.branch ? html`<button class="branch-copy" type="button" title=${`Copy branch name: ${pr.branch}`} aria-label=${`Copy branch name: ${pr.branch}`}
       ${copyFeedback(pr.branch, 'Branch name copied', `Copy branch name: ${pr.branch}`)}><span class="branch-name">${pr.branch}</span><span class="branch-copy-symbol" aria-hidden="true"><span class="copy-symbol">${icon('copy', 14)}</span><span class="copy-feedback-symbol" hidden></span></span></button>` : nothing}
     ${pr.review !== 'NONE' ? badge(reviewLabels[pr.review] ?? pr.review, pr.review, pr.review === 'REVIEW_BYPASS_AVAILABLE' ? 'GitHub requires reviews for this branch, but your account can bypass branch protections.' : nothing) : nothing}
-    <time class="updated-time" ${ageTint(pr.updatedAt)} datetime=${pr.updatedAt} title=${`Updated ${new Date(pr.updatedAt).toLocaleString()}`} aria-label=${`Updated ${age}`}>${icon('clock', 14)}${age}</time>
+    <time class="updated-time" ${ageTint(pr.updatedAt)} datetime=${pr.updatedAt} title=${`Updated ${new Date(pr.updatedAt).toLocaleString()}`} aria-label=${`Updated ${age}`}><span class="age-content">${icon('clock', 14)}${age}</span></time>
     <span class="diff-counts" title=${diff} aria-label=${diff}><span class="additions success">${pr.additions}</span><span class="deletions failure">${pr.deletions}</span></span>
     ${Number.isInteger(pr.commentCount) && pr.commentCount >= 0 ? html`<span class="comment-count" title=${commentTitle} aria-label=${commentTitle}>${icon('comment', 14)}${threads ? `${threads.resolved}/${threads.total}` : pr.commentCount}</span>` : nothing}
     ${issuePopover.button(pr)}${pr.labels.map(label => badge(label, 'label'))}

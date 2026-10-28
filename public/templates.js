@@ -1,4 +1,4 @@
-import { html, nothing, guard, directive, AsyncDirective } from './vendor/lit-html.js';
+import { html, nothing, guard, directive, Directive, AsyncDirective } from './vendor/lit-html.js';
 import { icon } from './ui.js';
 
 export const iconTemplate = (name, size = 16) => guard([name, size], () => icon(name, size));
@@ -29,8 +29,8 @@ export function usernameLink(name, className = '', hue) {
     aria-label=${`${name}'s GitHub profile (opens in a new tab)`}>${name}</a>`;
 }
 // Color strength halves daily, background weekly, saturation and brightness every six hours.
-// Use CSSOM for CSP.
-export const ageTint = directive(class extends AsyncDirective {
+// Recomputed on render alongside the relative age label. Use CSSOM for CSP.
+export const ageTint = directive(class extends Directive {
   render() { return nothing; }
   update(part, [value, now = Date.now()]) {
     const days = Math.max(0, (now - new Date(value).getTime()) / 86_400_000);
