@@ -1,0 +1,42 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { browserFixture } from './browser-fixture.mjs';
+import { ApiError } from '../github.js';
+
+test('quick comments preserve drafts, post explicitly, keep thread counts and recover failures', async t => {
+  let pr = { id: 'comment', number: 1, title: 'Quick comment fixture', url: 'https://github.com/example/demo/pull/1', repo: 'example/demo', author: 'bob', status: 'OPEN', checks: 'NONE', review: 'NONE', labels: [], reviewers: [], additions: 1, deletions: 0, createdAt: '2026-01-01', updatedAt: '2026-01-01', commentCount: 3, reviewThreadCounts: { resolved: 1, total: 2 } };
+  const list = async () => ({ viewer: 'alice', items: [pr], total: 1, pageInfo: { hasNextPage: false } });
+  list.reviewCounts = async () => ({ items: [pr] });
+  let calls = 0, release;
+  list.addComment = async input => {
+    calls++; assert.deepEqual(input, { id: 'comment', body: '**Thanks!**' });
+    if (calls === 1) throw new ApiError('Comment denied.');
+    await new Promise(resolve => { release = resolve; });
+    pr = { ...pr, commentCount: 4, updatedAt: '2026-10-28' };
+    return { id: pr.id, commentCount: pr.commentCount, updatedAt: pr.updatedAt };
+  };
+  const { page, origin, errors } = await browserFixture(t, { list });
+  await page.goto(origin);
+  const trigger = page.locator('.comment-count'), dialog = page.getByRole('dialog', { name: 'Quick comment', exact: true });
+  await trigger.click();
+  const field = dialog.getByRole('textbox', { name: 'Comment', exact: true });
+  const post = dialog.getByRole('button', { name: 'Post comment', exact: true });
+  assert.equal(await post.isDisabled(), true);
+  await field.fill('**Thanks!**'); assert.equal(calls, 0);
+  await page.keyboard.press('Escape'); await dialog.waitFor({ state: 'hidden' });
+  await trigger.click(); assert.equal(await field.inputValue(), '**Thanks!**');
+  await post.click(); await dialog.getByRole('alert').waitFor();
+  assert.equal(await field.inputValue(), '**Thanks!**');
+  await field.press('Control+Enter');
+  await dialog.getByRole('button', { name: 'Posting…' }).waitFor();
+  assert.equal(await field.isDisabled(), true);
+  await field.press('Control+Enter'); assert.equal(calls, 2);
+  release(); await dialog.waitFor({ state: 'hidden' });
+  assert.equal(await trigger.textContent(), '1/2');
+  assert.match(await trigger.getAttribute('title'), /4 total comments/);
+  await trigger.click(); assert.equal(await field.inputValue(), '');
+  await page.setViewportSize({ width: 320, height: 700 });
+  const box = await dialog.boundingBox(); assert.ok(box.x >= 0 && box.x + box.width <= 320);
+  await page.screenshot({ path: '/tmp/gh-pull-quick-comment-preview.png' });
+  assert.deepEqual(errors, []);
+});

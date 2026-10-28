@@ -1,3 +1,4 @@
+import { createCommentControls } from './comments.js';
 import { createReviewerManager } from './reviewer-manager.js';
 import { createSavedViews } from './saved-views.js';
 import { createReviewCountsLoader } from './review-counts.js';
@@ -29,7 +30,7 @@ if (!queryError(appliedQuery)) appliedQuery = normalizeQuery(appliedQuery);
 let items = [], total = 0, cursor = null, more = false, limited = false, loading = false;
 const collapsed = new Set();
 const pendingChanges = createPendingChanges();
-const { titleEdits, draftChanges, merges, lifecycleChanges, reviewChanges, reviewerChanges } = pendingChanges;
+const { commentChanges, titleEdits, draftChanges, merges, lifecycleChanges, reviewChanges, reviewerChanges } = pendingChanges;
 let viewerLogin = '', queryEditor, savedViews;
 const loads = createLatestRequest();
 const mergedStore = createMergedStore();
@@ -145,6 +146,7 @@ function createMergeAction(pr, prUrl) {
 }
 
 const changeMessages = {
+  comment: { failure: 'Could not post the comment. Check GitHub before trying again.', timeout: 'Posting timed out. Check GitHub before trying again to avoid a duplicate comment.' },
   title: { failure: 'Could not update the title. Please retry.', timeout: 'The save timed out. Retry to check and save the title.' },
   reviewers: { failure: 'Could not update reviewers. Refresh to check the current requests.', timeout: 'Reviewer update timed out. Refresh to check whether it succeeded before retrying.' },
   status: { failure: 'Could not change the PR status. Please retry.', timeout: 'Status change timed out. Click the status badge to retry or refresh to check its status.' },
@@ -184,6 +186,7 @@ async function changePull(pr, changes, { action, input = {}, apply, message, onS
   } catch (error) {
     change.saving = false;
     change.error = error.name === 'TimeoutError' ? messages.timeout : error.message;
+    if (action === 'comment' && !/check github/i.test(change.error)) change.error += ' Check GitHub before retrying to avoid a duplicate comment.';
     render(); onError?.();
   }
 }
@@ -235,6 +238,19 @@ const lifecycleControls = createLifecycleControls({
       },
       onSuccess() { lifecycleControls.reset(); scheduleMergeReadiness(); void load({ refresh: true, background: true }); },
       onError: lifecycleControls.recover,
+    });
+  },
+});
+
+const commentControls = createCommentControls({
+  changes: commentChanges,
+  onClose(id) { renderEditorRow(id); polling.invalidate(); },
+  async submit(pr, draft) {
+    await changePull(pr, commentChanges, {
+      action: 'comment', input: { body: draft.value.trim() }, message: 'Comment posted',
+      apply(current, data) { if (current) Object.assign(current, data); },
+      onSuccess() { commentControls.reset(); focusTitleControl(pr.id, '.comment-count'); },
+      onError: commentControls.recover,
     });
   },
 });
@@ -330,7 +346,7 @@ function titleEditor(pr) {
 const rowElements = new Map();
 const groupCache = new Map();
 const rowContext = () => ({ groupBy: $('group').value, viewedStore, markViewed, viewerLogin, draftChanges, merges, titleEdits,
-  changeDraftStatus, render, focusTitleControl, createMergeAction, issuePopover, titleEditor, reviewControl: reviewControls.button, reviewerManager: reviewerManager.button, lifecycleControl: lifecycleControls.button, savingPull, nameColors });
+  changeDraftStatus, render, focusTitleControl, createMergeAction, issuePopover, titleEditor, commentControl: commentControls.button, reviewControl: reviewControls.button, reviewerManager: reviewerManager.button, lifecycleControl: lifecycleControls.button, savingPull, nameColors });
 function renderEditorRow(id) {
   const row = rowElements.get(id);
   if (row) renderTemplate(renderRow(row.node, row.gutter, rowContext()), row.entry);
@@ -412,7 +428,7 @@ function render() {
     if (selection) focused.setSelectionRange(...selection);
   }
   issuePopover.reposition();
-  reviewerManager.reconcile(activeRows, items); reviewControls.reconcile(activeRows); lifecycleControls.reconcile(activeRows);
+  commentControls.reconcile(activeRows); reviewerManager.reconcile(activeRows, items); reviewControls.reconcile(activeRows); lifecycleControls.reconcile(activeRows);
   results.querySelector('.empty')?.remove();
   if (!count && !loading) results.append(element('p', 'No pull requests found for this query.', 'empty'));
   results.setAttribute('aria-busy', String(loading));
@@ -460,7 +476,7 @@ async function load({ append = false, refresh = false, background = false } = {}
     if (!loads.isCurrent(request)) return;
     if (viewedStore.selectAccount(data.viewer)) {
       queryEditor?.clearRepositoryCache();
-      issuePopover.close(); reviewerManager.reset(); reviewControls.reset(); lifecycleControls.reset();
+      issuePopover.close(); reviewerManager.reset(); reviewControls.reset(); lifecycleControls.reset(); commentControls.reset();
       mergedStore.clear();
       $('mutation-notice').hidden = true; $('mutation-notice').textContent = '';
       pendingChanges.clear(); mergeSelections.clear();

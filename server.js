@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { toGitHubQuery, repositoryScope } from './public/query.js';
-import { createGitHub, ApiError, validateTitleUpdate, validateDraftUpdate, validateMerge, validateReviewDismissal, validateClose } from './github.js';
+import { createGitHub, ApiError, validateTitleUpdate, validateDraftUpdate, validateMerge, validateReviewDismissal, validateClose, validateComment } from './github.js';
 import { cachedRequest } from './request-cache.js';
 import { authConfig, createAuth } from './auth.js';
 import { createMarketplaceWebhook } from './marketplace.js';
@@ -18,6 +18,7 @@ const assets = new Map(publicAssets.filter(([, type]) => type).map(([file, type]
   [file === 'index.html' ? '/' : `/${file}`, [file, type]]));
 
 const mutations = new Map([
+  ['/api/pulls/comment', { method: 'addComment', validate: validateComment, maxBytes: 32768, unavailable: 'Commenting is unavailable.' }],
   ['/api/pulls/reviewers', { method: 'changeReviewer', validate: validateReviewerChange, unavailable: 'Reviewer management is unavailable.' }],
   ['/api/pulls/close', { method: 'closePull', validate: validateClose, unavailable: 'Closing PRs is unavailable.' }],
   ['/api/pulls/reopen', { method: 'reopenPull', validate: validateDraftUpdate, unavailable: 'Reopening PRs is unavailable.' }],
@@ -28,7 +29,7 @@ const mutations = new Map([
   ['/api/pulls/merge', { method: 'merge', validate: validateMerge, unavailable: 'Status changes are unavailable.' }],
 ]);
 
-export function createApp({ savedViews = createSavedViewsStore(), list = createGitHub(), updateTitle = list.updateTitle, convertToDraft = list.convertToDraft, markReadyForReview = list.markReadyForReview, merge = list.merge, dismissReview = list.dismissReview, closePull = list.closePull, reopenPull = list.reopenPull, changeReviewer = list.changeReviewer, config = { mode: 'local' }, localControl, authOptions, deploymentEnv = process.env } = {}) {
+export function createApp({ savedViews = createSavedViewsStore(), list = createGitHub(), updateTitle = list.updateTitle, convertToDraft = list.convertToDraft, markReadyForReview = list.markReadyForReview, merge = list.merge, dismissReview = list.dismissReview, closePull = list.closePull, reopenPull = list.reopenPull, changeReviewer = list.changeReviewer, addComment = list.addComment, config = { mode: 'local' }, localControl, authOptions, deploymentEnv = process.env } = {}) {
   const build = config.mode === 'local' ? localControl?.version : null;
   const checkUpdate = createUpdateCheck(build);
   const version = deploymentVersion(deploymentEnv, build);
@@ -102,13 +103,13 @@ export function createApp({ savedViews = createSavedViewsStore(), list = createG
         let size = 0;
         for await (const chunk of req) {
           size += chunk.length;
-          if (size > 8192) throw new ApiError('Request body is too large.', 413);
+          if (size > (mutation.maxBytes ?? 8192)) throw new ApiError('Request body is too large.', 413);
           chunks.push(chunk);
         }
         let input;
         try { input = JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { throw new ApiError('Invalid JSON body.', 400); }
         input = mutation.validate(input);
-        const actions = session ? session.list : { merge, convertToDraft, markReadyForReview, updateTitle, dismissReview, closePull, reopenPull, changeReviewer };
+        const actions = session ? session.list : { merge, convertToDraft, markReadyForReview, updateTitle, dismissReview, closePull, reopenPull, changeReviewer, addComment };
         return await handleMutation(input, mutation, actions, cache, subscribers, send);
       }
       if (req.method !== 'GET') return send(405, { error: 'Method not allowed.' });

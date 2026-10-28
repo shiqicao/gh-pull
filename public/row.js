@@ -25,7 +25,7 @@ function checks(pr) {
     : html`<span class=${`ci-indicator ${pr.checks.toLowerCase()}`} title=${label} aria-label=${label}>${content}</span>`;
 }
 
-function metadata(pr) {
+function metadata(pr, ctx) {
   const age = relativeTime(pr.updatedAt), diff = `${pr.additions} additions, ${pr.deletions} deletions`;
   const threads = pr.reviewThreadCounts?.total > 0 ? pr.reviewThreadCounts : null;
   const commentTitle = threads ? `${threads.resolved} of ${threads.total} review threads resolved; ${pr.commentCount ?? 0} total comments`
@@ -34,7 +34,7 @@ function metadata(pr) {
     <span class="pr-ci">${checks(pr)}</span>
     <span class="pr-review">${pr.review !== 'NONE' ? badge(reviewLabels[pr.review] ?? pr.review, pr.review, pr.review === 'REVIEW_BYPASS_AVAILABLE' ? 'GitHub requires reviews for this branch, but your account can bypass branch protections.' : reviewLabels[pr.review]) : html`<span class="empty-value" aria-label="No review status">—</span>`}</span>
     <span class="diff-counts" title=${diff} aria-label=${diff}><span class="additions">+${pr.additions}</span><span class="deletions">−${pr.deletions}</span></span>
-    <span class="comment-count" title=${commentTitle} aria-label=${commentTitle}>${threads ? `${threads.resolved}/${threads.total}` : Number.isInteger(pr.commentCount) && pr.commentCount > 0 ? html`${icon('comment', 12)}${pr.commentCount}` : '—'}</span>
+    ${ctx.commentControl(pr, threads ? `${threads.resolved}/${threads.total}` : Number.isInteger(pr.commentCount) && pr.commentCount > 0 ? html`${icon('comment', 12)}${pr.commentCount}` : html`${icon('comment', 12)}0`, commentTitle, Boolean(ctx.savingPull(pr.id)))}
     <time class="updated-time" ${ageTint(pr.updatedAt)} datetime=${pr.updatedAt} title=${`Updated ${new Date(pr.updatedAt).toLocaleString()}`} aria-label=${`Updated ${age}`}><span class="age-content">${age === 'just now' ? 'now' : age.replace(/ ago$/, '')}</span></time>
   </div>`;
 }
@@ -93,7 +93,7 @@ export function renderRow(node, gutter, ctx) {
           <div class="pr-extras">${dependency(node)}${createMergeAction(pr, hasUrl ? url : null)}${issuePopover.button(pr)}${pr.labels.map(label => badge(label, 'label'))}</div>
         </div>
       </div>
-      ${metadata(pr)}
+      ${metadata(pr, ctx)}
       ${formError(merges.get(pr.id)?.error, 'draft-error')}${formError(draftChanges.get(pr.id)?.error, 'draft-error')}
       ${titleEdits.has(pr.id) && own ? titleEditor(pr) : nothing}<span class="sr-only" role="status"></span></div>
       ${reviewerList(pr, ctx)}

@@ -57,6 +57,12 @@ export function validateClose(input) {
   return { id, comment: comment.trim() };
 }
 
+export function validateComment(input) {
+  const { id } = validateDraftUpdate(input);
+  if (typeof input.body !== 'string' || !input.body.trim() || input.body.length > 4000) throw new ApiError('Enter a comment (1–4,000 characters).', 400);
+  return { id, body: input.body.trim() };
+}
+
 export function validateReviewDismissal(input) {
   const { id } = validateDraftUpdate(input);
   if (typeof input.reviewId !== 'string' || !input.reviewId.trim() || input.reviewId.length > 200 ||
@@ -317,6 +323,23 @@ export function createGitHub(options = {}) {
   }
   list.closePull = input => setClosed(input, true);
   list.reopenPull = input => setClosed(input, false);
+
+  list.addComment = async input => {
+    const { id, body } = validateComment(input);
+    const data = await graphql(`query($id: ID!) { node(id: $id) { __typename ... on PullRequest { id viewerCanComment } } }`, { id });
+    if (data.node?.__typename !== 'PullRequest') throw new ApiError('Pull request not found.', 404);
+    if (!data.node.viewerCanComment) throw new ApiError('GitHub does not allow comments on this pull request.', 403);
+    // Return the confirmed mutation result; do not risk turning a failed follow-up read into a duplicate post.
+    const result = await graphql(`mutation($input: AddCommentInput!) {
+      addComment(input: $input) {
+        commentEdge { node { id url } }
+        subject { ... on PullRequest { id updatedAt totalCommentsCount } }
+      }
+    }`, { input: { subjectId: id, body } });
+    const posted = result.addComment;
+    if (!posted?.commentEdge?.node?.id || posted.subject?.id !== id) throw new ApiError('Comment could not be confirmed. Check GitHub before posting again.');
+    return { id, updatedAt: posted.subject.updatedAt, commentCount: posted.subject.totalCommentsCount, commentUrl: posted.commentEdge.node.url };
+  };
 
   list.dismissReview = async input => {
     const { id, reviewId, message } = validateReviewDismissal(input);

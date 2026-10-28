@@ -1100,3 +1100,11 @@ body:has(#dashboard[hidden]) .pr-column-header, body:has(#dashboard[hidden]) .re
 .reviewer-tooltip-status { display: flex; align-items: center; gap: 6px; color: var(--color-muted); margin-top: 3px; }
 .reviewer-tooltip-status i { width: 7px; height: 7px; border-radius: 50%; background: var(--reviewer-ring, var(--color-subtle)); }
 .reviewer-tooltip-hint { display: block; margin-top: 6px; font-size: 11px; color: var(--color-muted); }
+
+.pr-row button.comment-count { border: 0; border-radius: var(--radius-small); min-height: 24px; cursor: pointer; }
+.pr-row button.comment-count:hover { background: var(--color-neutral-bg); color: var(--color-accent); }
+.comment-popover { width: min(380px, calc(100vw - 16px)); }
+.comment-popover h2 { margin: 0 0 6px; font-size: 14px; }
+.comment-popover textarea { display: block; width: 100%; min-height: 120px; resize: vertical; }
+.comment-help { margin: 6px 0; font-size: 11px; color: var(--color-muted); }
+.comment-conversation { font-size: 12px; }

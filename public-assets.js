@@ -17,6 +17,7 @@ export const publicAssets = [
   ['review-counts.js', 'text/javascript'],
   ['reviewer-manager.js', 'text/javascript'],
   ['reviews.js', 'text/javascript'],
+  ['comments.js', 'text/javascript'],
   ['issues.js', 'text/javascript'],
   ['ui.js', 'text/javascript'],
   ['polling.js', 'text/javascript'],
