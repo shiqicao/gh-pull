@@ -32,7 +32,7 @@ test('manage own reviewers: lazy search, errors, re-request, team, remove, dismi
   await panel.getByRole('textbox').click();
   await panel.getByRole('heading', { name: 'Contributors and suggestions' }).waitFor();
   await panel.getByRole('button', { name: 'Request review from dana', exact: true }).waitFor();
-  const rowHue = await page.locator('[data-pr-id=P1] .reviewer .author').first().evaluate(el => el.style.getPropertyValue('--author-hue'));
+  const rowHue = await page.locator('[data-pr-id=P1] .reviewer[title^="bob:"] .author').first().evaluate(el => el.style.getPropertyValue('--author-hue'));
   const popupHue = await panel.locator('.reviewer-choice-name .author').first().evaluate(el => el.style.getPropertyValue('--author-hue'));
   assert.equal(popupHue, rowHue); assert.notEqual(popupHue, '');
   await panel.getByRole('button', { name: 'Re-request review from bob' }).click();

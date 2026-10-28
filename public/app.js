@@ -329,7 +329,7 @@ function titleEditor(pr) {
 // Row containers survive regrouping; Lit owns and diffs everything inside.
 const rowElements = new Map();
 const groupCache = new Map();
-const rowContext = () => ({ viewedStore, markViewed, viewerLogin, draftChanges, merges, titleEdits,
+const rowContext = () => ({ groupBy: $('group').value, viewedStore, markViewed, viewerLogin, draftChanges, merges, titleEdits,
   changeDraftStatus, render, focusTitleControl, createMergeAction, issuePopover, titleEditor, reviewControl: reviewControls.button, reviewerManager: reviewerManager.button, lifecycleControl: lifecycleControls.button, savingPull, nameColors });
 function renderEditorRow(id) {
   const row = rowElements.get(id);
@@ -353,7 +353,7 @@ function place(parent, child, before) {
 }
 
 function render() {
-  const { count, groups } = groupPulls(items, { group: $('group').value, sort: 'query' });
+  const { count, groups } = groupPulls(items, { group: $('group').value, sort: queryPresets(appliedQuery).sort === 'review' ? 'review' : 'query' });
   updateSummary();
   const focused = document.activeElement;
   const selection = typeof focused?.selectionStart === 'number' ? [focused.selectionStart, focused.selectionEnd, focused.selectionDirection] : null;
@@ -377,7 +377,7 @@ function render() {
     place(results, section, nextSection);
     nextSection = section.nextElementSibling;
     renderTemplate(html`${$('group').value === 'repo' ? repositoryLink(name)
-      : $('group').value === 'author' ? usernameLink(name) : labels[name] ?? name} (${prs.length})`, heading);
+      : $('group').value === 'author' ? usernameLink(name, 'group-author', nameColors[name.toLowerCase()] * 360 / NAME_COLOR_COUNT) : labels[name] ?? name} (${prs.length})`, heading);
     const graph = dependencyLanes(prs, { allItems: items, sort: queryPresets(appliedQuery).sort });
     list.classList.toggle('has-dependency-lanes', Boolean(graph.gutter));
     if (graph.gutter) list.style.setProperty('--lane-gutter', `${graph.gutter}px`);

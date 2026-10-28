@@ -77,3 +77,17 @@ test('age effects use daily color, weekly background and six-hour saturation and
   ]);
   assert.deepEqual(errors, []);
 });
+
+test('reviewer initials distinguish single-part names and identify team slugs', async t => {
+  const { page } = await fixture(t);
+  const initials = await page.evaluate(async () => {
+    const { render } = await import('/vendor/lit-html.js');
+    const { reviewerAvatar } = await import('/templates.js');
+    const host = document.body.appendChild(document.createElement('div'));
+    return [['alex', 'user'], ['maya', 'user'], ['org/core', 'team'], ['octo_cat', 'user'], ['dependabot[bot]', 'bot']].map(([name, kind]) => {
+      render(reviewerAvatar(name, 'APPROVED', 120, kind), host);
+      return host.textContent;
+    });
+  });
+  assert.deepEqual(initials, ['AL', 'MA', 'CO', 'OC', 'DE']);
+});

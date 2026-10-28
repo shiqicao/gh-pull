@@ -31,7 +31,7 @@ export function reviewersFor(pr, viewerLogin) {
   for (const review of pr.latestReviews?.nodes ?? []) {
     const name = review?.author?.login;
     if (name && name !== pr.author?.login && review.state !== 'PENDING') {
-      reviewers.set(name, { name, state: review.state, ...(review.id ? {
+      reviewers.set(name, { name, state: review.state, ...(review.author.__typename === 'Bot' ? { kind: 'bot' } : {}), ...(review.id ? {
         reviewId: review.id, reviewUrl: review.url,
         canRevoke: review.state === 'APPROVED' && pr.state === 'OPEN' &&
           name.toLowerCase() === viewerLogin?.toLowerCase() &&
@@ -43,7 +43,7 @@ export function reviewersFor(pr, viewerLogin) {
   for (const request of pr.reviewRequests?.nodes ?? []) {
     const reviewer = request?.requestedReviewer;
     const name = reviewer?.login ?? (reviewer?.slug ? `${reviewer.organization.login}/${reviewer.slug}` : reviewer?.name);
-    if (name) reviewers.set(name, { name, state: 'REQUESTED' });
+    if (name) reviewers.set(name, { name, state: 'REQUESTED', ...(reviewer.__typename === 'Bot' ? { kind: 'bot' } : reviewer.slug ? { kind: 'team' } : {}) });
   }
   return [...reviewers.values()].sort((a, b) => a.name.localeCompare(b.name));
 }

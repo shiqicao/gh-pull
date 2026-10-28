@@ -39,7 +39,7 @@ test('own approval menu confirms, preserves errors and updates dismissed state',
   await page.getByRole('alert').filter({ hasText: 'Repository rules' }).waitFor();
   assert.equal(await page.getByRole('textbox', { name: 'Reason', exact: true }).inputValue(), 'Needs another look');
   await submit.click();
-  await page.locator('.review-status.dismissed').waitFor();
+  await page.locator('.reviewer-dismissed').waitFor();
   assert.equal(await page.getByRole('button', { name: 'Your approval options' }).count(), 0);
   assert.equal(calls, 2); assert.deepEqual(errors, []);
 });

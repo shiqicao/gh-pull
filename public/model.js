@@ -72,10 +72,16 @@ export function assignNameColors(usernames, previous = {}) {
   return colors;
 }
 
+const reviewOrder = { CHANGES_REQUESTED: 0, REVIEW_REQUIRED: 1, REVIEW_BYPASS_AVAILABLE: 1, APPROVED: 2, NONE: 3 };
+function compareReviewStatus(a, b) {
+  return (reviewOrder[a.review] ?? 3) - (reviewOrder[b.review] ?? 3)
+    || (Date.parse(b.updatedAt) || 0) - (Date.parse(a.updatedAt) || 0);
+}
+
 export function groupPulls(items, { search = '', group = 'repo', sort = 'updated' } = {}) {
   const query = search.trim().toLowerCase();
   const selected = items.filter(pr => [pr.title, pr.repo, pr.author, `#${pr.number}`, ...pr.labels].join(' ').toLowerCase().includes(query));
-  if (sort !== 'query') selected.sort((a, b) => sort === 'oldest' ? a.createdAt.localeCompare(b.createdAt) :
+  if (sort !== 'query') selected.sort((a, b) => sort === 'review' ? compareReviewStatus(a, b) : sort === 'oldest' ? a.createdAt.localeCompare(b.createdAt) :
     sort === 'created' ? b.createdAt.localeCompare(a.createdAt) : b.updatedAt.localeCompare(a.updatedAt));
   const groups = new Map();
   for (const pr of selected) {
@@ -136,6 +142,7 @@ export function dependencyForest(items, { allItems = items, sort = 'query' } = {
     (Date.parse(b.updatedAt) || 0) > (Date.parse(a.updatedAt) || 0) ? b : a);
   const representatives = new Map(roots.map(node => [node, newest(node)]));
   roots.sort((a, b) => {
+    if (sort === 'review') return compareReviewStatus(a.pr, b.pr);
     const x = representatives.get(a), y = representatives.get(b);
     if (sort === 'updated') return (Date.parse(y.updatedAt) || 0) - (Date.parse(x.updatedAt) || 0);
     if (sort === 'created' || sort === 'oldest') return ((Date.parse(y.createdAt) || 0) - (Date.parse(x.createdAt) || 0)) * (sort === 'oldest' ? -1 : 1);

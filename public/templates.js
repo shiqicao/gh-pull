@@ -28,6 +28,17 @@ export function usernameLink(name, className = '', hue) {
     href=${`https://github.com/${encodeURIComponent(name)}`} target="_blank" rel="noopener noreferrer"
     aria-label=${`${name}'s GitHub profile (opens in a new tab)`}>${name}</a>`;
 }
+export function reviewerAvatar(name, state, hue, kind, interactive = true) {
+  const label = name.replace(/\[bot\]$/i, '').split('/').at(-1);
+  const parts = label.split(/[-_]+/).filter(Boolean);
+  const initials = (parts.length > 1 ? parts.map(part => part[0]).join('') : label).slice(0, 2).toUpperCase();
+  const square = kind === 'bot' || kind === 'team' || name.includes('/') || /\[bot\]$/i.test(name);
+  const classes = `author reviewer-avatar reviewer-${state.toLowerCase()}${square ? ' reviewer-square' : ''}`;
+  return interactive && /^[a-z\d](?:[a-z\d-]*[a-z\d])?$/i.test(name)
+    ? html`<a class=${classes} ${authorHue(hue)} href=${`https://github.com/${encodeURIComponent(name)}`} target="_blank" rel="noopener noreferrer" aria-label=${`${name}'s GitHub profile (opens in a new tab)`}>${initials}</a>`
+    : html`<span class=${classes} ${authorHue(hue)}>${initials}</span>`;
+}
+
 // Color strength halves daily, background weekly, saturation and brightness every six hours.
 // Recomputed on render alongside the relative age label. Use CSSOM for CSP.
 export const ageTint = directive(class extends Directive {

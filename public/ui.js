@@ -36,6 +36,9 @@ function svgElement(tag, attributes) {
 
 // The file-diff path is GitHub Octicons (MIT); see THIRD_PARTY_NOTICES.
 const paths = {
+  'check': 'm3 8 3 3 7-7',
+  'cross': 'm4 4 8 8M12 4l-8 8',
+  'dash': 'M4 8h8',
   'reviewers': 'M10 14v-1a4 4 0 0 0-8 0v1 M8.5 5a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0Z M11 2.5a2.5 2.5 0 0 1 0 5 M12 10a3.5 3.5 0 0 1 2 3v1',
   'chevron-down': 'm4 6 4 4 4-4',
   'copy': 'M5 3V2a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1h-1 M2 5h8a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z',

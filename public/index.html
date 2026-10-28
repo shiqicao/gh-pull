@@ -38,11 +38,13 @@
         <label class="field field-label">Show<select id="scope"><option value="authored">Created by me</option><option value="involved" selected>Involving me</option><option value="review">Review requested</option><option value="all">Anyone</option><option value="custom" disabled>Custom</option></select></label>
         <label class="field field-label">State<select id="state"><option value="open">Open (including drafts)</option><option value="all">All states</option><option value="merged">Merged</option><option value="closed">Closed (unmerged)</option><option value="custom" disabled>Custom</option></select></label>
         <label class="field field-label">Group by<select id="group"><option value="repo">Repository</option><option value="author">Author</option><option value="status">Status</option><option value="checks">Checks</option><option value="none">No grouping</option></select></label>
-        <label class="field field-label">Sort<select id="sort"><option value="updated">Recently updated</option><option value="created">Newest created</option><option value="oldest">Oldest created</option><option value="relevance">Best match</option><option value="custom" disabled>Custom</option></select></label>
+        <label class="field field-label">Sort<select id="sort"><option value="updated">Recently updated</option><option value="created">Newest created</option><option value="oldest">Oldest created</option><option value="review">Review status</option><option value="relevance">Best match</option><option value="custom" disabled>Custom</option></select></label>
       </form>
       <div id="saved-view-footer" hidden></div>
     </section>
     <p id="summary" hidden role="status" aria-live="polite">Loading pull requests…</p>
+    <div class="reviewer-legend" aria-label="Reviewer status legend"><span>Reviewer ring:</span><span><i class="legend-approved" aria-hidden="true"></i>approved</span><span><i class="legend-changes" aria-hidden="true"></i>changes requested</span><span><i class="legend-commented" aria-hidden="true"></i>commented</span><span><i class="legend-requested" aria-hidden="true"></i>awaiting</span><span class="legend-note">Hover initials for name · square = bot or team</span></div>
+    <div class="pr-column-header" aria-hidden="true"><span>State</span><span>PR</span><span>Title · branch</span><span>CI</span><span>Review</span><span>Diff</span><span>Threads</span><span>Upd.</span><span>Reviewers</span></div>
   </div>
   <main id="dashboard" hidden>
     <div id="error" role="alert" hidden></div>

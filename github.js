@@ -22,6 +22,7 @@ const fields = `viewerCanClose viewerCanReopen id number title url state isDraft
   reviewRequests(first: 100) {
     pageInfo { hasNextPage }
     nodes { requestedReviewer {
+      __typename
       ... on Actor { login }
       ... on Team { slug organization { login } }
       ... on EnterpriseTeam { name }
@@ -29,7 +30,7 @@ const fields = `viewerCanClose viewerCanReopen id number title url state isDraft
   }
   latestReviews(first: 100) {
     pageInfo { hasNextPage }
-    nodes { id url author { login } state }
+    nodes { id url author { login __typename } state }
   }
   labels(first: 10) { nodes { name } }
   commits(last: 1) { nodes { commit { statusCheckRollup {

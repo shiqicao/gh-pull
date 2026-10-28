@@ -113,7 +113,7 @@ test('reviewers combine submitted reviews and requests, with re-requests taking 
     { name: 'alice', state: 'REQUESTED' },
     { name: 'bob', state: 'CHANGES_REQUESTED' },
     { name: 'carol', state: 'REQUESTED' },
-    { name: 'org/core', state: 'REQUESTED' },
+    { name: 'org/core', state: 'REQUESTED', kind: 'team' },
   ]);
 });
 
@@ -510,4 +510,9 @@ test('closing issues include titles, cross-repository links, states, totals and 
     ]);
   }
   for (const call of calls) assert.match(call.query, /closingIssuesReferences\(first: 20\)/);
+});
+
+test('reviewer identities retain GitHub bot type for avatar shape', () => {
+  const result = reviewersFor({ author: { login: 'author' }, latestReviews: { nodes: [{ author: { login: 'robot', __typename: 'Bot' }, state: 'COMMENTED' }] }, reviewRequests: { nodes: [{ requestedReviewer: { login: 'other-bot', __typename: 'Bot' } }] } });
+  assert.deepEqual(result, [{ name: 'other-bot', state: 'REQUESTED', kind: 'bot' }, { name: 'robot', state: 'COMMENTED', kind: 'bot' }]);
 });
