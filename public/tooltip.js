@@ -20,7 +20,7 @@ function show(owner) {
   cancelTimer();
   if (!owner.element.isConnected) return;
   if (!popup) {
-    popup = createPopover({ id: 'reviewer-tooltip', className: 'reviewer-tooltip', role: 'tooltip', mode: 'manual', align: 'end' });
+    popup = createPopover({ id: 'row-tooltip', className: 'row-tooltip', role: 'tooltip', mode: 'manual', align: 'end' });
     popup.panel.addEventListener('pointerenter', cancelTimer);
     popup.panel.addEventListener('pointerleave', scheduleHide);
     document.addEventListener('keydown', event => { if (event.key === 'Escape') hide(); });
@@ -31,19 +31,19 @@ function show(owner) {
   described = owner.element.querySelector('a, button, [tabindex]') ?? owner.element;
   described.setAttribute('aria-describedby', popup.panel.id);
   render(owner.content, popup.panel);
-  popup.attach(owner.element);
+  popup.attach(owner.element, { align: owner.align });
   if (!popup.isOpen) popup.panel.showPopover();
   else popup.reposition();
 }
 export const tooltip = directive(class extends AsyncDirective {
   render() { return nothing; }
-  update(part, [content]) {
-    this.content = content;
+  update(part, [content, { align = 'end' } = {}]) {
+    this.content = content; this.align = align;
     if (!this.element) {
       this.element = part.element;
       this.element.addEventListener('pointerenter', event => {
         if (event.pointerType === 'touch') return;
-        cancelTimer(); timer = setTimeout(() => show(this), 180);
+        cancelTimer(); timer = setTimeout(() => show(this), 500);
       });
       this.element.addEventListener('pointerleave', scheduleHide);
       this.element.addEventListener('focusin', () => show(this));
