@@ -585,6 +585,13 @@ button, .pr-group > summary {
   background: var(--color-neutral-bg);
 }
 
+.updated-time {
+  background: color-mix(in srgb, var(--color-age-bg) var(--age-background, 0%), var(--color-neutral-bg));
+  color: color-mix(in srgb, var(--color-age-text) var(--age-tint, 0%), var(--color-age-muted-text));
+}
+
+.age-content { display: inline-flex; align-items: center; gap: 4px; filter: saturate(var(--age-saturation, 0)) brightness(var(--age-brightness, 0.7)); }
+
 .updated-time, .comment-count {
   white-space: nowrap;
 }

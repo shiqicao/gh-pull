@@ -1,4 +1,4 @@
-import { html, nothing, guard, directive, AsyncDirective } from './vendor/lit-html.js';
+import { html, nothing, guard, directive, Directive, AsyncDirective } from './vendor/lit-html.js';
 import { icon } from './ui.js';
 
 export const iconTemplate = (name, size = 16) => guard([name, size], () => icon(name, size));
@@ -28,6 +28,26 @@ export function usernameLink(name, className = '', hue) {
     href=${`https://github.com/${encodeURIComponent(name)}`} target="_blank" rel="noopener noreferrer"
     aria-label=${`${name}'s GitHub profile (opens in a new tab)`}>${name}</a>`;
 }
+// Color strength halves daily, background weekly, saturation and brightness every six hours.
+// Recomputed on render alongside the relative age label. Use CSSOM for CSP.
+export const ageTint = directive(class extends Directive {
+  render() { return nothing; }
+  update(part, [value, now = Date.now()]) {
+    const days = Math.max(0, (now - new Date(value).getTime()) / 86_400_000);
+    const decay = Number.isFinite(days) ? 2 ** (-days / 0.25) : 0;
+    const strength = Number.isFinite(days) ? 100 * 2 ** (-days) : 0;
+    part.element.style.setProperty('--age-tint', `${strength.toFixed(3)}%`);
+    const background = Number.isFinite(days) ? 100 * 2 ** (-days / 7) : 0;
+    part.element.style.setProperty('--age-background', `${background.toFixed(3)}%`);
+    const saturation = decay;
+    part.element.style.setProperty('--age-saturation', saturation.toFixed(4));
+    const brightness = 0.7 + 0.3 * decay;
+    part.element.style.setProperty('--age-brightness', brightness.toFixed(4));
+    part.element.style.setProperty('--age-brightness-percent', `${(100 * brightness).toFixed(3)}%`);
+    return nothing;
+  }
+});
+
 export const repositoryLink = repo => html`<a class="repo-link" href=${`https://github.com/${repo.split('/').map(encodeURIComponent).join('/')}`}
   target="_blank" rel="noopener noreferrer" aria-label=${`${repo} repository (opens in a new tab)`}>${repo}</a>`;
 
