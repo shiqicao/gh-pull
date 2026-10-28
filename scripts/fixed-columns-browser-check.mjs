@@ -15,7 +15,7 @@ test('fixed columns align, preserve reviewer identities and statuses, and adapt 
     const lefts = await page.locator(`.pr-row ${selector}`).evaluateAll(nodes => nodes.map(el => el.getBoundingClientRect().left));
     assert.equal(lefts[0], lefts[1], selector);
   }
-  assert.deepEqual(await page.locator('.pr-row').first().locator('.reviewer').evaluateAll(nodes => nodes.map(el => el.getAttribute('title').split(':')[0])), ['dana', 'carol', 'bot', 'bob']);
+  assert.deepEqual(await page.locator('.pr-row').first().locator('.reviewer').evaluateAll(nodes => nodes.map(el => el.getAttribute('aria-label').split(':')[0])), ['dana', 'carol', 'bot', 'bob']);
   assert.equal(await page.locator('.pr-row').first().locator('.reviewer-square').count(), 1);
   await page.waitForFunction(() => document.querySelector('.comment-count').textContent === '2/3');
   assert.equal(await page.locator('.pr-row').nth(1).locator('.pr-title').getAttribute('title'), 'A much longer title that must not push the other columns out of alignment '.repeat(3));

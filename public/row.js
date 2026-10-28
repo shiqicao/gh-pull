@@ -1,7 +1,8 @@
+import { tooltip } from './tooltip.js';
 import { iconButton, formError } from './controls.js';
 import { html, nothing, repeat } from './vendor/lit-html.js';
 import { labels, reviewLabels, reviewStates, relativeTime, NAME_COLOR_COUNT, isOwn } from './model.js';
-import { iconTemplate as icon, badge, githubUrl, usernameLink, repositoryLink, ageTint, copyFeedback, reviewerAvatar } from './templates.js';
+import { iconTemplate as icon, badge, githubUrl, usernameLink, repositoryLink, ageTint, copyFeedback, reviewerAvatar, authorHue } from './templates.js';
 
 function dependency(node) {
   const pr = node.mergedParent ?? node.externalParent ?? (node.lane > 3 ? node.parent?.pr : null);
@@ -48,7 +49,7 @@ function reviewerList(pr, ctx) {
     <div class="reviewer-avatars">${repeat(sorted, r => r.name, reviewer => {
       const description = reviewStates[reviewer.state]?.[0] ?? reviewer.state;
       const avatar = reviewerAvatar(reviewer.name, reviewer.state, nameColors[reviewer.name.toLowerCase()] * 360 / NAME_COLOR_COUNT, reviewer.kind, !reviewer.canRevoke);
-      return html`<span class="reviewer" title=${`${reviewer.name}: ${description}`} aria-label=${`${reviewer.name}: ${description}`}>${reviewer.canRevoke ? reviewControl(pr, reviewer, avatar) : avatar}</span>`;
+      return html`<span class="reviewer" aria-label=${`${reviewer.name}: ${description}`} ${tooltip(html`<strong class="reviewer-tooltip-name group-author" ${authorHue(nameColors[reviewer.name.toLowerCase()] * 360 / NAME_COLOR_COUNT)}>${reviewer.name}</strong><span class=${`reviewer-tooltip-status reviewer-${reviewer.state.toLowerCase()}`}><i aria-hidden="true"></i>${description}</span>${reviewer.canRevoke ? html`<span class="reviewer-tooltip-hint">Click for approval options</span>` : nothing}`)}>${reviewer.canRevoke ? reviewControl(pr, reviewer, avatar) : avatar}</span>`;
     })}</div>
     ${pr.reviewersTruncated && githubUrl(pr.url) !== nothing ? html`<a class="reviewers-more" href=${githubUrl(pr.url)} target="_blank" rel="noopener noreferrer" data-view-pr title="View all reviewers on GitHub" aria-label="View all reviewers on GitHub">All ↗</a>` : nothing}
     ${manage ? reviewerManager(pr, Boolean(savingPull(pr.id))) : nothing}

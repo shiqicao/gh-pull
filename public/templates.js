@@ -13,7 +13,7 @@ export function githubUrl(value, suffix = '') {
 }
 // Use CSSOM even on the first render; styleMap initially writes a style
 // attribute, which is still blocked by a strict style-src-attr policy.
-const authorHue = directive(class extends AsyncDirective {
+export const authorHue = directive(class extends AsyncDirective {
   render() { return nothing; }
   update(part, [hue]) {
     if (hue === undefined) part.element.style.removeProperty('--author-hue');
@@ -36,7 +36,7 @@ export function reviewerAvatar(name, state, hue, kind, interactive = true) {
   const classes = `author reviewer-avatar reviewer-${state.toLowerCase()}${square ? ' reviewer-square' : ''}`;
   return interactive && /^[a-z\d](?:[a-z\d-]*[a-z\d])?$/i.test(name)
     ? html`<a class=${classes} ${authorHue(hue)} href=${`https://github.com/${encodeURIComponent(name)}`} target="_blank" rel="noopener noreferrer" aria-label=${`${name}'s GitHub profile (opens in a new tab)`}>${initials}</a>`
-    : html`<span class=${classes} ${authorHue(hue)}>${initials}</span>`;
+    : html`<span class=${classes} ${authorHue(hue)} tabindex=${interactive ? '0' : nothing} aria-label=${interactive ? name : nothing}>${initials}</span>`;
 }
 
 // Color strength halves daily, background weekly, saturation and brightness every six hours.
