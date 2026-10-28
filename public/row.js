@@ -81,7 +81,7 @@ export function renderRow(node, gutter, ctx) {
           ${hasUrl ? iconButton({ icon: 'copy', className: 'copy-link', title: 'Copy PR link', label: `Copy link to ${pr.title}`, copy: { text: url, success: 'PR link copied' } }) : nothing}
         </div>
         <div class="pr-title-cell">
-          <div class="pr-title-heading"><a class="pr-title" href=${url} target="_blank" rel="noopener noreferrer" data-view-pr title=${pr.title} aria-label=${`${hasUpdates ? 'New updates: ' : ''}${pr.title} (opens in a new tab)`}>${pr.title}</a>
+          <div class="pr-title-heading"><a class="pr-title" href=${url} target="_blank" rel="noopener noreferrer" data-view-pr ${tooltip(html`<span class="title-tooltip-text">${pr.title}</span>`, { align: 'start' })} aria-label=${`${hasUpdates ? 'New updates: ' : ''}${pr.title} (opens in a new tab)`}>${pr.title}</a>
             ${own ? iconButton({ icon: 'edit', className: 'edit-title', title: 'Edit PR title', label: `Edit title of ${pr.title}`, disabled: Boolean(titleEdits.get(pr.id)?.saving || merges.get(pr.id)?.saving), onClick: edit }) : nothing}
           </div>
           <div class="pr-branch-line">
