@@ -9,7 +9,6 @@ import { browserFixture } from './browser-fixture.mjs';
 
 async function setup(t, seed = true) {
   const dir = await mkdtemp(join(tmpdir(), 'saved-views-browser-'));
-  t.after(() => rm(dir, { recursive: true, force: true }));
   const store = createSavedViewsStore(join(dir, 'views.json'), () => '2026-01-01T00:00:00.000Z');
   if (seed) {
     await store.change('alice', { action: 'save', name: 'My work', query: 'is:open author:@me', group: 'author' });
@@ -18,10 +17,22 @@ async function setup(t, seed = true) {
   if (seed === 10) for (const [index, name] of ['CI', 'Team backend', 'Waiting on review', 'Documentation', 'Release 2.4', 'Dependabot', 'Stale pull requests', 'A long saved view name that needs to fit on a narrow mobile screen'].entries()) {
     await store.change('alice', { action: 'save', name, query: `is:open label:fixture-${index}`, group: 'repo' });
   }
+  const pendingWrites = new Set(), change = store.change.bind(store);
+  store.change = async (...args) => {
+    const pending = change(...args);
+    pendingWrites.add(pending);
+    try { return await pending; } finally { pendingWrites.delete(pending); }
+  };
   const queries = [];
   const list = async ({ query }) => { queries.push(query); return { viewer: 'alice', items: [], total: 0, pageInfo: { hasNextPage: false } }; };
   list.viewer = async () => 'alice';
   const fixture = await browserFixture(t, { list, savedViews: store });
+  // Fixture hooks stop the server and browser before deleting the store.
+  // A request may have disconnected while its filesystem write is still pending.
+  t.after(async () => {
+    await Promise.allSettled([...pendingWrites]);
+    await rm(dir, { recursive: true, force: true });
+  });
   const { page, origin } = fixture;
   await page.goto(`${origin}/?q=is%3Aopen%20author%3A%40me&group=author`);
   await page.waitForFunction(() => { const button = document.querySelector('#save-view-new'); return button && !button.disabled; });

@@ -13,7 +13,7 @@
     "dev": "node --watch server.js",
     "test": "node --test",
     "check": "node scripts/check.mjs",
-    "test:browser": "node --test scripts/*browser-check.mjs",
+    "test:browser": "node --test --test-timeout=60000 --test-reporter=tap scripts/*browser-check.mjs",
     "build:vendor": "node scripts/build-vendor.mjs",
     "cli": "node cli/main.js",
     "build:extension": "node scripts/build-extension.mjs",

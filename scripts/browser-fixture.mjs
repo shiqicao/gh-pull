@@ -5,9 +5,14 @@ import { createApp } from '../server.js';
 export async function browserFixture(t, options) {
   const server = createApp(options);
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
-  t.after(() => new Promise(resolve => { server.close(resolve); server.closeAllConnections(); }));
-  const browser = await chromium.launch({ executablePath: process.env.CHROME_BIN || undefined });
-  t.after(() => browser.close());
+  let browser;
+  t.after(async () => {
+    // Stop EventSource reconnects before closing the server, including failed tests.
+    try { await browser?.close(); } finally {
+      await new Promise(resolve => { server.close(resolve); server.closeAllConnections(); });
+    }
+  });
+  browser = await chromium.launch({ executablePath: process.env.CHROME_BIN || undefined });
   const context = await browser.newContext();
   const page = await context.newPage();
   page.setDefaultTimeout(5000);
