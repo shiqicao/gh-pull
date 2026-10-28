@@ -20,8 +20,8 @@ function checks(pr) {
   const label = `${labels[pr.checks] ?? pr.checks}${pending ? ` · ${pr.checkCounts.passed}/${pr.checkCounts.total}` : ''}`;
   const symbol = { SUCCESS: 'check', FAILURE: 'cross', PENDING: 'clock' }[pr.checks] ?? 'dash';
   const content = html`${icon(symbol, 16)}<span class="sr-only">${label}</span>`;
-  return pr.checks === 'FAILURE' && githubUrl(pr.url) !== nothing
-    ? html`<a class="ci-indicator failure" href=${githubUrl(pr.url, 'checks')} target="_blank" rel="noopener noreferrer" data-view-pr title="View checks (opens in a new tab)" aria-label=${`Checks failed: view checks for ${pr.title} (opens in a new tab)`}>${content}</a>`
+  return ['SUCCESS', 'FAILURE'].includes(pr.checks) && githubUrl(pr.url) !== nothing
+    ? html`<a class=${`ci-indicator ${pr.checks.toLowerCase()}`} href=${githubUrl(pr.url, 'checks')} target="_blank" rel="noopener noreferrer" data-view-pr title="View checks (opens in a new tab)" aria-label=${`${label}: view checks for ${pr.title} (opens in a new tab)`}>${content}</a>`
     : html`<span class=${`ci-indicator ${pr.checks.toLowerCase()}`} title=${label} aria-label=${label}>${content}</span>`;
 }
 

@@ -10,6 +10,9 @@ test('fixed columns align, preserve reviewer identities and statuses, and adapt 
   const { page, origin, errors } = await browserFixture(t, { list });
   await page.setViewportSize({ width: 1280, height: 1000 });
   await page.goto(origin); await page.locator('.pr-row').first().waitFor();
+  const passedChecks = page.locator('.pr-row').first().getByRole('link', { name: 'Checks passed: view checks for Short title (opens in a new tab)' });
+  assert.equal(await passedChecks.getAttribute('href'), 'https://github.com/example/dashboard/pull/1/checks');
+  assert.equal(await passedChecks.getAttribute('target'), '_blank');
   const selectors = ['.pr-identity', '.pr-title-cell', '.pr-ci', '.pr-review', '.diff-counts', '.comment-count', '.updated-time', '.reviewers'];
   for (const selector of selectors) {
     const lefts = await page.locator(`.pr-row ${selector}`).evaluateAll(nodes => nodes.map(el => el.getBoundingClientRect().left));
