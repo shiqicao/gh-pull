@@ -41,7 +41,8 @@
   --color-merged-bg: light-dark(#fbefff, #352044);
   --color-merged-text: light-dark(#8250df, #d2a8ff);
   --color-age-bg: light-dark(#ccfbf1, #123b36);
-  --color-age-muted-text: light-dark(#30363d, #a7b1bd);
+  /* Compensate for the 0.7 brightness floor so old dark-theme labels stay readable. */
+  --color-age-muted-text: light-dark(#30363d, #f4f6f8);
   --color-age-text: light-dark(#0b4642, #5eead4);
   --color-info-bg: light-dark(#ddf4ff, #152e49);
   --color-invalid: light-dark(#cf222e, #f85149);
