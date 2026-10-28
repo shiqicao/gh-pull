@@ -86,7 +86,7 @@ test('review badges distinguish bypass permission from required reviews', async 
     await open();
     const badge = page.locator(`.badge.${review.toLowerCase()}`);
     assert.equal(await badge.textContent(), review === 'REVIEW_REQUIRED' ? 'Review required' : 'Review bypass available');
-    if (review === 'REVIEW_BYPASS_AVAILABLE') assert.match(await badge.getAttribute('title'), /your account can bypass/);
+    if (review === 'REVIEW_BYPASS_AVAILABLE') assert.match(await badge.getAttribute('data-tooltip'), /your account can bypass/);
     assert.equal(await page.locator('.merge-action').count(), 0);
   }
 });
@@ -136,12 +136,12 @@ test('clipboard, filters, background refresh, icons and responsive metadata styl
   for (const [selector, text] of [['.copy-link', 'https://github.com/example/dashboard/pull/1'], ['.branch-copy', 'feature/keyboard']]) {
     await page.click(selector);
     await page.waitForFunction(expected => window.copiedText === expected, text);
-    assert.match(await page.locator(selector).getAttribute('title'), /copied/);
+    assert.match(await page.locator(selector).getAttribute('data-tooltip'), /copied/);
     await page.clock.fastForward(2100);
     assert.equal(await page.locator(`${selector} svg`).count(), 1);
     await page.evaluate(() => { window.failClipboard = true; });
     await page.click(selector);
-    await page.waitForFunction(s => document.querySelector(s).title.startsWith('Could not copy'), selector);
+    await page.waitForFunction(s => document.querySelector(s).dataset.tooltip.startsWith('Could not copy'), selector);
     await page.clock.fastForward(2100);
     assert.equal(await page.locator(`${selector} svg`).count(), 1);
     await page.evaluate(() => { window.failClipboard = false; });

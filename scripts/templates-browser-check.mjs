@@ -37,7 +37,7 @@ test('clipboard feedback keeps Lit icon expressions mounted and updateable', asy
     const { copyFeedback, iconTemplate } = await import('/templates.js');
     Object.defineProperty(navigator, 'clipboard', { value: { writeText: async () => {} } });
     const host = document.body.appendChild(document.createElement('div'));
-    window.draw = name => render(html`<div class="pr-row"><button title="Copy" ${copyFeedback('text', 'Copied', 'Copy')}>
+    window.draw = name => render(html`<div class="pr-row"><button data-tooltip="Copy" ${copyFeedback('text', 'Copied', 'Copy')}>
       <span class="copy-symbol">${iconTemplate(name)}</span><span class="copy-feedback-symbol" hidden></span>
       </button><span role="status"></span></div>`, host);
     window.draw('copy');
@@ -52,7 +52,7 @@ test('clipboard feedback keeps Lit icon expressions mounted and updateable', asy
   await page.clock.fastForward(2000);
   assert.equal(await page.locator('.copy-symbol').evaluate(el => el.hidden), false);
   assert.equal(await page.locator('.copy-feedback-symbol').evaluate(el => el.hidden), true);
-  assert.equal(await page.locator('button').getAttribute('title'), 'Copy');
+  assert.equal(await page.locator('button').getAttribute('data-tooltip'), 'Copy');
   assert.deepEqual(errors, []);
 });
 

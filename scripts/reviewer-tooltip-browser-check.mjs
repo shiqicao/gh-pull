@@ -53,3 +53,24 @@ test('title and reviewer hover tooltips share a half-second delay', async t => {
   }
   assert.equal(await page.locator('.pr-title').getAttribute('title'), null);
 });
+
+test('plain hints share styled tooltips, update dynamically, and dismiss when removed', async t => {
+  const pr = { id: 'hints', number: 3, title: 'Shared hints', url: 'https://github.com/example/demo/pull/3', repo: 'example/demo', author: 'bob', status: 'OPEN', checks: 'SUCCESS', review: 'NONE', branch: 'feature/long-branch', labels: [], additions: 20, deletions: 4, createdAt: '2026-01-01', updatedAt: '2026-01-01', reviewers: [] };
+  const { page, origin, errors } = await browserFixture(t, { list: async () => ({ viewer: 'bob', items: [pr], total: 1, pageInfo: { hasNextPage: false } }) });
+  await page.goto(origin);
+  const tip = page.getByRole('tooltip');
+  for (const selector of ['.ci-indicator', '.diff-counts', '.updated-time', '.branch-copy', '.copy-link', '#refresh']) {
+    const target = page.locator(selector).first();
+    await target.hover(); await tip.waitFor();
+    assert.equal(await tip.textContent(), await target.getAttribute('data-tooltip'));
+    assert.equal(await target.getAttribute('title'), null);
+    await page.keyboard.press('Escape');
+  }
+  await page.locator('.branch-copy').focus(); await tip.waitFor();
+  await page.locator('.branch-copy').evaluate(el => { el.dataset.tooltip = 'Changed hint'; });
+  await page.waitForFunction(() => document.querySelector('#row-tooltip').textContent === 'Changed hint');
+  await page.locator('.branch-copy').evaluate(el => el.remove());
+  await tip.waitFor({ state: 'hidden' });
+  assert.equal(await page.locator('[title]').count(), 0);
+  assert.deepEqual(errors, []);
+});
