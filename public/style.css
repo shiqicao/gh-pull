@@ -1109,3 +1109,5 @@ body:has(#dashboard[hidden]) .pr-column-header, body:has(#dashboard[hidden]) .re
 .comment-help { margin: 6px 0; font-size: 11px; color: var(--color-muted); }
 .comment-conversation { font-size: 12px; }
 .title-tooltip-text { display: block; max-width: 360px; white-space: normal; overflow-wrap: anywhere; }
+
+.comment-draft-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--color-accent); flex-shrink: 0; margin-left: 3px; }

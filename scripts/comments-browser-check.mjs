@@ -24,6 +24,8 @@ test('quick comments preserve drafts, post explicitly, keep thread counts and re
   assert.equal(await post.isDisabled(), true);
   await field.fill('**Thanks!**'); assert.equal(calls, 0);
   await page.keyboard.press('Escape'); await dialog.waitFor({ state: 'hidden' });
+  await trigger.locator('.comment-draft-dot').waitFor();
+  assert.match(await trigger.getAttribute('data-tooltip'), /^Continue draft comment/);
   await trigger.click(); assert.equal(await field.inputValue(), '**Thanks!**');
   await post.click(); await dialog.getByRole('alert').waitFor();
   assert.equal(await field.inputValue(), '**Thanks!**');
@@ -33,10 +35,12 @@ test('quick comments preserve drafts, post explicitly, keep thread counts and re
   await field.press('Control+Enter'); assert.equal(calls, 2);
   release(); await dialog.waitFor({ state: 'hidden' });
   assert.equal(await trigger.textContent(), '1/2');
+  assert.equal(await trigger.locator('.comment-draft-dot').count(), 0);
+  assert.match(await trigger.getAttribute('data-tooltip'), /^Add a comment/);
   assert.match(await trigger.getAttribute('data-tooltip'), /4 total comments/);
   await trigger.click(); assert.equal(await field.inputValue(), '');
   await page.setViewportSize({ width: 320, height: 700 });
   const box = await dialog.boundingBox(); assert.ok(box.x >= 0 && box.x + box.width <= 320);
-  await page.screenshot({ path: '/tmp/gh-pull-quick-comment-preview.png' });
+  if (process.env.GH_PULL_SCREENSHOTS) await page.screenshot({ path: '/tmp/gh-pull-quick-comment-preview.png' });
   assert.deepEqual(errors, []);
 });

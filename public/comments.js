@@ -1,4 +1,4 @@
-import { html, render } from './vendor/lit-html.js';
+import { html, render, nothing } from './vendor/lit-html.js';
 import { actionButton, formField, formError, formActions } from './controls.js';
 import { githubUrl } from './templates.js';
 import { createPopover } from './popover.js';
@@ -41,7 +41,9 @@ export function createCommentControls({ changes, submit, onClose }) {
     reconcile(ids) { if (active && !ids.has(active.id) && !changes.get(active.id)?.saving) popover.close(); },
     button(pr, count, description, busy) {
       if (active?.id === pr.id) { active = pr; content(); }
-      return actionButton({ className: 'comment-count', content: count, title: `${description} · Add a comment`, label: `Quick comment on ${pr.title}. ${description}`,
+      const hasDraft = Boolean(changes.get(pr.id)?.value.trim());
+      const action = hasDraft ? 'Continue draft comment' : 'Add a comment';
+      return actionButton({ className: 'comment-count', content: html`${count}${hasDraft ? html`<span class="comment-draft-dot" aria-hidden="true"></span>` : nothing}`, title: `${action} · ${description}`, label: `Quick comment on ${pr.title}. ${action}. ${description}`,
         popover: popover.panel, expanded: popover.pullId === pr.id, disabled: busy || [...changes.values()].some(draft => draft.saving),
         onClick(event) {
           if (active && active.id !== pr.id) {
