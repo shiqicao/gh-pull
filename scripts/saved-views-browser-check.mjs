@@ -348,3 +348,49 @@ test('saved views and their menus/forms pass accessibility checks in both themes
     await page.keyboard.press('Escape');
   }
 });
+
+test('root launches restore the applied query and grouping without saving typed edits', async t => {
+  const { page, origin, editor, errors } = await setup(t);
+  await page.getByRole('button', { name: 'To review', exact: true }).click();
+  await page.locator('#group').selectOption('author');
+  await editor.fill('is:closed author:unsubmitted');
+  // A fresh tab at the root matches a new gh pull launch.
+  const next = await page.context().newPage();
+  await next.route('**/*', route => new URL(route.request().url()).origin === origin ? route.continue() : route.abort());
+  await next.goto(origin);
+  await next.waitForFunction(() => document.querySelector('.cm-content')?.textContent === 'is:open review-requested:@me');
+  assert.equal(await next.locator('#group').inputValue(), 'author');
+  assert.equal(new URL(next.url()).searchParams.get('q'), 'is:open review-requested:@me');
+  // Matching saved views are selected again, without an implicit save or usage increment.
+  await page.locator('#group').selectOption('repo');
+  await next.goto(origin);
+  await next.locator('.saved-view-pill[aria-pressed="true"]').waitFor();
+  assert.equal((await next.locator('.saved-view-pill[aria-pressed="true"]').textContent()).trim(), 'To review');
+  await next.goto(origin + '/?q=is%3Aclosed&group=author');
+  await next.waitForFunction(() => document.querySelector('.cm-content')?.textContent === 'is:closed');
+  assert.equal(await next.locator('#group').inputValue(), 'author');
+  await next.goto(origin);
+  await next.waitForFunction(() => document.querySelector('.cm-content')?.textContent === 'is:closed');
+  await next.goto(origin + '/?scope=review&state=closed');
+  await next.waitForFunction(() => document.querySelector('.cm-content')?.textContent.includes('is:closed'));
+  assert.match(await next.locator('.cm-content').textContent(), /review-requested:@me/);
+  assert.deepEqual(errors, []);
+});
+
+test('invalid or unavailable remembered-query storage does not block launch', async t => {
+  const { page, origin } = await setup(t);
+  for (const value of ['{', JSON.stringify({ query: 'repo:', group: 'repo' }), JSON.stringify({ query: 'is:closed', group: 'invalid' })]) {
+    await page.evaluate(value => localStorage.setItem('gh-pull:last-query', value), value);
+    await page.goto(origin);
+    await page.locator('.cm-content').waitFor();
+    assert.match(await page.locator('.cm-content').textContent(), /is:open/);
+  }
+  await page.addInitScript(() => {
+    Storage.prototype.getItem = () => { throw new Error('Storage disabled'); };
+    Storage.prototype.setItem = () => { throw new Error('Storage disabled'); };
+  });
+  await page.goto(origin);
+  await page.locator('.cm-content').fill('is:closed');
+  await page.locator('#query-submit').click();
+  await page.waitForFunction(() => new URL(location.href).searchParams.get('q') === 'is:closed');
+});

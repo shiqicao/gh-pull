@@ -24,7 +24,8 @@ test('lifecycle menu confirms close, preserves errors, updates children and reop
   await row.locator('.lifecycle-action').click();
   await page.getByRole('button', { name: 'Reopen pull request', exact: true }).click();
   await row.locator('.lifecycle-action.open').waitFor();
-  await page.goto(origin);
+  // Explicitly request open PRs; a bare launch now remembers the all-state query.
+  await page.goto(`${origin}/?state=open`);
   await row.locator('.lifecycle-action').click();
   await page.getByRole('button', { name: 'Close pull request…', exact: true }).click();
   await page.getByRole('button', { name: 'Close pull request', exact: true }).click();

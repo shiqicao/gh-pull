@@ -533,12 +533,28 @@ async function load({ append = false, refresh = false, background = false } = {}
   }
 }
 
+const lastQueryKey = 'gh-pull:last-query';
+function restoreFilters() {
+  if (authMode !== 'local' || ['q', 'group', 'scope', 'state', 'sort', 'search'].some(key => params.has(key))) return;
+  try {
+    const stored = JSON.parse(localStorage.getItem(lastQueryKey));
+    if (!stored || queryError(stored.query) || ![...$('group').options].some(option => option.value === stored.group)) return;
+    appliedQuery = normalizeQuery(stored.query);
+    $('group').value = stored.group;
+  } catch { /* Missing or unavailable storage leaves the default query usable. */ }
+}
 function saveFilters() {
   const query = new URLSearchParams({ q: appliedQuery, group: $('group').value });
   history.replaceState(null, '', `?${query}`);
+  if (authMode === 'local' && !queryError(appliedQuery)) {
+    try { localStorage.setItem(lastQueryKey, JSON.stringify({ query: appliedQuery, group: $('group').value })); }
+    catch { /* Searching still works when browser storage is unavailable. */ }
+  }
 }
 async function initializeQueryEditor() {
   if (queryEditor) return;
+  restoreFilters();
+  if (authMode === 'local' && !queryError(appliedQuery)) saveFilters();
   const { createQueryEditor } = await import('./query-editor.js');
   queryEditor = createQueryEditor({
     parent: $('query-editor'), value: appliedQuery, getItems: () => items,
