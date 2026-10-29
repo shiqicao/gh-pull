@@ -2,31 +2,38 @@ import { directive, AsyncDirective, nothing, render } from './vendor/lit-html.js
 import { createPopover } from './popover.js';
 
 // One non-interactive tooltip, shared across rows and positioned like other popovers.
-let popup, active, described, timer;
-function cancelTimer() { clearTimeout(timer); }
+let popup, active, described, hoverTimer, focusTimer, hideTimer;
+function cancelHide() { clearTimeout(hideTimer); }
+function cancelTimers() { clearTimeout(hoverTimer); clearTimeout(focusTimer); cancelHide(); }
+function showOnHover(owner) {
+  clearTimeout(hoverTimer); cancelHide();
+  hoverTimer = setTimeout(() => {
+    if (owner.element.matches(':hover') && !active?.element.contains(document.activeElement)) show(owner);
+  }, 500);
+}
 function hide() {
-  cancelTimer();
+  cancelTimers();
   described?.removeAttribute('aria-describedby');
   described = null; active = null; popup?.close();
 }
 function scheduleHide() {
-  cancelTimer();
-  timer = setTimeout(() => {
+  clearTimeout(hoverTimer); cancelHide();
+  hideTimer = setTimeout(() => {
     if (active?.element.contains(document.activeElement) || active?.element.matches(':hover') || popup?.panel.matches(':hover')) return;
     hide();
   }, 120);
 }
 function showOnFocus(owner) {
-  cancelTimer();
+  clearTimeout(hoverTimer); clearTimeout(focusTimer); cancelHide();
   // Native popovers can restore focus during their own show/hide operation.
-  timer = setTimeout(() => { if (owner.element.contains(document.activeElement)) show(owner); }, 0);
+  focusTimer = setTimeout(() => { if (owner.element.contains(document.activeElement)) show(owner); }, 0);
 }
 function show(owner) {
-  cancelTimer();
+  cancelTimers();
   if (!owner.element.isConnected) return;
   if (!popup) {
     popup = createPopover({ id: 'row-tooltip', className: 'row-tooltip', role: 'tooltip', mode: 'manual', align: 'end', maxWidth: 384 });
-    popup.panel.addEventListener('pointerenter', cancelTimer);
+    popup.panel.addEventListener('pointerenter', cancelHide);
     popup.panel.addEventListener('pointerleave', scheduleHide);
     document.addEventListener('keydown', event => { if (event.key === 'Escape') hide(); });
     window.addEventListener('blur', hide);
@@ -49,7 +56,7 @@ export const tooltip = directive(class extends AsyncDirective {
       this.element = part.element;
       this.element.addEventListener('pointerenter', event => {
         if (event.pointerType === 'touch') return;
-        cancelTimer(); timer = setTimeout(() => show(this), 500);
+        showOnHover(this);
       });
       this.element.addEventListener('pointerleave', scheduleHide);
       this.element.addEventListener('focusin', () => showOnFocus(this));
@@ -77,7 +84,7 @@ export function installTooltips() {
   document.addEventListener('pointerover', event => {
     const element = find(event.target);
     if (!element?.dataset.tooltip || event.pointerType === 'touch' || element.contains(event.relatedTarget)) return;
-    cancelTimer(); timer = setTimeout(() => show(owner(element)), 500);
+    showOnHover(owner(element));
   });
   document.addEventListener('pointerout', event => {
     const element = find(event.target);

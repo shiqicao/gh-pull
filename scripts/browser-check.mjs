@@ -86,6 +86,7 @@ test('review badges distinguish bypass permission from required reviews', async 
     await open();
     const badge = page.locator(`.badge.${review.toLowerCase()}`);
     assert.equal(await badge.textContent(), review === 'REVIEW_REQUIRED' ? 'Review required' : 'Review bypass available');
+    assert.equal(await badge.getAttribute('aria-description'), await badge.getAttribute('data-tooltip'));
     if (review === 'REVIEW_BYPASS_AVAILABLE') assert.match(await badge.getAttribute('data-tooltip'), /your account can bypass/);
     assert.equal(await page.locator('.merge-action').count(), 0);
   }
