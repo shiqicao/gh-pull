@@ -3,7 +3,7 @@ import { iconTemplate, copyFeedback } from './templates.js';
 
 export function actionButton({ content, label, title, className = '', disabled = false, onClick,
   popover, expanded, feedback = nothing }) {
-  return html`<button type="button" class=${className} aria-label=${label} title=${title ?? nothing}
+  return html`<button type="button" class=${className} aria-label=${label} data-tooltip=${title ?? nothing}
     ?disabled=${disabled} @click=${onClick}
     aria-haspopup=${popover ? 'dialog' : nothing} aria-controls=${popover?.id ?? nothing}
     aria-expanded=${popover ? String(Boolean(expanded)) : nothing} .popoverTargetElement=${popover ?? null}

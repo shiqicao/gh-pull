@@ -71,22 +71,22 @@ export function icon(name, size = 16) {
 
 export function clipboardFeedback(button, { text, symbol = button, feedback, success }) {
   const original = [...symbol.childNodes];
-  const title = button.title;
+  const title = button.dataset.tooltip;
   let timer;
   button.addEventListener('click', async () => {
     clearTimeout(timer);
     try {
       await navigator.clipboard.writeText(text);
       symbol.textContent = '✓';
-      button.title = success;
+      button.dataset.tooltip = success;
     } catch {
       symbol.textContent = '!';
-      button.title = 'Could not copy. Allow clipboard access and retry.';
+      button.dataset.tooltip = 'Could not copy. Allow clipboard access and retry.';
     }
-    feedback.textContent = button.title;
+    feedback.textContent = button.dataset.tooltip;
     timer = setTimeout(() => {
       symbol.replaceChildren(...original);
-      button.title = title;
+      button.dataset.tooltip = title;
       feedback.textContent = '';
     }, 2000);
   });

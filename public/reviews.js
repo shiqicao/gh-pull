@@ -39,7 +39,7 @@ export function createReviewControls({ changes, submit, onClose }) {
     button(pr, reviewer, avatar) {
       if (active?.pr.id === pr.id) { active = { pr, reviewer }; content(); }
       const busy = [...changes.values()].some(draft => draft.saving);
-      return actionButton({ className: 'badge approved review-action', label: 'Your approval options', title: 'Your approval options',
+      return actionButton({ className: 'badge approved review-action', label: 'Your approval options',
         popover: popover.panel, expanded: popover.pullId === pr.id, disabled: busy,
         onClick: event => {
           if (active?.pr.id !== pr.id) {

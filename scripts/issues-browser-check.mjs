@@ -30,7 +30,7 @@ test('issue counts open full titles and states, hide empty lists, and support ke
   const trigger = page.locator('.issue-count').first(), panel = page.locator('#closing-issues');
   assert.equal(await page.locator('.issue-count').count(), 2);
   assert.equal(await trigger.textContent(), '2');
-  assert.equal(await trigger.getAttribute('title'), 'Closes 2 issues');
+  assert.equal(await trigger.getAttribute('data-tooltip'), 'Closes 2 issues');
   assert.equal(await trigger.evaluate(el => Boolean(el.closest('.pr-extras'))), true);
   assert.equal(await page.locator('.pr-row').first().locator('.comment-count').evaluate(el => getComputedStyle(el).gridColumnStart), '7');
   await trigger.focus(); await page.keyboard.press('Enter'); await panel.waitFor();

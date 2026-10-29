@@ -1,10 +1,10 @@
 import { element } from './ui.js';
 
 // Native dismissal and focus behavior, shared positioning and trigger state.
-export function createPopover({ id, className = '', label, labelledBy, align = 'start', onClose = () => {} }) {
+export function createPopover({ id, className = '', label, labelledBy, align = 'start', role = 'dialog', mode = 'auto', maxWidth = Infinity, onClose = () => {} }) {
   const panel = element('div', undefined, `anchored-popover ${className}`);
-  panel.id = id; panel.popover = 'auto';
-  panel.setAttribute('role', 'dialog');
+  panel.id = id; panel.popover = mode;
+  panel.setAttribute('role', role);
   if (label) panel.setAttribute('aria-label', label);
   if (labelledBy) panel.setAttribute('aria-labelledby', labelledBy);
   document.body.append(panel);
@@ -15,7 +15,7 @@ export function createPopover({ id, className = '', label, labelledBy, align = '
     // Client rectangles include CSS zoom; fixed-position coordinates do not.
     const scale = panel.getBoundingClientRect().width / panel.offsetWidth || 1;
     const viewportWidth = innerWidth / scale, viewportHeight = innerHeight / scale;
-    panel.style.maxWidth = `${Math.max(0, viewportWidth - 16)}px`;
+    panel.style.maxWidth = `${Math.min(maxWidth, Math.max(0, viewportWidth - 16))}px`;
     const bounds = anchor.getBoundingClientRect(), width = panel.offsetWidth, height = panel.offsetHeight;
     const rect = { left: bounds.left / scale, right: bounds.right / scale, top: bounds.top / scale, bottom: bounds.bottom / scale };
     const left = alignment === 'end' ? rect.right - width : rect.left;
@@ -29,7 +29,7 @@ export function createPopover({ id, className = '', label, labelledBy, align = '
       panel.classList.add('measuring'); position(); panel.classList.remove('measuring');
       panel.scrollTop = 0;
     }
-    trigger?.setAttribute('aria-expanded', String(opening));
+    if (role !== 'tooltip') trigger?.setAttribute('aria-expanded', String(opening));
   });
   panel.addEventListener('toggle', event => { if (event.newState === 'closed' && !isOpen()) onClose(); });
   window.addEventListener('resize', position);
@@ -42,9 +42,10 @@ export function createPopover({ id, className = '', label, labelledBy, align = '
     get pullId() { return isOpen() ? trigger?.closest('.pr-row')?.dataset.prId : null; },
     attach(button, options = {}) {
       if (trigger !== button && isOpen()) panel.hidePopover();
-      trigger?.setAttribute('aria-expanded', 'false'); trigger = button;
+      if (role !== 'tooltip') trigger?.setAttribute('aria-expanded', 'false');
+      trigger = button;
       anchor = options.anchor ?? button; alignment = options.align ?? align;
-      if (isOpen()) { trigger?.setAttribute('aria-expanded', 'true'); position(); }
+      if (isOpen()) { if (role !== 'tooltip') trigger?.setAttribute('aria-expanded', 'true'); position(); }
     },
     close() { if (isOpen()) panel.hidePopover(); },
     destroy() {

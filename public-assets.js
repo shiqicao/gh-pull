@@ -12,6 +12,7 @@ export const publicAssets = [
   ['vendor/svg.LICENSE.txt', 'text/plain'],
   ['controls.js', 'text/javascript'],
   ['popover.js', 'text/javascript'],
+  ['tooltip.js', 'text/javascript'],
   ['lifecycle.js', 'text/javascript'],
   ['review-counts.js', 'text/javascript'],
   ['reviewer-manager.js', 'text/javascript'],

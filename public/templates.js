@@ -2,7 +2,7 @@ import { html, nothing, guard, directive, Directive, AsyncDirective } from './ve
 import { icon } from './ui.js';
 
 export const iconTemplate = (name, size = 16) => guard([name, size], () => icon(name, size));
-export const badge = (text, kind, title = nothing) => html`<span class=${`badge ${kind.toLowerCase()}`} title=${title}>${text}</span>`;
+export const badge = (text, kind, title = nothing) => html`<span class=${`badge ${kind.toLowerCase()}`} data-tooltip=${title} aria-description=${title}>${text}</span>`;
 export function githubUrl(value, suffix = '') {
   try {
     const url = new URL(value);
@@ -13,7 +13,7 @@ export function githubUrl(value, suffix = '') {
 }
 // Use CSSOM even on the first render; styleMap initially writes a style
 // attribute, which is still blocked by a strict style-src-attr policy.
-const authorHue = directive(class extends AsyncDirective {
+export const authorHue = directive(class extends AsyncDirective {
   render() { return nothing; }
   update(part, [hue]) {
     if (hue === undefined) part.element.style.removeProperty('--author-hue');
@@ -36,7 +36,7 @@ export function reviewerAvatar(name, state, hue, kind, interactive = true) {
   const classes = `author reviewer-avatar reviewer-${state.toLowerCase()}${square ? ' reviewer-square' : ''}`;
   return interactive && /^[a-z\d](?:[a-z\d-]*[a-z\d])?$/i.test(name)
     ? html`<a class=${classes} ${authorHue(hue)} href=${`https://github.com/${encodeURIComponent(name)}`} target="_blank" rel="noopener noreferrer" aria-label=${`${name}'s GitHub profile (opens in a new tab)`}>${initials}</a>`
-    : html`<span class=${classes} ${authorHue(hue)}>${initials}</span>`;
+    : html`<span class=${classes} ${authorHue(hue)} tabindex=${interactive ? '0' : nothing} aria-label=${interactive ? name : nothing}>${initials}</span>`;
 }
 
 // Color strength halves daily, background weekly, saturation and brightness every six hours.
@@ -78,15 +78,15 @@ class ClipboardDirective extends AsyncDirective {
         const symbol = this.button.querySelector('.copy-symbol');
         const feedback = this.button.closest('.pr-row').querySelector('[role="status"]');
         const indicator = this.button.querySelector('.copy-feedback-symbol');
-        this.reset = () => { symbol.hidden = false; indicator.hidden = true; indicator.textContent = ''; this.button.title = this.title; feedback.textContent = ''; };
+        this.reset = () => { symbol.hidden = false; indicator.hidden = true; indicator.textContent = ''; this.button.dataset.tooltip = this.title; feedback.textContent = ''; };
         let copied = true;
         try { await navigator.clipboard.writeText(this.text); } catch { copied = false; }
         if (revision !== this.revision) return;
         symbol.hidden = true; indicator.hidden = false;
         indicator.textContent = copied ? '✓' : '!';
-        this.button.title = copied ? this.success : 'Could not copy. Allow clipboard access and retry.';
+        this.button.dataset.tooltip = copied ? this.success : 'Could not copy. Allow clipboard access and retry.';
         if (!this.isConnected) { this.restore(); return; }
-        feedback.textContent = this.button.title;
+        feedback.textContent = this.button.dataset.tooltip;
         this.timer = setTimeout(() => this.restore(), 2000);
       };
       this.button.addEventListener('click', this.click);

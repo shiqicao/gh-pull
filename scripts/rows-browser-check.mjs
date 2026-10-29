@@ -172,7 +172,7 @@ test('retained clipboard buttons copy the latest value once and restore their ic
   await button.click();
   assert.deepEqual(await page.evaluate(() => window.copies), ['feature/1', 'feature/new-name']);
   await page.clock.fastForward(2000);
-  assert.equal(await button.getAttribute('title'), 'Copy branch name: feature/new-name');
+  assert.equal(await button.getAttribute('data-tooltip'), 'Copy branch name: feature/new-name');
   assert.equal(await button.locator('.copy-symbol svg').count(), 1);
   assert.deepEqual(f.errors, []);
 });
