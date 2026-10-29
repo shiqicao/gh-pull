@@ -75,6 +75,8 @@ test('parent labels track merged and closed states after refresh without a merge
   await page.goto(origin);
   const chip = page.locator('.dependency-chip');
   await chip.waitFor();
+  assert.equal(await chip.getAttribute('aria-description'), await chip.getAttribute('data-tooltip'));
+  await chip.waitFor();
   assert.equal(await chip.innerText(), '↑ #42 · not loaded');
   assert.equal(await page.locator('.dependency-external').count(), 1);
   for (const state of ['MERGED', 'CLOSED', 'OPEN']) {
@@ -128,6 +130,8 @@ test('non-default base without an identifiable PR shows base not loaded until re
   });
   await page.goto(origin);
   const chip = page.locator('.dependency-chip');
+  await chip.waitFor();
+  assert.equal(await chip.getAttribute('aria-description'), await chip.getAttribute('data-tooltip'));
   await chip.waitFor();
   assert.equal(await chip.innerText(), '↑ base not loaded');
   assert.match(await chip.getAttribute('data-tooltip'), /merge-train\/spartan/);

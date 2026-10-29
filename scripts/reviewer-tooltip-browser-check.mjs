@@ -18,7 +18,10 @@ test('reviewer tooltips support hover, focus, Escape and leave approval actions 
   await tooltip.hover(); assert.equal(await tooltip.isVisible(), true);
   await page.keyboard.press('Escape'); await tooltip.waitFor({ state: 'hidden' });
   assert.equal(await trigger.getAttribute('aria-describedby'), null);
-  await trigger.focus(); await tooltip.waitFor();
+  await trigger.focus();
+  // A late pointer leave must not cancel a keyboard-triggered show.
+  await trigger.dispatchEvent('pointerleave', { pointerType: 'mouse' });
+  await tooltip.waitFor();
   await trigger.click(); await tooltip.waitFor({ state: 'hidden' });
   await page.getByRole('button', { name: 'Revoke approval…' }).waitFor();
   await page.keyboard.press('Escape');
@@ -38,9 +41,9 @@ test('title and reviewer hover tooltips share a half-second delay', async t => {
   const title = 'A long PR title that should use the same styled tooltip as reviewers';
   const pr = { id: 'delay', number: 2, title, url: 'https://github.com/example/demo/pull/2', repo: 'example/demo', author: 'bob', status: 'OPEN', checks: 'NONE', review: 'NONE', labels: [], additions: 0, deletions: 0, createdAt: '2026-01-01', updatedAt: '2026-01-01', reviewers: [{ name: 'alice', state: 'REQUESTED' }] };
   const { page, origin } = await browserFixture(t, { list: async () => ({ viewer: 'bob', items: [pr], total: 1, pageInfo: { hasNextPage: false } }) });
-  await page.clock.install();
+  await page.clock.install({ time: new Date("2026-01-01T00:00:00Z") });
+  await page.clock.pauseAt(new Date("2026-01-01T00:00:01Z"));
   await page.goto(origin); await page.locator('.pr-title').waitFor();
-  await page.clock.pauseAt(new Date());
   for (const [selector, text] of [['.reviewer-avatar', 'alice'], ['.pr-title', title]]) {
     await page.locator(selector).hover();
     await page.clock.runFor(450);

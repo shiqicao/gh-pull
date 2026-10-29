@@ -2,7 +2,7 @@ import { html, nothing, guard, directive, Directive, AsyncDirective } from './ve
 import { icon } from './ui.js';
 
 export const iconTemplate = (name, size = 16) => guard([name, size], () => icon(name, size));
-export const badge = (text, kind, title = nothing) => html`<span class=${`badge ${kind.toLowerCase()}`} data-tooltip=${title}>${text}</span>`;
+export const badge = (text, kind, title = nothing) => html`<span class=${`badge ${kind.toLowerCase()}`} data-tooltip=${title} aria-description=${title}>${text}</span>`;
 export function githubUrl(value, suffix = '') {
   try {
     const url = new URL(value);
