@@ -23,8 +23,23 @@ export function createSavedViews({ request, getQuery, getAppliedQuery, getGroup,
   const groupName = group => ({ repo: 'Repository', author: 'Author', status: 'Status', checks: 'Checks', none: 'No grouping' })[group ?? 'repo'];
   const differs = view => view && (view.query !== getAppliedQuery() || (view.group ?? 'repo') !== getGroup());
   const snapshot = () => ({ activeId, query: getAppliedQuery(), draft: getQuery(), group: getGroup() });
+  const selectionKey = () => `gh-pull.selected-view.v1:${account.toLowerCase()}`;
+  function rememberSelection() {
+    if (!account || loading) return;
+    try {
+      localStorage.setItem(selectionKey(), JSON.stringify({ id: activeId ?? null, query: getAppliedQuery(), group: getGroup() }));
+    } catch { /* Selection still works for this session without browser storage. */ }
+  }
+  function restoredSelection() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(selectionKey()));
+      if (saved?.query === getAppliedQuery() && saved?.group === getGroup() && views.some(view => view.id === saved.id)) return saved.id;
+    } catch { /* Fall back to matching the applied search. */ }
+    return views.find(view => view.query === getAppliedQuery() && (view.group ?? 'repo') === getGroup())?.id;
+  }
   let previousSearch;
   function update() {
+    rememberSelection();
     const search = JSON.stringify([getQuery(), getAppliedQuery(), getGroup()]);
     if (previousSearch !== search) notice = null;
     previousSearch = search;
@@ -214,14 +229,14 @@ export function createSavedViews({ request, getQuery, getAppliedQuery, getGroup,
     } finally { if (current === generation) { busy = false; update(); } }
   }
   async function load() {
-    const current = ++generation, initialQuery = getAppliedQuery(), initialGroup = getGroup();
+    const current = ++generation;
     loading = true; failure = ''; update();
     try {
       const data = await request();
       if (current !== generation) return;
       account = data.account; views = data.views;
       sessionOrder = views.map(view => view.id); usageWarning = '';
-      activeId = views.find(view => view.query === initialQuery && (view.group ?? 'repo') === initialGroup)?.id;
+      activeId = restoredSelection();
     } catch (error) { if (current === generation) failure = `Could not load saved views. ${error.message}`; }
     finally { if (current === generation) { loading = false; update(); } }
   }
