@@ -121,6 +121,14 @@ function markViewed(pr) {
 
 window.addEventListener('storage', event => {
   if (viewedStore.storageChanged(event.key)) render();
+  if (groupState.storageChanged(event.key)) {
+    for (const [key, { section }] of groupCache) section.open = groupState.isOpen(key);
+  }
+});
+
+// Native details toggle events are queued; flush before a tab closes.
+window.addEventListener('pagehide', () => {
+  for (const [key, { section }] of groupCache) groupState.setOpen(key, section.open);
 });
 
 // Keep conflict resolution, merge availability, and app-access messaging together.

@@ -113,22 +113,32 @@ export function createPendingChanges() {
 // Only collapsed groups need storing: unknown groups start expanded.
 export function createGroupStateStore(storage) {
   let storageKey, collapsed = new Set();
+  function read() {
+    try {
+      const saved = JSON.parse(storage.getItem(storageKey));
+      return new Set(Array.isArray(saved) ? saved.filter(key => typeof key === 'string') : []);
+    } catch { return collapsed; }
+  }
   return {
     selectAccount(login) {
       const next = `gh-pull.collapsed-groups.v1:${login.toLowerCase()}`;
       if (next === storageKey) return;
       storageKey = next; collapsed = new Set();
-      try {
-        const saved = JSON.parse(storage.getItem(storageKey));
-        if (Array.isArray(saved)) collapsed = new Set(saved.filter(key => typeof key === 'string'));
-      } catch { /* Start expanded when storage is unavailable or invalid. */ }
+      collapsed = read();
     },
     isOpen(key) { return !collapsed.has(key); },
     setOpen(key, open) {
       if (!storageKey || open === !collapsed.has(key)) return;
+      // Preserve other groups changed by a different tab before this toggle.
+      collapsed = read();
       if (open) collapsed.delete(key); else collapsed.add(key);
       try { storage.setItem(storageKey, JSON.stringify([...collapsed])); }
       catch { /* Retain the choice for this session when storage is blocked. */ }
+    },
+    storageChanged(key) {
+      if (!storageKey || (key !== null && key !== storageKey)) return false;
+      collapsed = read();
+      return true;
     },
   };
 }
