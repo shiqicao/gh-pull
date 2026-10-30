@@ -109,3 +109,26 @@ export function createPendingChanges() {
     isMergeBusy(id) { return reviewerChanges.has(id) || merges.get(id)?.saving || draftChanges.get(id)?.saving || titleEdits.has(id) || lifecycleChanges.has(id); },
   };
 }
+
+// Only collapsed groups need storing: unknown groups start expanded.
+export function createGroupStateStore(storage) {
+  let storageKey, collapsed = new Set();
+  return {
+    selectAccount(login) {
+      const next = `gh-pull.collapsed-groups.v1:${login.toLowerCase()}`;
+      if (next === storageKey) return;
+      storageKey = next; collapsed = new Set();
+      try {
+        const saved = JSON.parse(storage.getItem(storageKey));
+        if (Array.isArray(saved)) collapsed = new Set(saved.filter(key => typeof key === 'string'));
+      } catch { /* Start expanded when storage is unavailable or invalid. */ }
+    },
+    isOpen(key) { return !collapsed.has(key); },
+    setOpen(key, open) {
+      if (!storageKey || open === !collapsed.has(key)) return;
+      if (open) collapsed.delete(key); else collapsed.add(key);
+      try { storage.setItem(storageKey, JSON.stringify([...collapsed])); }
+      catch { /* Retain the choice for this session when storage is blocked. */ }
+    },
+  };
+}

@@ -9,7 +9,7 @@ import { githubUrl, usernameLink, repositoryLink } from './templates.js';
 import { renderRow } from './row.js';
 import { drawDependencies } from './dependencies.js';
 import { createPollingSchedule, createBackgroundRefresh, pendingPulls } from './polling.js';
-import { createViewedStore, createLatestRequest, mergePullPages, createMergedStore, createPendingChanges } from './state.js';
+import { createViewedStore, createGroupStateStore, createLatestRequest, mergePullPages, createMergedStore, createPendingChanges } from './state.js';
 import { createIssuePopover } from './issues.js';
 import { createLifecycleControls } from './lifecycle.js';
 import { createReviewControls } from './reviews.js';
@@ -30,7 +30,10 @@ if ([...$('group').options].some(option => option.value === params.get('group'))
 let appliedQuery = queryFromParams(params);
 if (!queryError(appliedQuery)) appliedQuery = normalizeQuery(appliedQuery);
 let items = [], total = 0, cursor = null, more = false, limited = false, loading = false;
-const collapsed = new Set();
+const groupState = createGroupStateStore({
+  getItem: key => localStorage.getItem(key),
+  setItem: (key, value) => localStorage.setItem(key, value),
+});
 const pendingChanges = createPendingChanges();
 const { commentChanges, titleEdits, draftChanges, merges, lifecycleChanges, reviewChanges, reviewerChanges } = pendingChanges;
 let viewerLogin = '', queryEditor, savedViews;
@@ -383,8 +386,10 @@ function render() {
     let group = groupCache.get(key);
     if (!group) {
       const section = element('details', undefined, 'pr-group');
-      section.open = !collapsed.has(key);
-      section.addEventListener('toggle', () => section.open ? collapsed.delete(key) : collapsed.add(key));
+      section.open = groupState.isOpen(key);
+      section.addEventListener('toggle', () => {
+        if (section.isConnected) groupState.setOpen(key, section.open);
+      });
       const heading = element('summary'), list = element('ul', undefined, 'pr-list');
       section.append(heading, list);
       group = { section, heading, list, clear: () => {} };
@@ -476,6 +481,9 @@ async function load({ append = false, refresh = false, background = false } = {}
     data.items = fetchedItems;
     if (!loads.isCurrent(request)) return;
     if (viewedStore.selectAccount(data.viewer)) {
+      groupState.selectAccount(data.viewer);
+      for (const group of groupCache.values()) { group.clear(); group.section.remove(); }
+      groupCache.clear();
       queryEditor?.clearRepositoryCache();
       issuePopover.close(); reviewerManager.reset(); reviewControls.reset(); lifecycleControls.reset(); commentControls.reset();
       mergedStore.clear();
