@@ -394,3 +394,30 @@ test('invalid or unavailable remembered-query storage does not block launch', as
   await page.locator('#query-submit').click();
   await page.waitForFunction(() => new URL(location.href).searchParams.get('q') === 'is:closed');
 });
+
+test('edited saved-view identity survives relaunch without implicitly updating the saved view', async t => {
+  const { page, origin, editor, store } = await setup(t);
+  const selected = page.locator('.saved-view-pill[aria-pressed="true"]');
+  await page.getByRole('button', { name: 'To review', exact: true }).click();
+  await page.selectOption('#sort', 'review');
+  await page.selectOption('#group', 'author');
+  await editor.fill('is:closed author:unsubmitted');
+  await page.goto(origin);
+  await selected.waitFor();
+  assert.match(await selected.textContent(), /To review/);
+  assert.match(await page.locator('.cm-content').textContent(), /sort:review-status/);
+  assert.equal(await page.locator('#group').inputValue(), 'author');
+  await page.waitForFunction(() => document.querySelector('#save-view')?.disabled === false);
+  const original = (await store.list('alice')).find(view => view.name === 'To review');
+  assert.equal(original.query, 'is:open review-requested:@me');
+  assert.equal(original.group, 'repo');
+  // An unrelated explicit link must not inherit that edited selection.
+  await page.goto(origin + '/?q=is%3Aclosed&group=repo');
+  await page.waitForFunction(() => document.querySelector('#save-view-new')?.disabled === false);
+  assert.equal(await selected.count(), 0);
+  // Deleted/stale IDs fall back to matching a valid view.
+  await page.evaluate(() => localStorage.setItem('gh-pull.selected-view.v1:alice', JSON.stringify({ id: 'deleted', query: 'is:open author:@me', group: 'author' })));
+  await page.goto(origin + '/?q=is%3Aopen%20author%3A%40me&group=author');
+  await selected.waitFor();
+  assert.match(await selected.textContent(), /My work/);
+});
