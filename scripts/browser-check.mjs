@@ -266,13 +266,14 @@ test('new-tab links release mouse focus but preserve keyboard focus on return', 
 test('every CI status links to the PR checks page', async t => {
   for (const checks of ['SUCCESS', 'FAILURE', 'PENDING', 'NONE']) {
     await t.test(checks, async t => {
-      const { page, errors, open } = await fixture(t, { checks });
+      const { page, errors, open } = await fixture(t, { checks, checkCounts: { passed: 3, total: 8 } });
       await open();
       const link = page.locator('a.ci-indicator');
       await link.waitFor();
       assert.equal(await link.getAttribute('href'), 'https://github.com/example/dashboard/pull/1/checks');
       assert.equal(await link.getAttribute('target'), '_blank');
       assert.match(await link.getAttribute('aria-label'), /view checks/);
+      if (checks === 'PENDING') assert.match(await link.getAttribute('data-tooltip'), /3\/8 · View checks/);
       assert.deepEqual(errors, []);
     });
   }

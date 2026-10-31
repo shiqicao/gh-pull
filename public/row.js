@@ -22,7 +22,7 @@ function checks(pr) {
   const symbol = { SUCCESS: 'check', FAILURE: 'cross', PENDING: 'clock' }[pr.checks] ?? 'dash';
   const content = html`${icon(symbol, 16)}<span class="sr-only">${label}</span>`;
   return githubUrl(pr.url) !== nothing
-    ? html`<a class=${`ci-indicator ${pr.checks.toLowerCase()}`} href=${githubUrl(pr.url, 'checks')} target="_blank" rel="noopener noreferrer" data-view-pr data-tooltip="View checks (opens in a new tab)" aria-label=${`${label}: view checks for ${pr.title} (opens in a new tab)`}>${content}</a>`
+    ? html`<a class=${`ci-indicator ${pr.checks.toLowerCase()}`} href=${githubUrl(pr.url, 'checks')} target="_blank" rel="noopener noreferrer" data-view-pr data-tooltip=${`${label} · View checks (opens in a new tab)`} aria-label=${`${label}: view checks for ${pr.title} (opens in a new tab)`}>${content}</a>`
     : html`<span class=${`ci-indicator ${pr.checks.toLowerCase()}`} data-tooltip=${label} aria-label=${label}>${content}</span>`;
 }
 
