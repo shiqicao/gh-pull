@@ -28,14 +28,19 @@ function checks(pr) {
 
 function metadata(pr, ctx) {
   const age = relativeTime(pr.updatedAt), diff = `${pr.additions} additions, ${pr.deletions} deletions`;
-  const threads = pr.reviewThreadCounts?.total > 0 ? pr.reviewThreadCounts : null;
-  const commentTitle = threads ? `${threads.resolved} of ${threads.total} review threads resolved; ${pr.commentCount ?? 0} total comments`
-    : `${pr.commentCount ?? 0} total comments${pr.reviewThreadCounts === null ? '; review thread resolution unavailable' : ''}`;
+  const threads = pr.reviewThreadCounts;
+  const unresolved = threads ? threads.total - threads.resolved : 0;
+  const threadTitle = threads?.total > 0 ? `${unresolved} unresolved of ${threads.total} review threads`
+    : threads || pr.commentCount === 0 ? 'No review threads'
+    : threads === null ? 'Review thread counts unavailable' : 'Review thread counts loading';
+  const commentTitle = `${threadTitle}; ${pr.commentCount ?? 0} total comments`;
+  const threadCount = threads?.total > 0 ? html`<span class="comment-summary" aria-hidden="true"><span class="comment-bubble">${icon('comment', 16)}${unresolved > 0 ? html`<span class="comment-unresolved">${unresolved}</span>` : nothing}</span><span class="comment-total">${threads.total}</span></span>`
+    : html`<span class="empty-value" aria-hidden="true">—</span>`;
   return html`<div class="meta">
     <span class="pr-ci">${checks(pr)}</span>
     <span class="pr-review">${pr.review !== 'NONE' ? badge(reviewLabels[pr.review] ?? pr.review, pr.review, pr.review === 'REVIEW_BYPASS_AVAILABLE' ? 'GitHub requires reviews for this branch, but your account can bypass branch protections.' : reviewLabels[pr.review]) : html`<span class="empty-value" aria-label="No review status">—</span>`}</span>
     <span class="diff-counts" data-tooltip=${diff} aria-label=${diff}><span class="additions">+${pr.additions}</span><span class="deletions">−${pr.deletions}</span></span>
-    ${ctx.commentControl(pr, threads ? `${threads.resolved}/${threads.total}` : Number.isInteger(pr.commentCount) && pr.commentCount > 0 ? html`${icon('comment', 12)}${pr.commentCount}` : html`${icon('comment', 12)}0`, commentTitle, Boolean(ctx.savingPull(pr.id)))}
+    ${ctx.commentControl(pr, threadCount, commentTitle, Boolean(ctx.savingPull(pr.id)))}
     <time class="updated-time" ${ageTint(pr.updatedAt)} datetime=${pr.updatedAt} data-tooltip=${`Updated ${new Date(pr.updatedAt).toLocaleString()}`} aria-label=${`Updated ${age}`}><span class="age-content">${age === 'just now' ? 'now' : age.replace(/ ago$/, '')}</span></time>
   </div>`;
 }

@@ -34,7 +34,8 @@ test('quick comments preserve drafts, post explicitly, keep thread counts and re
   assert.equal(await field.isDisabled(), true);
   await field.press('Control+Enter'); assert.equal(calls, 2);
   release(); await dialog.waitFor({ state: 'hidden' });
-  assert.equal(await trigger.textContent(), '1/2');
+  assert.equal(await trigger.locator('.comment-unresolved').innerText(), '1');
+  assert.equal(await trigger.locator('.comment-total').innerText(), '2');
   assert.equal(await trigger.locator('.comment-draft-dot').count(), 0);
   assert.match(await trigger.getAttribute('data-tooltip'), /^Add a comment/);
   assert.match(await trigger.getAttribute('data-tooltip'), /4 total comments/);

@@ -165,7 +165,8 @@ test('clipboard, filters, background refresh, icons and responsive metadata styl
   assert.match(await page.locator('.pr-files').getAttribute('aria-label'), /8 files changed/);
   assert.match(await page.locator('.pr-files').getAttribute('href'), /\/files$/);
   assert.equal(await page.locator('.pr-files').getAttribute('target'), '_blank');
-  assert.equal(await page.locator('.diff-counts + .comment-count').textContent(), '12');
+  assert.equal(await page.locator('.diff-counts + .comment-count').textContent(), '—');
+  assert.match(await page.locator('.comment-count').getAttribute('aria-label'), /12 total comments/);
   for (const colorScheme of ['light', 'dark']) {
     await page.emulateMedia({ colorScheme });
     assert.equal(await page.locator('.pr-ci .ci-indicator').count(), 1);

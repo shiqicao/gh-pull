@@ -92,7 +92,7 @@ Credentials stay in the local backend and are never sent to the browser. Both op
 
 ### Query search
 
-Click a PR’s **Threads** count to write a quick Markdown comment on its conversation. **Post comment** (or Ctrl/⌘+Enter) submits it; Escape or clicking outside keeps the draft for this session, and Cancel discards it. Comments are limited to 4,000 characters. Posting a conversation comment does not change the resolved/total review-thread ratio.
+Click a PR’s **Threads** cell to write a quick Markdown comment on its conversation. **Post comment** (or Ctrl/⌘+Enter) submits it; Escape or clicking outside keeps the draft for this session, and Cancel discards it. Comments are limited to 4,000 characters. Posting a conversation comment does not change review-thread counts.
 
 **Review status** sorting (`sort:review-status`) orders loaded PRs by changes requested, review required, approved, then no review, with recently updated PRs first within each category. Dependency stacks stay together and are ordered by their root PR’s review status. This dashboard-specific sort is saved with the query; GitHub fetches pages by recent update.
 
@@ -171,6 +171,6 @@ The extension workflow tests native builds on each supported platform. Version t
 
 [MIT](LICENSE) © 2026 shiqicao. Third-party attribution and license terms are listed in [THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES).
 
-Review indicators show **resolved/total review threads** when a PR has review threads. Hover for the total comment count. PRs render immediately with comment totals; resolved counts load separately in the background and refresh at most once a minute per PR version; PRs with no review threads show the plain comment count. Failed or incomplete lookups (including more than 1,000 threads) fall back to the comment count instead of showing partial resolution totals.
+The **Threads** cell shows a comment bubble beside the **total review-thread count**, with an amber notification badge for **unresolved threads**. When all threads are resolved, the badge disappears. Hover for an explanation and the total PR comment count, which includes conversation comments and replies. PRs render immediately while thread counts load separately in the background, refreshing at most once a minute per PR version. PRs with no review threads show a muted dash. Loading, failed, or incomplete lookups (including more than 1,000 threads) also show a dash, with the tooltip distinguishing unavailable counts from zero threads.
 
 On your own PRs, the Open/Draft badge menu includes **Close pull request…** when GitHub permits it. Confirm with an optional comment; the branch is retained. Closed PRs offer **Reopen pull request** when permitted. Closing a parent refreshes its dependent PRs. If closing succeeds but the comment cannot be confirmed, the dashboard reports that separately.

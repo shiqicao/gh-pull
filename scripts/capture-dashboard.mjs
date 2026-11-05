@@ -69,7 +69,7 @@ try {
   await page.goto(`${origin}/?q=sort:review-status`);
   await page.locator('.dependency-dot').first().waitFor();
   await page.getByRole('button', { name: 'Team reviews', exact: true }).waitFor();
-  await page.waitForFunction(() => [...document.querySelectorAll('.comment-count')].every(el => el.textContent.includes('/')));
+  await page.waitForFunction(() => document.querySelectorAll('.comment-total').length === 8);
   await page.evaluate(() => document.fonts.ready);
   await page.waitForFunction(() => Number(document.querySelector('.dependency-connector').getAttribute('height')) === document.querySelector('.has-dependency-lanes').offsetHeight);
   assert.equal(await page.locator('.pr-row').count(), 8);

@@ -38,6 +38,8 @@
   --color-danger-text: light-dark(#a40e26, #ffa198);
   --color-warning-bg: light-dark(#fff8c5, #3c3010);
   --color-warning-text: light-dark(#7d4e00, #eac54f);
+  --color-thread-badge: light-dark(#9a6700, #d29922);
+  --color-thread-badge-text: light-dark(#ffffff, #0d1117);
   --color-merged-bg: light-dark(#fbefff, #352044);
   --color-merged-text: light-dark(#8250df, #d2a8ff);
   --color-age-bg: light-dark(#ccfbf1, #123b36);
