@@ -29,11 +29,12 @@ function checks(pr) {
 function metadata(pr, ctx) {
   const age = relativeTime(pr.updatedAt), diff = `${pr.additions} additions, ${pr.deletions} deletions`;
   const threads = pr.reviewThreadCounts;
-  const unresolved = threads ? threads.total - threads.resolved : 0;
+  const unresolved = threads ? threads.unresolved ?? threads.total - threads.resolved : 0;
+  const excluded = threads ? threads.total - threads.resolved - unresolved : 0;
   const threadTitle = threads?.total > 0 ? `${unresolved} unresolved of ${threads.total} review threads`
     : threads || pr.commentCount === 0 ? 'No review threads'
     : threads === null ? 'Review thread counts unavailable' : 'Review thread counts loading';
-  const commentTitle = `${threadTitle}; ${pr.commentCount ?? 0} total comments`;
+  const commentTitle = `${threadTitle}${excluded > 0 ? `; ${excluded} unanswered author ${excluded === 1 ? 'thread' : 'threads'} excluded` : ''}; ${pr.commentCount ?? 0} total comments`;
   const threadCount = threads?.total > 0 ? html`<span class="comment-summary" aria-hidden="true"><span class="comment-bubble">${icon('comment', 16)}${unresolved > 0 ? html`<span class="comment-unresolved">${unresolved}</span>` : nothing}</span><span class="comment-total">${threads.total}</span></span>`
     : html`<span class="empty-value" aria-hidden="true">—</span>`;
   return html`<div class="meta">

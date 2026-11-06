@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { browserFixture } from './browser-fixture.mjs';
 test('thread bubbles show total threads with an unresolved badge and distinguish empty/unavailable counts', async t => {
-  const counts = [{ resolved: 2, total: 3 }, { resolved: 0, total: 0 }, null, { resolved: 5, total: 5 }, { resolved: 3, total: 18 }];
+  const counts = [{ resolved: 1, unresolved: 1, total: 3 }, { resolved: 0, total: 0 }, null, { resolved: 0, unresolved: 0, total: 5 }, { resolved: 3, total: 18 }];
   const items = counts.map((reviewThreadCounts, i) => ({ id: String(i), number: i + 1, title: `Pull ${i}`, repo: 'example/repo', author: 'alice',
     status: 'OPEN', checks: 'NONE', review: 'NONE', labels: [], reviewers: [], commentCount: 7,
     additions: 1, deletions: 0, updatedAt: '2026-10-20T00:00:00Z', createdAt: '2026-10-20T00:00:00Z' }));
@@ -25,7 +25,7 @@ test('thread bubbles show total threads with an unresolved badge and distinguish
   const cells = page.locator('.comment-count');
   assert.equal(await cells.nth(0).locator('.comment-unresolved').innerText(), '1');
   assert.equal(await cells.nth(0).locator('.comment-total').innerText(), '3');
-  assert.match(await cells.nth(0).getAttribute('aria-label'), /1 unresolved of 3 review threads; 7 total comments/);
+  assert.match(await cells.nth(0).getAttribute('aria-label'), /1 unresolved of 3 review threads; 1 unanswered author thread excluded; 7 total comments/);
   assert.equal(await cells.nth(1).innerText(), '—');
   assert.match(await cells.nth(1).getAttribute('data-tooltip'), /No review threads; 7 total comments/);
   assert.equal(await cells.nth(2).innerText(), '—');
@@ -33,6 +33,7 @@ test('thread bubbles show total threads with an unresolved badge and distinguish
   assert.equal(await cells.nth(3).locator('.comment-unresolved').count(), 0);
   assert.equal(await cells.nth(3).locator('.comment-total').innerText(), '5');
   assert.match(await cells.nth(3).getAttribute('aria-label'), /0 unresolved of 5 review threads/);
+  assert.match(await cells.nth(3).getAttribute('data-tooltip'), /5 unanswered author threads excluded/);
   assert.equal(await cells.nth(4).locator('.comment-unresolved').innerText(), '15');
   assert.equal(await cells.nth(4).locator('.comment-total').innerText(), '18');
   for (const width of [390, 320]) {

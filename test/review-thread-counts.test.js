@@ -2,13 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createReviewThreadCounts } from '../review-thread-counts.js';
 const pr = { id: 'one', commentCount: 102, updatedAt: '2026-10-20T00:00:00Z' };
-const response = (nodes, totalCount = nodes.length, cursor = null) => ({ node: { reviewThreads: {
-  nodes: nodes.map(isResolved => ({ isResolved })), totalCount, pageInfo: { hasNextPage: Boolean(cursor), endCursor: cursor },
+const response = (nodes, totalCount = nodes.length, cursor = null) => ({ node: { author: { login: 'alice' }, reviewThreads: {
+  nodes: nodes.map(isResolved => ({ isResolved, comments: { totalCount: 1, nodes: [{ author: { login: 'bob' } }] } })), totalCount, pageInfo: { hasNextPage: Boolean(cursor), endCursor: cursor },
 } } });
 test('thread counts paginate exactly and cache across polls, invalidating on time or PR update', async () => {
   let calls = 0, time = 0;
   const load = createReviewThreadCounts(async (query, { cursor }) => { calls++; return cursor ? response([false, true], 102) : response(Array(100).fill(true), 102, 'next'); }, { now: () => time });
-  assert.deepEqual((await load([pr]))[0].reviewThreadCounts, { resolved: 101, total: 102 });
+  assert.deepEqual((await load([pr]))[0].reviewThreadCounts, { resolved: 101, unresolved: 1, total: 102 });
   await load([pr]); assert.equal(calls, 2);
   time = 60_001; await load([pr]); assert.equal(calls, 4);
   await load([{ ...pr, updatedAt: 'new' }]); assert.equal(calls, 6);
@@ -43,6 +43,35 @@ test('main list and status never fetch review threads; dedicated lookup uses lig
   await list(); await list.status(['one']);
   assert.equal(calls.length, 2); assert.ok(calls.every(query => !query.includes('reviewThreads')));
   const result = await list.reviewCounts(['one']);
-  assert.deepEqual(result.items[0].reviewThreadCounts, { resolved: 1, total: 2 });
+  assert.deepEqual(result.items[0].reviewThreadCounts, { resolved: 1, unresolved: 1, total: 2 });
   assert.doesNotMatch(calls[2], /commits|latestReviews|mergeable/);
+});
+
+test('unanswered author threads stay in total but are excluded from unresolved', async () => {
+  const thread = (login, totalCount = 1, isResolved = false) => ({ isResolved,
+    comments: { totalCount, nodes: [{ author: login ? { login } : null }] } });
+  const data = { node: { author: { login: 'Alice' }, reviewThreads: {
+    totalCount: 6, pageInfo: { hasNextPage: false }, nodes: [
+      thread('alice'), thread('alice', 2), thread('bob'), thread(null),
+      thread('alice', 1, true), thread('bob', 3, true),
+    ],
+  } } };
+  const load = createReviewThreadCounts(async query => {
+    assert.match(query, /comments\(first: 1\)/);
+    assert.match(query, /author \{ login \}/);
+    return data;
+  });
+  assert.deepEqual((await load([pr]))[0].reviewThreadCounts, { resolved: 2, unresolved: 3, total: 6 });
+});
+
+test('missing authors do not hide threads and incomplete comment metadata is unavailable', async () => {
+  const data = response([false]);
+  data.node.author = null;
+  data.node.reviewThreads.nodes[0].comments.nodes[0].author = null;
+  assert.deepEqual((await createReviewThreadCounts(async () => data)([pr]))[0].reviewThreadCounts,
+    { resolved: 0, unresolved: 1, total: 1 });
+  for (const comments of [undefined, { totalCount: 0, nodes: [] }, { totalCount: 1, nodes: [] }]) {
+    data.node.reviewThreads.nodes[0].comments = comments;
+    assert.equal((await createReviewThreadCounts(async () => data)([pr]))[0].reviewThreadCounts, null);
+  }
 });
