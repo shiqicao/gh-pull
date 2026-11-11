@@ -32,7 +32,7 @@ export function createSavedViewsStore(path = defaultSavedViewsPath(), now = () =
   async function read() {
     try {
       const data = JSON.parse(await readFile(path, 'utf8'));
-      if (data.version !== 1 || !Array.isArray(data.accounts)) throw new Error('Invalid saved views file');
+      if (!data || data.version !== 1 || !Array.isArray(data.accounts)) throw new Error('Invalid saved views file');
       return data;
     } catch (error) {
       if (error.code === 'ENOENT') return { version: 1, accounts: [] };

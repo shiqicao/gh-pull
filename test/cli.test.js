@@ -100,11 +100,13 @@ test('invalid or unreadable config fails before starting a dashboard and preserv
   const dir = await mkdtemp(join(tmpdir(), 'gh-pull-invalid-config-'));
   t.after(() => rm(dir, { recursive: true, force: true }));
   const configPath = join(dir, 'views.json');
-  for (const content of ['broken', '{}']) {
+  for (const content of ['broken', '{}', 'null']) {
     await writeFile(configPath, content);
-    await assert.rejects(serve({ dir, port: 0, configPath }), /Cannot read saved-views config/);
+    let reason = 'Invalid saved views file';
+    try { JSON.parse(content); } catch (error) { reason = error.message; }
+    await assert.rejects(serve({ dir, port: 0, configPath }), { message: `Cannot read saved-views config ${configPath}: ${reason}` });
     assert.equal(await readFile(configPath, 'utf8'), content);
     await assert.rejects(readFile(join(dir, 'instance.json')), { code: 'ENOENT' });
   }
-  await assert.rejects(serve({ dir, port: 0, configPath: dir }), /Cannot read saved-views config/);
+  await assert.rejects(serve({ dir, port: 0, configPath: dir }), /Cannot read saved-views config .*EISDIR/);
 });
