@@ -51,6 +51,37 @@ test('saved views API checks origin, payload and server-derived account', async 
   const data = await (await fetch(`${origin}/api/saved-views`)).json();
   assert.equal(data.account, 'alice'); assert.equal(data.views[0].name, 'Mine');
 });
+test('saved views API explains runtime config corruption, preserves the file and recovers after repair', async t => {
+  const { store, path } = await fixture(t);
+  await store.change('alice', { action: 'save', name: 'Mine', query: 'author:@me' });
+  const original = await readFile(path, 'utf8');
+  const list = async () => ({}); list.viewer = async () => 'alice';
+  const server = createApp({ list, savedViews: store });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  t.after(() => { server.closeAllConnections(); server.close(); });
+  const origin = `http://127.0.0.1:${server.address().port}`;
+  for (const damaged of ['broken JSON', 'null', '{"version":2,"accounts":[]}']) {
+    await writeFile(path, damaged);
+    for (const method of ['GET', 'POST']) {
+      const response = await fetch(`${origin}/api/saved-views`, {
+        method, headers: { 'Content-Type': 'application/json', Origin: origin },
+        ...(method === 'POST' ? { body: JSON.stringify({ action: 'save', account: 'alice', name: 'New', query: 'is:open' }) } : {}),
+      });
+      assert.equal(response.status, 500);
+      const { error } = await response.json();
+      assert.match(error, /Cannot read the saved-views config file/);
+      assert.match(error, /repair or restore it from a backup, then retry/);
+      assert.match(error, /file has not been changed/);
+      assert.equal(await readFile(path, 'utf8'), damaged);
+    }
+  }
+  await writeFile(path, original);
+  const response = await fetch(`${origin}/api/saved-views`);
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).views[0].name, 'Mine');
+  await store.change('alice', { action: 'save', name: 'New', query: 'is:open' });
+  assert.equal((await store.list('alice')).length, 2);
+});
 test('views save grouping, allow distinct groupings, and default legacy views to repository grouping', async t => {
   const { store, path } = await fixture(t);
   await writeFile(path, JSON.stringify({ version: 1, accounts: [{ login: 'alice', views: [{ id: 'legacy', name: 'Old', query: 'is:open' }] }] }));
