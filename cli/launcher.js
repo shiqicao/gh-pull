@@ -114,7 +114,7 @@ export async function serve({ dir, port, configPath = defaultSavedViewsPath(), t
   configPath = resolve(configPath);
   const savedViews = createSavedViewsStore(configPath);
   try { await savedViews.list(''); }
-  catch (error) { throw new Error(`Cannot read saved-views config ${configPath}: ${error.message}`, { cause: error }); }
+  catch (error) { throw new Error(`Cannot read saved-views config ${configPath}: ${error.cause?.message ?? error.message}`, { cause: error }); }
   const app = makeApp({ savedViews, config: { mode: 'local' }, localControl: { token, version: VERSION, stop } });
   try {
     try { await listen(app, port ?? 3000); }

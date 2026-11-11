@@ -32,9 +32,14 @@ export function createSavedViewsStore(path = defaultSavedViewsPath(), now = () =
   async function read() {
     try {
       const data = JSON.parse(await readFile(path, 'utf8'));
-      if (data.version !== 1 || !Array.isArray(data.accounts)) throw new Error('Invalid saved views file');
+      if (!data || data.version !== 1 || !Array.isArray(data.accounts)) throw new Error('Invalid saved views file');
       return data;
-    } catch (error) { if (error.code === 'ENOENT') return { version: 1, accounts: [] }; throw error; }
+    } catch (error) {
+      if (error.code === 'ENOENT') return { version: 1, accounts: [] };
+      const failure = new ApiError('Cannot read the saved-views config file. Check its permissions and JSON format, repair or restore it from a backup, then retry. The file has not been changed.', 500);
+      failure.cause = error;
+      throw failure;
+    }
   }
   return {
     async list(account) { return (await read()).accounts.find(a => a.login === account.toLowerCase())?.views ?? []; },
