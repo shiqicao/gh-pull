@@ -9,10 +9,11 @@ import { isSea, getAsset } from 'node:sea';
 import lockfile from 'proper-lockfile';
 import { createApp } from '../server.js';
 import { defaultToken } from '../github-client.js';
+import { createSavedViewsStore, defaultSavedViewsPath } from '../saved-views.js';
 
 const exec = promisify(execFile);
 export const VERSION = typeof CLI_VERSION === 'string' ? CLI_VERSION : 'development';
-export const HELP = `Usage: gh pull [--no-open] [--port PORT] [--foreground]
+export const HELP = `Usage: gh pull [--no-open] [--port PORT] [--foreground] [--config PATH]
        gh pull status
        gh pull stop
 
@@ -21,6 +22,7 @@ The dashboard runs in the background on 127.0.0.1. Run again to reopen it.
 
   --no-open       Print the URL without opening a browser
   --port PORT     Listen on a specific port (default: 3000, or an available port)
+  --config PATH   Use a saved-views JSON file (default: XDG config directory)
   --foreground    Keep the server in this terminal; Ctrl+C stops it
   --licenses      Show bundled open-source licenses
   --version       Show the installed version
@@ -39,14 +41,18 @@ export function parseArgs(args) {
     if (arg === '--version' || arg === '-v') return { command: 'version' };
     if (arg === '--no-open') options.open = false;
     else if (arg === '--foreground') options.foreground = true;
-    else if (arg === '--port') {
+    else if (arg === '--config') {
+      const path = args[++i];
+      if (!path || path.startsWith('-')) throw new Error('--config requires a file path.');
+      options.configPath = resolve(path === '~' ? homedir() : path.startsWith('~/') || path.startsWith('~\\') ? join(homedir(), path.slice(2)) : path);
+    } else if (arg === '--port') {
       const port = args[++i];
       if (!/^\d+$/.test(port ?? '') || Number(port) < 1 || Number(port) > 65535) throw new Error('--port must be between 1 and 65535.');
       options.port = Number(port);
     } else if (['status', 'stop'].includes(arg) && options.command === 'start') options.command = arg;
     else throw new Error(`Unknown argument: ${arg}. Run gh pull --help.`);
   }
-  if (options.command !== 'start' && (options.port || options.foreground || !options.open)) throw new Error('Start options cannot be used with status or stop.');
+  if (options.command !== 'start' && (options.port || options.configPath || options.foreground || !options.open)) throw new Error('Start options cannot be used with status or stop.');
   return options;
 }
 
@@ -97,7 +103,7 @@ function listen(app, port) {
   });
 }
 
-export async function serve({ dir, port, token = randomBytes(32).toString('hex') }, { makeApp = createApp } = {}) {
+export async function serve({ dir, port, configPath = defaultSavedViewsPath(), token = randomBytes(32).toString('hex') }, { makeApp = createApp } = {}) {
   let closing;
   const stop = () => closing ??= (async () => {
     await new Promise(resolve => { app.close(resolve); app.closeAllConnections(); });
@@ -105,14 +111,18 @@ export async function serve({ dir, port, token = randomBytes(32).toString('hex')
     if (state?.token === token) await rm(join(dir, 'instance.json'), { force: true });
     process.off('SIGINT', stop); process.off('SIGTERM', stop);
   })();
-  const app = makeApp({ config: { mode: 'local' }, localControl: { token, version: VERSION, stop } });
+  configPath = resolve(configPath);
+  const savedViews = createSavedViewsStore(configPath);
+  try { await savedViews.list(''); }
+  catch (error) { throw new Error(`Cannot read saved-views config ${configPath}: ${error.message}`, { cause: error }); }
+  const app = makeApp({ savedViews, config: { mode: 'local' }, localControl: { token, version: VERSION, stop } });
   try {
     try { await listen(app, port ?? 3000); }
     catch (error) {
       if (error.code !== 'EADDRINUSE' || port !== undefined) throw error;
       await listen(app, 0);
     }
-    const state = { port: app.address().port, token, pid: process.pid };
+    const state = { port: app.address().port, token, pid: process.pid, configPath };
     const temp = join(dir, `instance-${token}.tmp`);
     await writeFile(temp, JSON.stringify(state), { mode: 0o600 });
     await rename(temp, join(dir, 'instance.json'));
@@ -164,9 +174,10 @@ export async function runCLI(args, { dir = stateDirectory(), authenticate = defa
       return output(instance ? 'gh-pull stopped.' : 'gh-pull is not running.');
     }
     if (instance && options.port && options.port !== instance.port) throw new Error(`Already running on port ${instance.port}. Run gh pull stop before changing the port.`);
+    if (instance && options.configPath && options.configPath !== instance.configPath) throw new Error('Already running with a different or unknown config file. Run gh pull stop before changing --config.');
     if (!instance) {
       await authenticate();
-      instance = options.foreground ? await serve({ dir, port: options.port }) : await launchDaemon({ dir, port: options.port });
+      instance = options.foreground ? await serve({ dir, port: options.port, configPath: options.configPath }) : await launchDaemon({ dir, port: options.port, configPath: options.configPath });
     } else output('Reusing the running dashboard.');
   } finally { await release(); }
   const url = `http://127.0.0.1:${instance.port}`;

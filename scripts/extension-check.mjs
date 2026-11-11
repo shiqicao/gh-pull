@@ -49,6 +49,12 @@ test('standalone extension launches, embeds assets, reuses, stops, and recovers 
   assert.match((await command('--no-open')).stdout, /Reusing/);
   assert.match((await command('stop')).stdout, /stopped/);
   assert.match((await command('status')).stdout, /not running/);
+  const configPath = join(dir, 'custom views.json');
+  await command('--no-open', '--config', configPath);
+  assert.equal(JSON.parse(await readFile(join(dir, 'instance.json'))).configPath, configPath);
+  assert.match((await command('--no-open', '--config', configPath)).stdout, /Reusing/);
+  await assert.rejects(command('--no-open', '--config', join(dir, 'other.json')), /gh pull stop/);
+  await command('stop');
   // Stale state pointing at an unrelated server must not let stop kill it.
   const other = createServer((req, res) => { res.writeHead(404); res.end('unrelated'); });
   await new Promise(resolve => other.listen(0, '127.0.0.1', resolve));

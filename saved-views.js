@@ -24,7 +24,11 @@ export function rankSavedViews(views, now = Date.now()) {
   return [...favorites, ...entries.filter(entry => !favorites.includes(entry)).sort((a, b) => b.score - a.score)].map(entry => entry.view);
 }
 
-export function createSavedViewsStore(path = join(process.env.XDG_CONFIG_HOME || join(homedir(), '.config'), 'gh-pull', 'saved-views.json'), now = () => new Date().toISOString()) {
+export function defaultSavedViewsPath() {
+  return join(process.env.XDG_CONFIG_HOME || join(homedir(), '.config'), 'gh-pull', 'saved-views.json');
+}
+
+export function createSavedViewsStore(path = defaultSavedViewsPath(), now = () => new Date().toISOString()) {
   async function read() {
     try {
       const data = JSON.parse(await readFile(path, 'utf8'));
