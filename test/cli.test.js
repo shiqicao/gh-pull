@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { mkdtemp, readFile, writeFile, rm } from 'node:fs/promises';
+import { tmpdir, homedir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { createServer } from 'node:http';
 import { parseArgs, serve, runCLI } from '../cli/launcher.js';
 import { createApp } from '../server.js';
@@ -65,4 +65,46 @@ test('missing credentials produce actionable instructions without starting a ser
   t.after(() => rm(dir, { recursive: true, force: true }));
   await assert.rejects(runCLI(['--no-open'], { dir, authenticate: () => { throw new Error('Run gh auth login'); } }), /gh auth login/);
   await assert.rejects(readFile(join(dir, 'instance.json')), { code: 'ENOENT' });
+});
+
+
+test('config paths accept relative paths, spaces and home expansion; reject missing values and control commands', () => {
+  assert.equal(parseArgs(['--config', 'my views.json']).configPath, resolve('my views.json'));
+  assert.equal(parseArgs(['--config', '~/views.json']).configPath, join(homedir(), 'views.json'));
+  for (const args of [['--config'], ['--config', ''], ['--config', '--no-open'], ['status', '--config', 'views.json'], ['--config', 'views.json', 'stop']]) assert.throws(() => parseArgs(args));
+});
+
+test('custom config persists saved views and prevents switching a running dashboard to another file', async t => {
+  const dir = await mkdtemp(join(tmpdir(), 'gh-pull-config-'));
+  t.after(() => rm(dir, { recursive: true, force: true }));
+  const configPath = join(dir, 'new folder', 'custom views.json');
+  const list = async () => ({}); list.viewer = async () => 'alice';
+  const instance = await serve({ dir, port: 0, configPath }, { makeApp: options => createApp({ ...options, list }) });
+  t.after(instance.stop);
+  await assert.rejects(readFile(configPath), { code: 'ENOENT' });
+  const origin = `http://127.0.0.1:${instance.port}`;
+  const response = await fetch(`${origin}/api/saved-views`, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: origin }, body: JSON.stringify({ action: 'save', account: 'alice', name: 'Mine', query: 'author:@me' }) });
+  assert.equal(response.status, 200);
+  assert.equal(JSON.parse(await readFile(configPath)).accounts[0].views[0].name, 'Mine');
+  const options = { dir, output() {}, authenticate() { throw new Error('Must reuse'); } };
+  await runCLI(['--no-open', '--config', configPath], options);
+  await runCLI(['--no-open'], options);
+  await assert.rejects(runCLI(['--no-open', '--config', join(dir, 'other.json')], options), /gh pull stop/);
+  await instance.stop();
+  const restarted = await serve({ dir, port: 0, configPath }, { makeApp: options => createApp({ ...options, list }) });
+  t.after(restarted.stop);
+  assert.equal((await (await fetch(`http://127.0.0.1:${restarted.port}/api/saved-views`)).json()).views[0].name, 'Mine');
+});
+
+test('invalid or unreadable config fails before starting a dashboard and preserves the file', async t => {
+  const dir = await mkdtemp(join(tmpdir(), 'gh-pull-invalid-config-'));
+  t.after(() => rm(dir, { recursive: true, force: true }));
+  const configPath = join(dir, 'views.json');
+  for (const content of ['broken', '{}']) {
+    await writeFile(configPath, content);
+    await assert.rejects(serve({ dir, port: 0, configPath }), /Cannot read saved-views config/);
+    assert.equal(await readFile(configPath, 'utf8'), content);
+    await assert.rejects(readFile(join(dir, 'instance.json')), { code: 'ENOENT' });
+  }
+  await assert.rejects(serve({ dir, port: 0, configPath: dir }), /Cannot read saved-views config/);
 });

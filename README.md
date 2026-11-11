@@ -68,9 +68,12 @@ Open <http://localhost:3000>. Local mode is the default (`AUTH_MODE=local`). The
 | --- | --- | --- |
 | `GH_TOKEN` / `GITHUB_TOKEN` | Both | Optional token; takes precedence over your GitHub CLI login |
 | `--port PORT` | Extension | Select a port explicitly; otherwise tries 3000, then an available port |
+| `--config PATH` | Extension | Use a saved-views JSON file instead of the default XDG config path |
 | `GH_PULL_STATE_DIR` | Extension | Override the directory containing instance-control state |
 | `PORT` | Source | Server port; defaults to 3000 |
 | `AUTH_MODE=local` | Source | Local authentication; this is the default |
+
+For a custom saved-views file, run `gh pull --config /path/to/saved-views.json`. Relative paths resolve from your current directory; `~/` expands to your home directory. The file uses the existing saved-views JSON format, not environment variables or startup settings. Missing files and parent directories are created on first save; unreadable or invalid files fail at startup. To change files, run `gh pull stop` first. Running `gh pull` without `--config` reopens the current dashboard, including its custom file; after stopping it, omitting the flag uses the default again.
 
 Credentials stay in the local backend and are never sent to the browser. Both options bind only to `127.0.0.1`. The extension uses `--port`, not the source server's `PORT` environment variable.
 
