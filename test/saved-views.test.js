@@ -1,16 +1,75 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { createSavedViewsStore, rankSavedViews } from '../saved-views.js';
 import { createApp } from '../server.js';
-async function fixture(t) {
+async function fixture(t, existing = true) {
   const dir = await mkdtemp(join(tmpdir(), 'gh-pull-views-'));
   t.after(() => rm(dir, { recursive: true, force: true }));
   const path = join(dir, 'saved-views.json');
+  if (existing) await writeFile(path, JSON.stringify({ version: 1, accounts: [{ login: 'alice', views: [] }, { login: 'bob', views: [] }] }));
   return { path, store: createSavedViewsStore(path) };
 }
+test('new accounts receive a persistent mine view, while deleted and existing views stay intact', async t => {
+  const { path, store } = await fixture(t, false);
+  assert.deepEqual(await store.list(''), []);
+  await assert.rejects(readFile(path), { code: 'ENOENT' });
+  const [mine] = await store.list('Alice');
+  assert.deepEqual({ ...mine, id: 'id', createdAt: 'date' }, {
+    id: 'id', name: 'mine', query: 'is:open involves:@me sort:updated-desc', group: 'repo',
+    loadCount: 0, createdAt: 'date', lastEditedAt: null, lastLoadedAt: null,
+  });
+  assert.match(mine.id, /^[a-f0-9-]{36}$/);
+  assert.ok(Number.isFinite(Date.parse(mine.createdAt)));
+  assert.deepEqual(await createSavedViewsStore(path).list('ALICE'), [mine]);
+  const [bob] = await store.list('bob');
+  assert.equal(bob.name, 'mine');
+  assert.notEqual(bob.id, mine.id);
+  await store.change('alice', { action: 'delete', id: mine.id });
+  assert.deepEqual(await createSavedViewsStore(path).list('alice'), []);
+  assert.deepEqual(JSON.parse(await readFile(path)).accounts.find(a => a.login === 'alice').views, []);
+  assert.deepEqual(await store.list('bob'), [bob]);
+  await store.change('bob', { action: 'rename', id: bob.id, name: 'My queue' });
+  assert.deepEqual((await createSavedViewsStore(path).list('bob')).map(v => v.name), ['My queue']);
+});
+
+test('concurrent initialization and saves preserve one default per new account', async t => {
+  const { path, store } = await fixture(t, false);
+  const other = createSavedViewsStore(path);
+  const [first, second] = await Promise.all([store.list('alice'), other.list('ALICE')]);
+  assert.deepEqual(first, second);
+  assert.equal(first.length, 1);
+  await Promise.all([
+    store.list('bob'),
+    other.change('bob', { action: 'save', name: 'Authored', query: 'author:@me' }),
+    store.list('charlie'),
+  ]);
+  assert.deepEqual((await store.list('bob')).map(v => v.name), ['mine', 'Authored']);
+  assert.equal((await store.list('charlie')).length, 1);
+  assert.equal(JSON.parse(await readFile(path)).accounts.length, 3);
+});
+
+test('initialization explains unwritable directories without changing existing accounts', { skip: process.platform === 'win32' || process.getuid?.() === 0 }, async t => {
+  const { path, store } = await fixture(t, false);
+  const original = await store.list('alice');
+  const before = await readFile(path, 'utf8');
+  await chmod(dirname(path), 0o500);
+  try {
+    assert.deepEqual(await store.list('alice'), original);
+    await assert.rejects(store.list('bob'), error => {
+      assert.equal(error.status, 500);
+      assert.match(error.message, /Check write permissions/);
+      assert.ok(error.message.includes(path));
+      assert.equal(error.cause.code, 'EACCES');
+      return true;
+    });
+    assert.equal(await readFile(path, 'utf8'), before);
+  } finally { await chmod(dirname(path), 0o700); }
+  assert.equal((await store.list('bob'))[0].name, 'mine');
+});
+
 test('saved views persist, preserve order, isolate accounts and reject duplicates', async t => {
   const { store, path } = await fixture(t);
   assert.deepEqual(await store.list('alice'), []);

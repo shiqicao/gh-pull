@@ -1,7 +1,7 @@
 import test from 'node:test';
 import AxeBuilder from '@axe-core/playwright';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createSavedViewsStore } from '../saved-views.js';
@@ -9,6 +9,7 @@ import { browserFixture } from './browser-fixture.mjs';
 
 async function setup(t, seed = true) {
   const dir = await mkdtemp(join(tmpdir(), 'saved-views-browser-'));
+  if (seed !== null) await writeFile(join(dir, 'views.json'), JSON.stringify({ version: 1, accounts: [{ login: 'alice', views: [] }] }));
   const store = createSavedViewsStore(join(dir, 'views.json'), () => '2026-01-01T00:00:00.000Z');
   if (seed) {
     await store.change('alice', { action: 'save', name: 'My work', query: 'is:open author:@me', group: 'author' });
@@ -38,6 +39,21 @@ async function setup(t, seed = true) {
   await page.waitForFunction(() => { const button = document.querySelector('#save-view-new'); return button && !button.disabled; });
   return { ...fixture, store, queries, panel: page.locator('#saved-views-panel'), editor: page.locator('.cm-content') };
 }
+
+test('a new account can load its default mine view grouped by repository', async t => {
+  const { page, store, editor, errors } = await setup(t, null);
+  const response = page.waitForResponse(res => res.url().endsWith('/api/saved-views') && res.request().postDataJSON()?.action === 'load');
+  await page.getByRole('button', { name: 'mine', exact: true }).click();
+  await response;
+  assert.equal(await editor.innerText(), 'is:open involves:@me sort:updated-desc');
+  assert.equal(new URL(page.url()).searchParams.get('group'), 'repo');
+  const [mine] = await store.list('alice');
+  assert.equal(mine.loadCount, 1);
+  await page.reload();
+  await page.getByRole('button', { name: 'mine', exact: true }).waitFor();
+  assert.equal((await store.list('alice'))[0].id, mine.id);
+  assert.deepEqual(errors, []);
+});
 
 test('searching and saving are explicit, with stable controls and applied-query-only saves', async t => {
   const { page, store, editor, queries, errors } = await setup(t);
