@@ -126,6 +126,27 @@ test('selected view arrow and More toggle their popup closed', async t => {
   assert.deepEqual(errors, []);
 });
 
+test('delete confirmation keeps keyboard focus and exposes its description', async t => {
+  const { page, panel, store, errors } = await setup(t);
+  const pill = page.locator('.saved-view-pill[aria-pressed="true"]');
+  const original = await store.list('alice');
+  await pill.focus();
+  await page.keyboard.press('Enter');
+  await page.keyboard.press('Tab');
+  assert.equal(await panel.getByRole('button', { name: 'Delete…' }).evaluate(el => el === document.activeElement), true);
+  await page.keyboard.press('Enter');
+  assert.equal(await panel.getByRole('button', { name: 'Cancel', exact: true }).evaluate(el => el === document.activeElement), true);
+  const description = await panel.getAttribute('aria-describedby');
+  assert.match(await page.locator(`#${description}`).textContent(), /Delete “My work”/);
+  await page.keyboard.press('Enter');
+  assert.equal(await panel.isVisible(), false);
+  assert.deepEqual(await store.list('alice'), original);
+  await pill.focus();
+  await page.keyboard.press('Enter');
+  assert.equal(await panel.getAttribute('aria-describedby'), null);
+  assert.deepEqual(errors, []);
+});
+
 test('view selection, revert, discarded-edit undo, rename, delete and delete undo', async t => {
   const { page, store, editor, panel, errors } = await setup(t);
   await page.locator('#group').selectOption('status');
