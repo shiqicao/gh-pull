@@ -516,3 +516,26 @@ test('reviewer identities retain GitHub bot type for avatar shape', () => {
   const result = reviewersFor({ author: { login: 'author' }, latestReviews: { nodes: [{ author: { login: 'robot', __typename: 'Bot' }, state: 'COMMENTED' }] }, reviewRequests: { nodes: [{ requestedReviewer: { login: 'other-bot', __typename: 'Bot' } }] } });
   assert.deepEqual(result, [{ name: 'other-bot', state: 'REQUESTED', kind: 'bot' }, { name: 'robot', state: 'COMMENTED', kind: 'bot' }]);
 });
+
+
+test('failed check names include runs and legacy statuses with a bounded list and complete count', async () => {
+  const list = createGitHub({ getToken: async () => 'test-token', fetchImpl: async (url, options) => {
+    assert.match(JSON.parse(options.body).query, /contexts\(first: 100\)/);
+    return Response.json({ data: { viewer: { login: 'alice', pullRequests: {
+      totalCount: 1, pageInfo: { hasNextPage: false }, nodes: [node({
+        commits: { nodes: [{ commit: { statusCheckRollup: { state: 'FAILURE', contexts: {
+          nodes: [null, { name: 'pass', conclusion: 'SUCCESS' }, { name: 'skip', conclusion: 'SKIPPED' },
+            { name: 'unit', conclusion: 'FAILURE', detailsUrl: 'https://github.com/example/repo/actions/runs/1' }, { context: 'legacy', state: 'ERROR', targetUrl: 'https://ci.example.com/build/1' },
+            ...['TIMED_OUT', 'CANCELLED', 'ACTION_REQUIRED', 'STARTUP_FAILURE'].map(conclusion => ({ name: conclusion, conclusion }))],
+          checkRunCountsByState: [{ state: 'FAILURE', count: 6 }, { state: 'TIMED_OUT', count: 1 },
+            { state: 'CANCELLED', count: 1 }, { state: 'ACTION_REQUIRED', count: 1 }, { state: 'STARTUP_FAILURE', count: 1 }, { state: 'SUCCESS', count: 90 }],
+          statusContextCountsByState: [{ state: 'ERROR', count: 1 }],
+          totalCount: 101, pageInfo: { hasNextPage: true },
+        } } } }] },
+      })],
+    } } } });
+  } });
+  assert.deepEqual((await list()).items[0].failedChecks, {
+    items: [{ name: 'unit', url: 'https://github.com/example/repo/actions/runs/1' }, { name: 'legacy', url: 'https://ci.example.com/build/1' }, ...['TIMED_OUT', 'CANCELLED', 'ACTION_REQUIRED'].map(name => ({ name, url: null }))], total: 11, truncated: true,
+  });
+});

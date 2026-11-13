@@ -1,4 +1,5 @@
 import { tooltip } from './tooltip.js';
+import { hovercard } from './hovercard.js';
 import { iconButton, formError } from './controls.js';
 import { html, nothing, repeat } from './vendor/lit-html.js';
 import { labels, reviewLabels, reviewStates, relativeTime, NAME_COLOR_COUNT, isOwn } from './model.js';
@@ -16,13 +17,27 @@ function dependency(node) {
   const baseDescription = `Base branch: ${node.pr.baseBranch}. Its parent PR could not be identified in the loaded results or GitHub lookup.`;
   return node.unloadedBase ? html`<span class="dependency-chip" aria-description=${baseDescription} data-tooltip=${baseDescription}>↑ base not loaded</span>` : nothing;
 }
+function checkUrl(value, fallback) {
+  try {
+    const url = new URL(value);
+    if (['https:', 'http:'].includes(url.protocol)) return url.href;
+  } catch {}
+  return fallback;
+}
 function checks(pr) {
   const pending = pr.checks === 'PENDING' && pr.checkCounts?.total > 0;
   const label = `${labels[pr.checks] ?? pr.checks}${pending ? ` · ${pr.checkCounts.passed}/${pr.checkCounts.total}` : ''}`;
   const symbol = { SUCCESS: 'check', FAILURE: 'cross', PENDING: 'clock' }[pr.checks] ?? 'dash';
   const content = html`${icon(symbol, 16)}<span class="sr-only">${label}</span>`;
+  const failed = pr.checks === 'FAILURE' || pr.checks === 'ERROR' ? pr.failedChecks : null;
+  const items = failed?.items ?? [];
+  const hasFailures = items.length || failed?.total > 0;
+  const fallbackUrl = githubUrl(pr.url, 'checks');
+  const details = hasFailures
+    ? html`<strong>${label}</strong><ul class="ci-failed-checks">${items.map(check => html`<li><a href=${checkUrl(check.url, fallbackUrl)} target="_blank" rel="noopener noreferrer" data-view-pr>${check.name.length > 80 ? `${check.name.slice(0, 79)}…` : check.name}<span class="sr-only"> (opens in a new tab)</span></a></li>`)}</ul>${failed.total > items.length ? html`<a href=${fallbackUrl} target="_blank" rel="noopener noreferrer" data-view-pr>+${failed.total - items.length} more<span class="sr-only"> (opens in a new tab)</span></a>` : failed.truncated ? html`<a href=${fallbackUrl} target="_blank" rel="noopener noreferrer" data-view-pr>More checks on GitHub<span class="sr-only"> (opens in a new tab)</span></a>` : nothing}`
+    : `${label} · View checks (opens in a new tab)`;
   return githubUrl(pr.url) !== nothing
-    ? html`<a class=${`ci-indicator ${pr.checks.toLowerCase()}`} href=${githubUrl(pr.url, 'checks')} target="_blank" rel="noopener noreferrer" data-view-pr data-tooltip=${`${label} · View checks (opens in a new tab)`} aria-label=${`${label}: view checks for ${pr.title} (opens in a new tab)`}>${content}</a>`
+    ? html`<a class=${`ci-indicator ${pr.checks.toLowerCase()}`} href=${fallbackUrl} target="_blank" rel="noopener noreferrer" data-view-pr ${hasFailures ? hovercard(details) : tooltip(details)} aria-label=${`${label}: view checks for ${pr.title} (opens in a new tab)`}>${content}</a>`
     : html`<span class=${`ci-indicator ${pr.checks.toLowerCase()}`} data-tooltip=${label} aria-label=${label}>${content}</span>`;
 }
 

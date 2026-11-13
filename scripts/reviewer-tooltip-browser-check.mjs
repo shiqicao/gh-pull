@@ -65,7 +65,9 @@ test('plain hints share styled tooltips, update dynamically, and dismiss when re
   for (const selector of ['.ci-indicator', '.diff-counts', '.updated-time', '.branch-copy', '.copy-link', '#refresh']) {
     const target = page.locator(selector).first();
     await target.hover(); await tip.waitFor();
-    assert.equal(await tip.textContent(), await target.getAttribute('data-tooltip'));
+    assert.equal(await tip.textContent(), selector === '.ci-indicator'
+      ? 'Checks passed · View checks (opens in a new tab)'
+      : await target.getAttribute('data-tooltip'));
     assert.equal(await target.getAttribute('title'), null);
     await page.keyboard.press('Escape');
   }
