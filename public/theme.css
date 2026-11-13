@@ -52,8 +52,8 @@
   --color-suggestion-bg: light-dark(#ffffff, #161b22);
   --color-suggestion-selected: light-dark(#ddf4ff, #26374c);
   --color-unread: light-dark(#0969da, #ffffff);
-  --font-size-small: 12px;
-  --font-size-body: 13px;
+  --font-size-small: 0.75rem;
+  --font-size-body: 0.8125rem;
   --radius-small: 4px;
   --radius-control: 6px;
   --radius-panel: 8px;

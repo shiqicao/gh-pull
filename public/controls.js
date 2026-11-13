@@ -30,7 +30,7 @@ export const formError = (message, className = '') => message
 
 export function formActions({ saving, disabled, submitLabel, pendingLabel, onCancel, tone = 'default' }) {
   return html`<div class="form-actions">
-    <button type="button" ?disabled=${saving} @click=${onCancel}>Cancel</button>
+    <button type="button" data-form-cancel ?disabled=${saving} @click=${onCancel}>Cancel</button>
     <button type="submit" class=${tone === 'danger' ? 'button-danger' : nothing} ?disabled=${saving || disabled}>${saving ? pendingLabel : submitLabel}</button>
   </div>`;
 }

@@ -458,3 +458,33 @@ test('edited saved-view identity survives relaunch without implicitly updating t
   await selected.waitFor();
   assert.match(await selected.textContent(), /My work/);
 });
+
+
+test('saved-view forms remain usable at 200% text size on a narrow viewport', async t => {
+  const { page, panel, store, errors } = await setup(t, false);
+  const cdp = await page.context().newCDPSession(page);
+  await cdp.send('Page.setFontSizes', { fontSizes: { standard: 32, fixed: 32 } });
+  await page.setViewportSize({ width: 320, height: 900 });
+  await page.reload();
+  assert.equal(await page.evaluate(() => getComputedStyle(document.documentElement).fontSize), '32px');
+  await page.locator('#save-view-new').click();
+  const name = panel.getByRole('textbox');
+  await name.fill('Large text');
+  const fits = async () => {
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+    assert.equal(await panel.evaluate(el => el.scrollWidth <= el.clientWidth), true);
+    const clipped = await panel.locator('button').evaluateAll(buttons => buttons.filter(el => el.scrollWidth > el.clientWidth || el.scrollHeight > el.clientHeight).map(el => el.textContent));
+    assert.deepEqual(clipped, []);
+  };
+  await fits();
+  await panel.getByRole('button', { name: 'Save view', exact: true }).click();
+  await page.waitForFunction(() => !document.querySelector('#saved-views-panel').matches(':popover-open'));
+  assert.equal((await store.list('alice')).some(view => view.name === 'Large text'), true);
+  await page.locator('.saved-view-pill[aria-pressed="true"]').click();
+  await panel.getByRole('button', { name: 'Delete…' }).click();
+  await fits();
+  await page.screenshot({ path: '/tmp/gh-pull-text-delete-200.png', fullPage: true });
+  await panel.getByRole('button', { name: 'Cancel', exact: true }).press('Enter');
+  assert.equal(await panel.isVisible(), false);
+  assert.deepEqual(errors, []);
+});

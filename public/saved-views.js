@@ -178,7 +178,7 @@ export function createSavedViews({ request, getQuery, getAppliedQuery, getGroup,
     if (popupTrigger) popover.attach(popupTrigger, { anchor: mode === 'save' ? footer : popupTrigger, align: ['save', 'more'].includes(mode) ? 'end' : 'start' });
     render(mode === 'more' ? html`<div class="popover-menu" aria-label="More saved views">${repeat(overflow, view => view.id, view => html`<button type="button" class="popover-menu-item" data-tooltip=${`${view.query} · Group by: ${groupName(view.group)}`} @click=${() => select(view)}>${view.name}</button>`)}</div>` : mode === 'menu' ? html`<div class="popover-menu">
       <button type="button" class="popover-menu-item" @click=${() => { mode = 'rename'; name = view.name; content(); popover.panel.querySelector('input').focus(); }}>Rename…</button>
-      <button type="button" class="popover-menu-item destructive" @click=${() => { mode = 'delete'; content(); popover.panel.querySelector('button[type="button"]').focus(); }}>Delete…</button>
+      <button type="button" class="popover-menu-item destructive" @click=${() => { mode = 'delete'; content(); popover.panel.querySelector('[data-form-cancel]').focus(); }}>Delete…</button>
     </div>` : html`<form @submit=${event => {
       event.preventDefault();
       if (busy) return;
