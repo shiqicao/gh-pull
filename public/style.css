@@ -1115,3 +1115,6 @@ body:has(#dashboard[hidden]) .pr-column-header, body:has(#dashboard[hidden]) .re
 .title-tooltip-text { display: block; max-width: 360px; white-space: normal; overflow-wrap: anywhere; }
 
 .comment-draft-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--color-accent); flex-shrink: 0; margin-left: 3px; }
+
+.ci-failed-checks { margin: 4px 0; padding-left: 16px; }
+.ci-failed-checks ~ span { display: block; }

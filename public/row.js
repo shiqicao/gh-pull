@@ -21,8 +21,12 @@ function checks(pr) {
   const label = `${labels[pr.checks] ?? pr.checks}${pending ? ` · ${pr.checkCounts.passed}/${pr.checkCounts.total}` : ''}`;
   const symbol = { SUCCESS: 'check', FAILURE: 'cross', PENDING: 'clock' }[pr.checks] ?? 'dash';
   const content = html`${icon(symbol, 16)}<span class="sr-only">${label}</span>`;
+  const failed = pr.checks === 'FAILURE' || pr.checks === 'ERROR' ? pr.failedChecks : null;
+  const details = failed?.names?.length || failed?.total > 0
+    ? html`<strong>${label}</strong><ul class="ci-failed-checks">${(failed.names ?? []).map(name => html`<li>${name.length > 80 ? `${name.slice(0, 79)}…` : name}</li>`)}</ul>${failed.total > failed.names.length ? html`<span>+${failed.total - failed.names.length} more</span>` : failed.truncated ? html`<span>More checks on GitHub</span>` : nothing}<span>View checks ↗</span>`
+    : `${label} · View checks (opens in a new tab)`;
   return githubUrl(pr.url) !== nothing
-    ? html`<a class=${`ci-indicator ${pr.checks.toLowerCase()}`} href=${githubUrl(pr.url, 'checks')} target="_blank" rel="noopener noreferrer" data-view-pr data-tooltip=${`${label} · View checks (opens in a new tab)`} aria-label=${`${label}: view checks for ${pr.title} (opens in a new tab)`}>${content}</a>`
+    ? html`<a class=${`ci-indicator ${pr.checks.toLowerCase()}`} href=${githubUrl(pr.url, 'checks')} target="_blank" rel="noopener noreferrer" data-view-pr ${tooltip(details)} aria-label=${`${label}: view checks for ${pr.title} (opens in a new tab)`}>${content}</a>`
     : html`<span class=${`ci-indicator ${pr.checks.toLowerCase()}`} data-tooltip=${label} aria-label=${label}>${content}</span>`;
 }
 

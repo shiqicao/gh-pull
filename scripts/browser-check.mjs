@@ -274,8 +274,41 @@ test('every CI status links to the PR checks page', async t => {
       assert.equal(await link.getAttribute('href'), 'https://github.com/example/dashboard/pull/1/checks');
       assert.equal(await link.getAttribute('target'), '_blank');
       assert.match(await link.getAttribute('aria-label'), /view checks/);
-      if (checks === 'PENDING') assert.match(await link.getAttribute('data-tooltip'), /3\/8 · View checks/);
+      if (checks === 'PENDING') {
+        await link.focus();
+        await page.locator('#row-tooltip:popover-open').waitFor();
+        assert.match(await page.locator('#row-tooltip').innerText(), /3\/8 · View checks/);
+      }
       assert.deepEqual(errors, []);
     });
   }
+});
+
+
+test('failed CI tooltip lists brief names on hover and focus and updates after refresh', async t => {
+  const f = await fixture(t, { checks: 'FAILURE', failedChecks: {
+    names: ['unit tests', 'lint', '<script>bad</script>', 'build macOS', 'x'.repeat(120)], total: 8, truncated: true,
+  } });
+  await f.open();
+  const link = f.page.locator('a.ci-indicator');
+  await link.hover();
+  const tip = f.page.locator('#row-tooltip:popover-open');
+  await tip.waitFor();
+  assert.equal(await tip.locator('li').count(), 5);
+  assert.match(await tip.innerText(), /unit tests/);
+  assert.match(await tip.innerText(), /\+3 more/);
+  assert.equal(await tip.locator('li').last().innerText(), `${'x'.repeat(79)}…`);
+  assert.equal(await tip.locator('script').count(), 0);
+  await f.page.keyboard.press('Escape');
+  await tip.waitFor({ state: 'hidden' });
+  await link.focus();
+  await tip.waitFor();
+  assert.equal(await link.getAttribute('aria-describedby'), 'row-tooltip');
+  f.laterUpdate({ checks: 'SUCCESS', failedChecks: { names: [], total: 0, truncated: false } });
+  await f.refresh();
+  await link.focus();
+  await tip.waitFor();
+  assert.equal(await tip.locator('li').count(), 0);
+  assert.doesNotMatch(await tip.innerText(), /unit tests/);
+  assert.deepEqual(f.errors, []);
 });

@@ -35,7 +35,12 @@ const fields = `viewerCanClose viewerCanReopen id number title url state isDraft
   labels(first: 10) { nodes { name } }
   commits(last: 1) { nodes { commit { statusCheckRollup {
     state
-    contexts {
+    contexts(first: 100) {
+      nodes {
+        ... on CheckRun { name conclusion }
+        ... on StatusContext { context state }
+      }
+      pageInfo { hasNextPage }
       totalCount
       checkRunCountsByState { state count }
       statusContextCountsByState { state count }
