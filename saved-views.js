@@ -4,7 +4,7 @@ import { homedir } from 'node:os';
 import { randomUUID } from 'node:crypto';
 import lockfile from 'proper-lockfile';
 import { ApiError } from './github-client.js';
-import { normalizeQuery } from './public/query.js';
+import { DEFAULT_QUERY, normalizeQuery } from './public/query.js';
 
 function history(view) {
   const timestamp = value => typeof value === 'string' && Number.isFinite(Date.parse(value)) ? value : null;
@@ -41,8 +41,40 @@ export function createSavedViewsStore(path = defaultSavedViewsPath(), now = () =
       throw failure;
     }
   }
+  function newEntry(login) {
+    return { login, views: [{ id: randomUUID(), name: 'mine', query: normalizeQuery(DEFAULT_QUERY), group: 'repo', loadCount: 0, createdAt: now(), lastEditedAt: null, lastLoadedAt: null }] };
+  }
+  async function write(change) {
+    await mkdir(dirname(path), { recursive: true, mode: 0o700 });
+    const release = await lockfile.lock(path, { realpath: false, retries: { retries: 5, minTimeout: 20, maxTimeout: 200 } });
+    const temporary = `${path}.${randomUUID()}.tmp`;
+    try {
+      const data = await read();
+      const result = change(data);
+      await writeFile(temporary, JSON.stringify(data, null, 2) + '\n', { mode: 0o600 });
+      await rename(temporary, path);
+      return result;
+    } finally { await rm(temporary, { force: true }); await release(); }
+  }
   return {
-    async list(account) { return (await read()).accounts.find(a => a.login === account.toLowerCase())?.views ?? []; },
+    async list(account) {
+      const login = account.toLowerCase(), data = await read();
+      const entry = data.accounts.find(a => a.login === login);
+      // The launcher reads with no account to validate the config before authentication.
+      if (entry || !login) return entry?.views ?? [];
+      try {
+        return await write(data => {
+          let entry = data.accounts.find(a => a.login === login);
+          if (!entry) { entry = newEntry(login); data.accounts.push(entry); }
+          return entry.views;
+        });
+      } catch (error) {
+        if (!['EACCES', 'EPERM', 'EROFS'].includes(error.code)) throw error;
+        const failure = new ApiError(`Cannot create the default saved view in ${path}. Check write permissions for the saved-views config directory, then retry.`, 500);
+        failure.cause = error;
+        throw failure;
+      }
+    },
     async change(account, input) {
       if (!input || !['save', 'rename', 'update', 'delete', 'restore', 'load'].includes(input.action)) throw new ApiError('Invalid saved view action.', 400);
       const { action, id } = input;
@@ -57,13 +89,10 @@ export function createSavedViewsStore(path = defaultSavedViewsPath(), now = () =
         try { query = normalizeQuery(input.query); } catch (error) { throw new ApiError(error.message, 400); }
       }
       if (action === 'restore' && (typeof id !== 'string' || !/^[a-f0-9-]{36}$/i.test(id) || !Number.isInteger(input.position) || input.position < 0 || input.position > 100)) throw new ApiError('Invalid view to restore.', 400);
-      await mkdir(dirname(path), { recursive: true, mode: 0o700 });
-      const release = await lockfile.lock(path, { realpath: false, retries: { retries: 5, minTimeout: 20, maxTimeout: 200 } });
-      const temporary = `${path}.${randomUUID()}.tmp`;
-      try {
-        const data = await read(), login = account.toLowerCase();
+      return write(data => {
+        const login = account.toLowerCase();
         let entry = data.accounts.find(a => a.login === login);
-        if (!entry) { entry = { login, views: [] }; data.accounts.push(entry); }
+        if (!entry) { entry = newEntry(login); data.accounts.push(entry); }
         const views = entry.views, view = views.find(v => v.id === id);
         if (!['save', 'restore'].includes(action) && !view) throw new ApiError('This saved view no longer exists. Reload the page to refresh saved views.', 404);
         if (action === 'restore' && view) throw new ApiError('This view has already been restored.', 409);
@@ -79,10 +108,8 @@ export function createSavedViewsStore(path = defaultSavedViewsPath(), now = () =
           Object.assign(view, { query, group });
         } else if (action === 'load') Object.assign(view, { ...history(view), loadCount: Math.min(Number.MAX_SAFE_INTEGER, history(view).loadCount + 1), lastLoadedAt: now() });
         else views.splice(views.indexOf(view), 1);
-        await writeFile(temporary, JSON.stringify(data, null, 2) + '\n', { mode: 0o600 });
-        await rename(temporary, path);
         return views;
-      } finally { await rm(temporary, { force: true }); await release(); }
+      });
     },
   };
 }

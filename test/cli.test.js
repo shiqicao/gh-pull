@@ -83,9 +83,9 @@ test('custom config persists saved views and prevents switching a running dashbo
   t.after(instance.stop);
   await assert.rejects(readFile(configPath), { code: 'ENOENT' });
   const origin = `http://127.0.0.1:${instance.port}`;
-  const response = await fetch(`${origin}/api/saved-views`, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: origin }, body: JSON.stringify({ action: 'save', account: 'alice', name: 'Mine', query: 'author:@me' }) });
+  const response = await fetch(`${origin}/api/saved-views`, { method: 'POST', headers: { 'Content-Type': 'application/json', Origin: origin }, body: JSON.stringify({ action: 'save', account: 'alice', name: 'Authored', query: 'author:@me' }) });
   assert.equal(response.status, 200);
-  assert.equal(JSON.parse(await readFile(configPath)).accounts[0].views[0].name, 'Mine');
+  assert.equal(JSON.parse(await readFile(configPath)).accounts[0].views[1].name, 'Authored');
   const options = { dir, output() {}, authenticate() { throw new Error('Must reuse'); } };
   await runCLI(['--no-open', '--config', configPath], options);
   await runCLI(['--no-open'], options);
@@ -93,7 +93,7 @@ test('custom config persists saved views and prevents switching a running dashbo
   await instance.stop();
   const restarted = await serve({ dir, port: 0, configPath }, { makeApp: options => createApp({ ...options, list }) });
   t.after(restarted.stop);
-  assert.equal((await (await fetch(`http://127.0.0.1:${restarted.port}/api/saved-views`)).json()).views[0].name, 'Mine');
+  assert.equal((await (await fetch(`http://127.0.0.1:${restarted.port}/api/saved-views`)).json()).views.find(view => view.name === 'Authored').query, 'author:@me');
 });
 
 test('invalid or unreadable config fails before starting a dashboard and preserves the file', async t => {
