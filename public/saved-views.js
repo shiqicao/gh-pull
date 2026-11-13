@@ -170,13 +170,15 @@ export function createSavedViews({ request, getQuery, getAppliedQuery, getGroup,
   }
   function content() {
     const view = active(), nameForm = mode === 'save' || mode === 'rename';
+    if (mode === 'delete') popover.panel.setAttribute('aria-describedby', 'saved-view-delete-description');
+    else popover.panel.removeAttribute('aria-describedby');
     popover.panel.classList.toggle('saved-views-menu', !nameForm);
     popover.panel.classList.toggle('saved-views-rename', mode === 'rename');
     popover.panel.classList.toggle('saved-views-overflow', mode === 'more');
     if (popupTrigger) popover.attach(popupTrigger, { anchor: mode === 'save' ? footer : popupTrigger, align: ['save', 'more'].includes(mode) ? 'end' : 'start' });
     render(mode === 'more' ? html`<div class="popover-menu" aria-label="More saved views">${repeat(overflow, view => view.id, view => html`<button type="button" class="popover-menu-item" data-tooltip=${`${view.query} · Group by: ${groupName(view.group)}`} @click=${() => select(view)}>${view.name}</button>`)}</div>` : mode === 'menu' ? html`<div class="popover-menu">
       <button type="button" class="popover-menu-item" @click=${() => { mode = 'rename'; name = view.name; content(); popover.panel.querySelector('input').focus(); }}>Rename…</button>
-      <button type="button" class="popover-menu-item destructive" @click=${() => { mode = 'delete'; content(); }}>Delete…</button>
+      <button type="button" class="popover-menu-item destructive" @click=${() => { mode = 'delete'; content(); popover.panel.querySelector('button[type="button"]').focus(); }}>Delete…</button>
     </div>` : html`<form @submit=${event => {
       event.preventDefault();
       if (busy) return;
@@ -186,7 +188,7 @@ export function createSavedViews({ request, getQuery, getAppliedQuery, getGroup,
       if (mode === 'delete') job.removed = { ...view, position: views.indexOf(view) };
       void mutate(job);
     }}>
-      ${mode === 'delete' ? html`<p class="form-description">Delete “${view?.name}”? The current search stays on screen.</p>` : html`
+      ${mode === 'delete' ? html`<p id="saved-view-delete-description" class="form-description">Delete “${view?.name}”? The current search stays on screen.</p>` : html`
         <label class="form-label">${mode === 'save' ? 'Save as new view' : 'Rename view'}${formField({ label: 'View name', value: name, maxLength: 80, disabled: busy, onInput: value => { name = value; content(); } })}</label>`}
       ${mode === 'save' ? html`<div class="saved-view-summary"><div>Saves the current search:</div><code>${getAppliedQuery()}</code><div>Group by: <span>${groupName(getGroup())}</span></div></div>
         ${unapplied() ? html`<p class="form-description">Apply your query with Search or Enter before saving.</p>` : nothing}` : nothing}
