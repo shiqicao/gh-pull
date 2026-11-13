@@ -29,11 +29,11 @@ function checkCountsFor(pr) {
 const failedCheckStates = new Set(['FAILURE', 'ERROR', 'TIMED_OUT', 'CANCELLED', 'ACTION_REQUIRED', 'STARTUP_FAILURE', 'STALE']);
 function failedChecksFor(pr) {
   const contexts = pr.commits?.nodes[0]?.commit.statusCheckRollup?.contexts;
-  const names = (contexts?.nodes ?? []).filter(check => check && failedCheckStates.has(check.conclusion ?? check.state))
-    .map(check => check.name ?? check.context).filter(Boolean);
+  const items = (contexts?.nodes ?? []).filter(check => check && failedCheckStates.has(check.conclusion ?? check.state))
+    .map(check => ({ name: check.name ?? check.context, url: check.detailsUrl ?? check.targetUrl ?? null })).filter(check => check.name);
   const counts = [...(contexts?.checkRunCountsByState ?? []), ...(contexts?.statusContextCountsByState ?? [])];
-  const total = Math.max(names.length, counts.filter(count => failedCheckStates.has(count.state)).reduce((sum, count) => sum + count.count, 0));
-  return { names: names.slice(0, 5), total, truncated: Boolean(contexts?.pageInfo?.hasNextPage) };
+  const total = Math.max(items.length, counts.filter(count => failedCheckStates.has(count.state)).reduce((sum, count) => sum + count.count, 0));
+  return { items: items.slice(0, 5), total, truncated: Boolean(contexts?.pageInfo?.hasNextPage) };
 }
 
 export function reviewersFor(pr, viewerLogin) {

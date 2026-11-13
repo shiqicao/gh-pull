@@ -58,3 +58,10 @@ alongside the generated browser bundle.
 lit-html — BSD-3-Clause
 Copyright (c) 2017 Google LLC. All rights reserved.
 Vendored in public/vendor/lit-html.js. Full license: public/vendor/lit-html.LICENSE.txt.
+
+---
+
+Interest Invokers polyfill — BSD-3-Clause
+https://github.com/mfreed7/interestfor
+
+Full license and copyright notices: public/vendor/interestfor.LICENSE.txt.

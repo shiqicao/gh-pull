@@ -525,7 +525,7 @@ test('failed check names include runs and legacy statuses with a bounded list an
       totalCount: 1, pageInfo: { hasNextPage: false }, nodes: [node({
         commits: { nodes: [{ commit: { statusCheckRollup: { state: 'FAILURE', contexts: {
           nodes: [null, { name: 'pass', conclusion: 'SUCCESS' }, { name: 'skip', conclusion: 'SKIPPED' },
-            { name: 'unit', conclusion: 'FAILURE' }, { context: 'legacy', state: 'ERROR' },
+            { name: 'unit', conclusion: 'FAILURE', detailsUrl: 'https://github.com/example/repo/actions/runs/1' }, { context: 'legacy', state: 'ERROR', targetUrl: 'https://ci.example.com/build/1' },
             ...['TIMED_OUT', 'CANCELLED', 'ACTION_REQUIRED', 'STARTUP_FAILURE'].map(conclusion => ({ name: conclusion, conclusion }))],
           checkRunCountsByState: [{ state: 'FAILURE', count: 6 }, { state: 'TIMED_OUT', count: 1 },
             { state: 'CANCELLED', count: 1 }, { state: 'ACTION_REQUIRED', count: 1 }, { state: 'STARTUP_FAILURE', count: 1 }, { state: 'SUCCESS', count: 90 }],
@@ -536,6 +536,6 @@ test('failed check names include runs and legacy statuses with a bounded list an
     } } } });
   } });
   assert.deepEqual((await list()).items[0].failedChecks, {
-    names: ['unit', 'legacy', 'TIMED_OUT', 'CANCELLED', 'ACTION_REQUIRED'], total: 11, truncated: true,
+    items: [{ name: 'unit', url: 'https://github.com/example/repo/actions/runs/1' }, { name: 'legacy', url: 'https://ci.example.com/build/1' }, ...['TIMED_OUT', 'CANCELLED', 'ACTION_REQUIRED'].map(name => ({ name, url: null }))], total: 11, truncated: true,
   });
 });

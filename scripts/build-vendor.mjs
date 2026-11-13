@@ -24,3 +24,18 @@ await build({
   bundle: true, minify: true, format: 'esm', target: ['es2022'], legalComments: 'external',
 });
 await writeFile('public/vendor/lit-html.LICENSE.txt', await readFile('node_modules/lit-html/LICENSE', 'utf8'));
+
+// The upstream polyfill creates two style elements. Authorize them with the
+// same per-response nonce as CodeMirror, without weakening the app's CSP.
+const interestSource = await readFile('node_modules/interestfor/src/interestfor.js', 'utf8');
+let noncePatches = 0;
+const interestWithNonce = interestSource.replace(/const (style|uaStyle) = document\.createElement\("style"\);/g, (line, name) => {
+  noncePatches++;
+  return `${line}\n${name}.nonce = document.querySelector('meta[name="style-nonce"]')?.content ?? '';`;
+});
+if (noncePatches !== 2) throw new Error('Review interestfor style nonce integration after upgrade');
+await build({
+  stdin: { contents: interestWithNonce, sourcefile: 'interestfor.js' }, outfile: 'public/vendor/interestfor.js',
+  bundle: true, minify: true, format: 'esm', target: ['es2022'], legalComments: 'external',
+});
+await writeFile('public/vendor/interestfor.LICENSE.txt', await readFile('node_modules/interestfor/LICENSE', 'utf8'));

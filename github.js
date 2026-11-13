@@ -37,8 +37,8 @@ const fields = `viewerCanClose viewerCanReopen id number title url state isDraft
     state
     contexts(first: 100) {
       nodes {
-        ... on CheckRun { name conclusion }
-        ... on StatusContext { context state }
+        ... on CheckRun { name conclusion detailsUrl }
+        ... on StatusContext { context state targetUrl }
       }
       pageInfo { hasNextPage }
       totalCount

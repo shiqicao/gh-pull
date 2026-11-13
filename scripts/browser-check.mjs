@@ -285,30 +285,72 @@ test('every CI status links to the PR checks page', async t => {
 });
 
 
-test('failed CI tooltip lists brief names on hover and focus and updates after refresh', async t => {
+for (const polyfill of [false, true]) test(`failed CI hovercard links jobs, supports keyboard navigation and cleans up after refresh (${polyfill ? 'polyfill' : 'native'})`, async t => {
   const f = await fixture(t, { checks: 'FAILURE', failedChecks: {
-    names: ['unit tests', 'lint', '<script>bad</script>', 'build macOS', 'x'.repeat(120)], total: 8, truncated: true,
+    items: [
+      { name: 'unit tests', url: 'https://github.com/example/dashboard/actions/runs/1' },
+      { name: 'lint', url: 'https://ci.example.com/build/2' },
+      { name: '<script>bad</script>', url: 'javascript:alert(1)' },
+      { name: 'build macOS', url: null }, { name: 'x'.repeat(120), url: 'not a url' },
+    ], total: 8, truncated: true,
   } });
+  if (polyfill) await f.page.addInitScript(() => {
+    // Current Chromium ships this API without a runtime flag. Hide the IDL
+    // and cancel native interest so only the compatibility code drives it.
+    for (const type of [HTMLButtonElement, HTMLAnchorElement, HTMLAreaElement, SVGAElement]) delete type.prototype.interestForElement;
+    for (const type of ['interest', 'loseinterest']) document.addEventListener(type, event => {
+      if (event.isTrusted) { event.preventDefault(); event.stopImmediatePropagation(); }
+    }, true);
+  });
+  const polyfillRequests = [];
+  f.page.on('request', request => { if (request.url().endsWith('/vendor/interestfor.js')) polyfillRequests.push(request.url()); });
   await f.open();
+  assert.equal(polyfillRequests.length, polyfill ? 1 : 0);
   const link = f.page.locator('a.ci-indicator');
   await link.hover();
-  const tip = f.page.locator('#row-tooltip:popover-open');
+  const tip = f.page.locator('.ci-hovercard:popover-open');
   await tip.waitFor();
   assert.equal(await tip.locator('li').count(), 5);
   assert.match(await tip.innerText(), /unit tests/);
   assert.match(await tip.innerText(), /\+3 more/);
-  assert.equal(await tip.locator('li').last().innerText(), `${'x'.repeat(79)}…`);
+  assert.match(await tip.locator('li').last().innerText(), new RegExp(`${'x'.repeat(79)}…`));
   assert.equal(await tip.locator('script').count(), 0);
+  assert.doesNotMatch(await tip.innerText(), /View checks|View details/);
+  assert.equal(await tip.getAttribute('role'), 'group');
+  assert.equal(await link.getAttribute('aria-describedby'), null);
+  assert.equal(await tip.locator('li a').nth(0).getAttribute('href'), 'https://github.com/example/dashboard/actions/runs/1');
+  assert.equal(await tip.locator('li a').nth(1).getAttribute('href'), 'https://ci.example.com/build/2');
+  for (const index of [2, 3, 4]) assert.equal(await tip.locator('li a').nth(index).getAttribute('href'), 'https://github.com/example/dashboard/pull/1/checks');
+  await tip.locator('li a').first().hover();
+  await f.page.waitForTimeout(300);
+  assert.equal(await tip.count(), 1);
   await f.page.keyboard.press('Escape');
   await tip.waitFor({ state: 'hidden' });
+  await f.page.mouse.move(0, 0);
   await link.focus();
   await tip.waitFor();
-  assert.equal(await link.getAttribute('aria-describedby'), 'row-tooltip');
-  f.laterUpdate({ checks: 'SUCCESS', failedChecks: { names: [], total: 0, truncated: false } });
+  await f.page.keyboard.press('Tab');
+  assert.equal(await tip.locator('li a').first().evaluate(el => el === document.activeElement), true);
+  await f.page.waitForTimeout(300);
+  assert.equal(await tip.count(), 1);
+  await f.page.keyboard.press('Shift+Tab');
+  assert.equal(await link.evaluate(el => el === document.activeElement), true);
+  await tip.locator('a').last().focus();
+  await f.page.keyboard.press('Tab');
+  assert.equal(await f.page.evaluate(() => !!document.activeElement.closest('.ci-hovercard')), false);
+  await link.focus();
+  await tip.waitFor();
+  await f.page.keyboard.press('Tab');
+  await f.page.keyboard.press('Escape');
+  await tip.waitFor({ state: 'hidden' });
+  assert.equal(await link.evaluate(el => el === document.activeElement), true);
+  f.laterUpdate({ checks: 'SUCCESS', failedChecks: { items: [], total: 0, truncated: false } });
   await f.refresh();
+  assert.equal(await f.page.locator('.ci-hovercard').count(), 0);
+  assert.equal(await link.getAttribute('interestfor'), null);
   await link.focus();
-  await tip.waitFor();
-  assert.equal(await tip.locator('li').count(), 0);
-  assert.doesNotMatch(await tip.innerText(), /unit tests/);
+  const plain = f.page.locator('#row-tooltip:popover-open');
+  await plain.waitFor();
+  assert.doesNotMatch(await plain.innerText(), /unit tests/);
   assert.deepEqual(f.errors, []);
 });

@@ -1117,5 +1117,10 @@ body:has(#dashboard[hidden]) .pr-column-header, body:has(#dashboard[hidden]) .re
 
 .comment-draft-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--color-accent); flex-shrink: 0; margin-left: 3px; }
 
+/* Failed check previews contain links, so use an interactive hint. */
+.ci-hovercard > strong { color: var(--color-danger-text); }
+.ci-hovercard a { color: inherit; text-decoration: underline; text-underline-offset: 2px; display: block; min-height: 1.5rem; }
+.ci-hovercard a:hover { text-decoration-thickness: 2px; }
 .ci-failed-checks { margin: 4px 0; padding-left: 16px; }
-.ci-failed-checks ~ span { display: block; }
+.ci-indicator[interestfor] { interest-delay: 0.5s 0.12s; --interest-delay-start: 0.5s; --interest-delay-end: 0.12s; }
+.ci-indicator[interestfor]:focus-visible { interest-delay-start: 0s; --interest-delay-start: 0s; }
