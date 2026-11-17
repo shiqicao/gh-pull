@@ -1,19 +1,52 @@
 # <img src="docs/favicon.png" width="32" height="32" align="absmiddle" alt=""> gh-pull
 
-**A local pull request dashboard for GitHub CLI**
+**Your pull requests. One clear view.**
 
-Organize PRs across repositories, track reviews and checks, and manage your work in the browser using your existing GitHub login.
+A local dashboard for GitHub CLI. Find your next review, follow stacked PRs, and get straight to failing checks—all with your existing GitHub login.
 
-Choose how to run it:
+[Get started](#github-cli-extension) · [Watch the 81-second tour](https://youtu.be/4LBga5H5Wwk) · [Full dashboard](docs/demo.png) · [Usage guide](docs/usage.md)
 
-- **[GitHub CLI extension](#github-cli-extension) — recommended:** Install once, then run `gh pull`. No Node installation or source checkout needed.
-- **[Local app from source](#local-app-from-source):** Clone the repository and run it with Node.js. Useful for development and customization.
+## Features
 
-Both use your existing GitHub CLI login or a personal access token. No separate GitHub App installation is required. You can access the repositories your credentials allow, subject to your organization's token and SSO policies. A **GitHub.com** account is required; GitHub Enterprise hosts are not supported.
+### Find your focus. Save it for tomorrow.
 
-[![gh-pull dashboard showing fictional pull requests — click to enlarge](docs/demo.png)](https://raw.githubusercontent.com/shiqicao/gh-pull/refs/heads/main/docs/demo.png)
+Search across repositories with GitHub qualifiers and autocomplete. Save your go-to searches as one-click views, then group PRs by repository, author, status, or checks.
 
-[▶ Watch the quick tour](https://youtu.be/4LBga5H5Wwk) · 81 seconds · narrated with captions
+![Saved views above a highlighted GitHub query, with Show, State, Group by, and Sort controls](docs/features/saved-views.png)
+
+### See the stack. Know what comes next.
+
+Follow branch dependencies at a glance. Connected lanes keep parent and child PRs together—even when a stack branches.
+
+![A stack of session-related PRs connected by branching dependency lanes](docs/features/stacks.png)
+
+### Find the failure. Jump to the job.
+
+Hover a failed CI badge to see which checks broke, then open the job directly. Running checks show progress without leaving the dashboard.
+
+<img src="docs/features/failed-checks.png" width="300" alt="Failed checks with direct links to Keyboard navigation tests and Accessibility checks">
+
+### Keep reviews moving.
+
+See who approved, who requested changes, and who’s still to review. Request or re-request reviews on your own PRs, with changes held until you apply them.
+
+<img src="docs/features/reviewers.png" width="400" alt="Reviewer manager showing approved reviewers and a pending review request before Apply changes">
+
+### Reply while it’s fresh.
+
+Spot unresolved review threads and leave a quick Markdown comment from the dashboard. Drafts stay with you while you work.
+
+<img src="docs/features/comments.png" width="460" alt="Quick comment composer with a draft asking for a review of timeout handling">
+
+Plus automatic refresh, new-update highlights, linked issues, branch copying, and light and dark themes. On your own PRs, edit titles, manage draft status, or merge eligible changes.
+
+Screenshots use fictional PRs. See the [usage guide](docs/usage.md) for shortcuts, permissions, and details.
+
+## Get started
+
+**Run `gh pull`. Get back to your work.** No Node installation, source checkout, or separate GitHub App installation needed with the CLI extension.
+
+Both the extension and [local app from source](#local-app-from-source) use your GitHub CLI login or a personal access token. You can access the repositories your credentials allow, subject to your organization's token and SSO policies. A **GitHub.com** account is required; GitHub Enterprise hosts are not supported.
 
 ## GitHub CLI extension
 
@@ -79,45 +112,6 @@ Credentials stay in the local backend and are never sent to the browser. Both op
 
 `npm start` reads environment variables from your shell. If you prefer a `.env` file, use `node --env-file=.env server.js`; `.env` files are ignored by Git.
 
-## Features
-
-- **Query search:** Search GitHub with highlighted qualifiers and autocomplete. Show, State, and Sort are synchronized shortcuts for the query; queries and grouping are shareable through the URL.
-- **PR dependencies:** A fixed graph gutter shows branch-based stacks without indenting rows. First children continue their parent’s lane; side branches occupy up to four lanes. Nodes reflect readiness and check status. Trees sort as a unit using their most recently updated member; children appear depth-first in PR-number order. Known open parents outside the loaded group get a dashed stub and “not loaded” chip. Non-default base branches without an identifiable parent PR retain a lane marker and dashed stub labeled “base not loaded.” Closed parents say “closed”; merged parents say “merged” without an active connector. Parent state is checked on GitHub with a one-minute cache; edges beyond four lanes use parent chips. Standalone-only groups have no gutter.
-- **Grouping:** Group results by repository, author, status, or checks; collapse groups while preserving GitHub's query order within each group.
-- **PR details:** Fixed desktop columns for state, PR, title/branch, CI, review, diff, threads, update time, and reviewers, with a compact layout on narrow screens. Reviewer initials use status rings; bots and teams use square avatars. Hover for full names. Authors, reviewers, review decisions, labels, changed-line and file counts, comment counts, source branches, and update times. Authors and reviewers have consistent colors saved in this browser.
-- **Check progress:** Pending badges show passed/total counts, such as **Checks pending · 1/8**. Only successful checks count as passed; skipped and neutral checks do not. Failed-check badges link to GitHub's checks page.
-- **Closing issues:** A compact issue-count button opens linked issue titles, repository names, and open/closed states. Issue links open in a new tab; PRs without closing issues show no button.
-- **Background refresh:** Refreshes the list every 30 seconds and polls PRs with running checks every 15 seconds. Polling pauses while the tab is hidden or offline and while you edit a PR; returning to a stale dashboard refreshes it immediately. Errors trigger automatic backoff, respecting GitHub rate-limit cooldowns. The circular refresh icon shows the countdown in its center and tooltip, and spins while fetching, with the button disabled until the request finishes. Existing PRs stay visible until fresh data arrives, including when a refresh fails.
-- **Viewed tracking:** New updates have brighter, bolder titles. Opening a PR, diff, or checks link marks the displayed update as viewed. Newer updates highlight it again; tracking is per GitHub account and synchronized across dashboard tabs.
-- **Quick links and copying:** Open PRs, repositories, diffs, and user profiles in new tabs. Usernames keep their existing appearance and show a pointer cursor. Copy PR URLs or branch names with confirmation feedback.
-- **Feedback:** Use **report an issue** in the footer to open this repository's GitHub issue form.
-- **Appearance:** Inter typography, responsive layout, keyboard-accessible controls, and system light/dark colors.
-
-### Query search
-
-Click a PR’s **Threads** cell to write a quick Markdown comment on its conversation. **Post comment** (or Ctrl/⌘+Enter) submits it; Escape or clicking outside keeps the draft for this session, and Cancel discards it. Comments are limited to 4,000 characters. Posting a conversation comment does not change review-thread counts.
-
-**Review status** sorting (`sort:review-status`) orders loaded PRs by changes requested, review required, approved, then no review, with recently updated PRs first within each category. Dependency stacks stay together and are ordered by their root PR’s review status. This dashboard-specific sort is saved with the query; GitHub fetches pages by recent update.
-
-The default query is `is:open involves:@me sort:updated-desc`. The server always adds `is:pr`; type qualifiers cannot be specified in the editor. Add qualifiers such as `repo:owner/repository`, `author:octocat`, `-label:wip`, or `label:"good first issue"`, and press **Enter** or **Search**. Free text follows GitHub's search semantics (title, body, and comments by default); it no longer filters just the loaded rows.
-
-Type a qualifier or press **Ctrl+Space** for suggestions. Use arrow keys to choose, Enter or Tab to accept, and Escape to dismiss. When a suggestion is selected, Enter accepts it; press Enter again to search. Repository suggestions are fetched from GitHub using the query's people filters (`involves:`, `author:`, `review-requested:`, and similar qualifiers), independently of `repo:` and state filters. With no people filter or no matching repositories, discovery falls back to your account. Loaded repositories appear immediately; fetched repositories are added as they arrive. Results are cached for five minutes and marked as partial when the lookup reaches its page cap or GitHub's 1,000-PR search limit. User, branch, and label suggestions still come from loaded PRs, and you can type values that aren't suggested.
-
-Changing Show, State, or Sort rewrites that part of the query and searches immediately. A dropdown shows **Custom** when the query doesn't match one of its presets. Show replaces author/involvement/review-request qualifiers; State replaces state/draft qualifiers; unrelated terms stay intact. Closed means closed and unmerged. Group by only changes presentation.
-
-Unsubmitted edits stay in the editor while automatic refresh and pagination use the last applied query. Only applied queries are saved in the URL. In local mode, reopening the dashboard restores the last applied query and grouping from this browser’s storage; explicit query/filter links take priority. Group headings also remember their expanded/collapsed state per GitHub account and grouping type in browser storage, across queries, tab closure, and dashboard launches. Open tabs at the same dashboard address also synchronize group changes. New groups start expanded. The selected saved view is also remembered per account, including its edited state when the restored query or grouping differs; only Save changes updates the saved view. This selection is specific to the browser and dashboard address (including port), and does not update a saved view. Qualifiers, exclusions, and quoted phrases are supported; Boolean operators and parenthesized groups are not yet supported. In local mode, saved views appear as pills above the query in one bordered search panel, with save actions below the filters. Pills size to their names and stay on one row; extra views appear under **More (n)**, with the selected view always visible. Selecting one restores its query and **Group by** setting. On dashboard open, the two most-used views get priority; remaining views rank by usage plus temporary boosts for creation (7-day half-life), saved query/grouping edits (3 days), and recent selection (2 days). Order stays stable during the session, with the selected view kept visible as space allows; narrow windows may fit fewer favorites. Counts and timestamps persist locally across sessions. Opening a view menu or refreshing the dashboard does not count as a selection. **Save changes** explicitly updates the selected view; **Save as new view** creates a named view. Both buttons stay in place and are disabled while query text is unapplied: press Search/Enter first. Search never overwrites a saved view, and Save never runs a search. Changing Group by takes effect immediately but is only persisted to a view when you save. Edited views show a dot and a status message with **Revert**; switching away offers **Undo**. Clicking the selected pill’s **▾** opens rename and delete, with Undo after deletion. Failed saves keep edits and offer Retry. Ctrl/⌘+S saves applied changes (or opens the name prompt when no view is selected). Views are stored per GitHub account in `$XDG_CONFIG_HOME/gh-pull/saved-views.json` (default: `~/.config/gh-pull/saved-views.json`) and survive browser cache clearing and extension upgrades. They stay on this machine; hosted mode and cross-machine sync are not supported.
-
-### PR actions
-
-Actions apply to your own PRs and require GitHub write permissions:
-
-- **Edit a title:** Select the pencil icon. Save or Enter submits; Cancel or Escape discards. Titles must be 1–256 characters on one line. Failed saves retain the draft, and the server checks whether the title changed on GitHub before updating it.
-- **Manage reviewers:** On your open PRs, select the **Manage reviewers** people icon in the Reviewers column. Browse repository contributors (up to 100, cached for five minutes), search GitHub suggestions, or enter an exact username or `org/team`, request or re-request a review, or remove a pending request. Selections stay pending until you select **Apply changes**; closing the popup discards unapplied selections. Removing a request preserves past reviews and comments. Draft PRs must be marked ready first; GitHub enforces reviewer eligibility and token permissions.
-- **Change draft status:** Select **Open** to convert a PR to draft, or **Draft** to mark it ready for review. A tooltip explains the action on hover. The badge changes after GitHub confirms, and merge readiness is rechecked automatically.
-- **Merge:** Eligible PRs default to your preferred GitHub merge method. When the repository allows multiple methods, a dropdown offers merge commit, squash, or rebase using GitHub's current settings. A valid selection survives refreshes; disabled methods are removed. The server rechecks the chosen method, permissions, and readiness and pins the merge to the displayed commit. Drafts, blocked PRs, merge queues, and stacked PRs do not show this action.
-
-If GitHub is still calculating mergeability, the dashboard rechecks in the background every two seconds, up to five times, without resetting loaded pages. Adaptive background polling continues afterward.
-
 ## Local data and privacy
 
 PRs load in pages of 50, with a 25-second server cache keyed by query and cursor. Tabs share cached results and requests already in flight. Manual refresh bypasses completed cached results; background refresh reuses them. Refresh preserves loaded pages. Local edits notify other open tabs to refresh. Searches run against GitHub; grouping applies to loaded pages. All dashboard searches, including Created by me, expose at most 1,000 matches, with a notice when that limit applies. Narrow the query by repository or date to find more specific results.
@@ -152,7 +146,7 @@ npm run test:browser
 
 To use an existing Chrome installation instead, set `CHROME_BIN` to its executable path when running `npm run test:browser`. Browser screenshots are written to `/tmp/gh-pull-query-browser` (override with `BROWSER_ARTIFACT_DIR`).
 
-Regenerate the README and Marketplace screenshots with `node scripts/capture-dashboard.mjs` (or set `CHROME_BIN` as above). The capture uses fictional PRs and mocked update information.
+Regenerate the five README component screenshots with `node scripts/capture-dashboard.mjs --readme` (or set `CHROME_BIN` as above). Omit `--readme` to also update the full dashboard images (`docs/demo.png` and `docs/marketplace-dashboard.png`). Captures use fictional PRs, isolated saved views, a fixed clock, and local responses; external browser requests are blocked.
 
 ### Frontend organization
 
@@ -173,7 +167,3 @@ The extension workflow tests native builds on each supported platform. Version t
 ## License
 
 [MIT](LICENSE) © 2026 shiqicao. Third-party attribution and license terms are listed in [THIRD_PARTY_NOTICES](THIRD_PARTY_NOTICES).
-
-The **Threads** cell shows a comment bubble beside the **total review-thread count**, with an amber notification badge for **unresolved threads**. Unresolved threads started by the PR author with no replies are excluded from the badge, but remain in the total. Once a thread has a reply, it counts as unresolved until resolved. The badge disappears when no counted unresolved threads remain. Hover for an explanation and the total PR comment count, which includes conversation comments and replies. PRs render immediately while thread counts load separately in the background, refreshing at most once a minute per PR version. PRs with no review threads show a muted dash. Loading, failed, or incomplete lookups (including more than 1,000 threads) also show a dash, with the tooltip distinguishing unavailable counts from zero threads.
-
-On your own PRs, the Open/Draft badge menu includes **Close pull request…** when GitHub permits it. Confirm with an optional comment; the branch is retained. Closed PRs offer **Reopen pull request** when permitted. Closing a parent refreshes its dependent PRs. If closing succeeds but the comment cannot be confirmed, the dashboard reports that separately.
