@@ -1,0 +1,31 @@
+1
+00:00:00,000 --> 00:00:05,000
+Your pull requests, in one clear view.
+
+2
+00:00:05,000 --> 00:00:09,000
+Switch to a saved search with one click.
+
+3
+00:00:09,000 --> 00:00:14,000
+Follow connected lanes through a stack of dependent PRs.
+
+4
+00:00:14,000 --> 00:00:20,000
+Amber thread badges show feedback that still needs an answer.
+
+5
+00:00:20,000 --> 00:00:26,000
+Hover failed checks to find the broken jobs and open their logs.
+
+6
+00:00:26,000 --> 00:00:32,000
+Request reviewers on your PR. Apply changes when ready.
+
+7
+00:00:32,000 --> 00:00:44,000
+Draft a Markdown comment without leaving the dashboard.
+
+8
+00:00:44,000 --> 00:01:00,000
+Keep reviews moving with gh-pull.

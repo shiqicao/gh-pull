@@ -6,3 +6,6 @@ coverage/
 *.log
 .build/
 dist/
+
+# Generated demo video (hosted on YouTube).
+/docs/demo.mp4

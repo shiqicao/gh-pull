@@ -4,7 +4,7 @@
 
 A local dashboard for GitHub CLI. Find your next review, follow stacked PRs, and get straight to failing checks—all with your existing GitHub login.
 
-[Get started](#github-cli-extension) · [Watch the 81-second tour](https://youtu.be/4LBga5H5Wwk) · [Full dashboard](docs/demo.png) · [Usage guide](docs/usage.md)
+[Get started](#github-cli-extension) · [Watch the dashboard tour](https://youtu.be/LfIj6tZMKWM) · [Full dashboard](docs/demo.png) · [Usage guide](docs/usage.md)
 
 ## Features
 
@@ -24,19 +24,25 @@ Follow branch dependencies at a glance. Connected lanes keep parent and child PR
 
 Hover a failed CI badge to see which checks broke, then open the job directly. Running checks show progress without leaving the dashboard.
 
-<img src="docs/features/failed-checks.png" width="300" alt="Failed checks with direct links to Keyboard navigation tests and Accessibility checks">
+![Failed checks with direct links to Keyboard navigation tests and Accessibility checks](docs/features/failed-checks.png)
 
 ### Keep reviews moving.
 
 See who approved, who requested changes, and who’s still to review. Request or re-request reviews on your own PRs, with changes held until you apply them.
 
-<img src="docs/features/reviewers.png" width="400" alt="Reviewer manager showing approved reviewers and a pending review request before Apply changes">
+![Reviewer manager showing approved reviewers and a pending review request before Apply changes](docs/features/reviewers.png)
+
+### See what still needs an answer.
+
+Amber thread badges flag unresolved review feedback beside each PR’s total thread count. Hover for the breakdown, so you can spot the conversations that still need attention.
+
+![PR rows with Threads counts and a tooltip showing two unresolved threads out of five](docs/features/unresolved-feedback.png)
 
 ### Reply while it’s fresh.
 
 Spot unresolved review threads and leave a quick Markdown comment from the dashboard. Drafts stay with you while you work.
 
-<img src="docs/features/comments.png" width="460" alt="Quick comment composer with a draft asking for a review of timeout handling">
+![Quick comment composer with a draft asking for a review of timeout handling](docs/features/comments.png)
 
 Plus automatic refresh, new-update highlights, linked issues, branch copying, and light and dark themes. On your own PRs, edit titles, manage draft status, or merge eligible changes.
 
@@ -146,7 +152,9 @@ npm run test:browser
 
 To use an existing Chrome installation instead, set `CHROME_BIN` to its executable path when running `npm run test:browser`. Browser screenshots are written to `/tmp/gh-pull-query-browser` (override with `BROWSER_ARTIFACT_DIR`).
 
-Regenerate the five README component screenshots with `node scripts/capture-dashboard.mjs --readme` (or set `CHROME_BIN` as above). Omit `--readme` to also update the full dashboard images (`docs/demo.png` and `docs/marketplace-dashboard.png`). Captures use fictional PRs, isolated saved views, a fixed clock, and local responses; external browser requests are blocked.
+Regenerate the six README component screenshots with `node scripts/capture-dashboard.mjs --readme` (or set `CHROME_BIN` as above). Add `--video` to record a captioned, silent `docs/demo.mp4` as well (requires `ffmpeg` with the subtitles filter). The video is ignored by Git; upload it to YouTube and update the tour link above. Omit `--readme` to also update the full dashboard images (`docs/demo.png` and `docs/marketplace-dashboard.png`). Captures use fictional PRs, isolated saved views, a fixed clock, and local responses; external browser requests are blocked.
+
+For optional narration, set `GH_PULL_NARRATION_DIR` to a directory containing `scenes.json`: an array of eight objects in tour order, each with `text`, `duration` in seconds, and an absolute audio-file `path`. The recorder uses these local audio clips to time the scenes and captions; it does not generate speech.
 
 ### Frontend organization
 
