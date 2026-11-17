@@ -4,7 +4,7 @@
 
 A local dashboard for GitHub CLI. Find your next review, follow stacked PRs, and get straight to failing checks—all with your existing GitHub login.
 
-[Get started](#github-cli-extension) · [Watch the dashboard tour](https://github.com/shiqicao/gh-pull/raw/refs/heads/main/docs/demo.mp4) · [Full dashboard](docs/demo.png) · [Usage guide](docs/usage.md)
+[Get started](#github-cli-extension) · [Watch the dashboard tour](https://youtu.be/LfIj6tZMKWM) · [Full dashboard](docs/demo.png) · [Usage guide](docs/usage.md)
 
 ## Features
 
@@ -152,7 +152,9 @@ npm run test:browser
 
 To use an existing Chrome installation instead, set `CHROME_BIN` to its executable path when running `npm run test:browser`. Browser screenshots are written to `/tmp/gh-pull-query-browser` (override with `BROWSER_ARTIFACT_DIR`).
 
-Regenerate the six README component screenshots with `node scripts/capture-dashboard.mjs --readme` (or set `CHROME_BIN` as above). Add `--video` to record `docs/demo.mp4` as well (requires `ffmpeg`). Omit `--readme` to also update the full dashboard images (`docs/demo.png` and `docs/marketplace-dashboard.png`). Captures use fictional PRs, isolated saved views, a fixed clock, and local responses; external browser requests are blocked.
+Regenerate the six README component screenshots with `node scripts/capture-dashboard.mjs --readme` (or set `CHROME_BIN` as above). Add `--video` to record a captioned, silent `docs/demo.mp4` as well (requires `ffmpeg` with the subtitles filter). The video is ignored by Git; upload it to YouTube and update the tour link above. Omit `--readme` to also update the full dashboard images (`docs/demo.png` and `docs/marketplace-dashboard.png`). Captures use fictional PRs, isolated saved views, a fixed clock, and local responses; external browser requests are blocked.
+
+For optional narration, set `GH_PULL_NARRATION_DIR` to a directory containing `scenes.json`: an array of eight objects in tour order, each with `text`, `duration` in seconds, and an absolute audio-file `path`. The recorder uses these local audio clips to time the scenes and captions; it does not generate speech.
 
 ### Frontend organization
 
