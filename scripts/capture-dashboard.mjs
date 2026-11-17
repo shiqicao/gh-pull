@@ -2,12 +2,13 @@
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
 import { createApp } from '../server.js';
-import { copyFile, mkdtemp, rm } from 'node:fs/promises';
+import { copyFile, mkdir, mkdtemp, rm } from 'node:fs/promises';
 
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createSavedViewsStore } from '../saved-views.js';
 
+const readmeOnly = process.argv.includes('--readme');
 const now = Date.UTC(2026, 9, 27, 22, 30);
 const repo = 'orbit-demo/web';
 const make = (number, parent, title, minutes, extra = {}) => ({
@@ -30,21 +31,27 @@ const items = [
   make(252, 251, 'Keep form data when a session expires', 12, { checks: 'PENDING', checkCounts: { passed: 3, total: 8 },
     review: 'NONE', author: 'noah', additions: 96, deletions: 23, reviewers: [{ name: 'maya', state: 'REQUESTED' }] }),
   make(253, 251, 'Add keyboard navigation to the sign-in dialog', 40, { checks: 'FAILURE', review: 'CHANGES_REQUESTED',
+    failedChecks: { total: 2, truncated: false, items: [
+      { name: 'Keyboard navigation tests', url: `https://github.com/${repo}/actions/runs/100/jobs/101` },
+      { name: 'Accessibility checks', url: `https://github.com/${repo}/actions/runs/100/jobs/102` },
+    ] },
     author: 'zoe', additions: 42, deletions: 18, reviewers: [{ name: 'alex', state: 'CHANGES_REQUESTED' }] }),
   make(254, 248, 'Record session events in the audit log', 90, { author: 'riley', additions: 118, deletions: 12,
     reviewers: [{ name: 'sam', state: 'REQUESTED' }] }),
   make(255, 248, 'Benchmark session handling in CI', 1440, { review: 'APPROVED', additions: 203, deletions: 4,
     reviewers: [{ name: 'noah', state: 'APPROVED' }] }),
   make(246, null, 'Document local development and troubleshooting', 10080, { author: 'sam', review: 'APPROVED',
-    additions: 45, deletions: 9, changedFiles: 2, reviewers: [{ name: 'alex', state: 'APPROVED', canRevoke: true, reviewId: 'demo-review', reviewUrl: `https://github.com/${repo}/pull/246#pullrequestreview-1` }, { name: 'claude', kind: 'bot', state: 'COMMENTED' }] }),
+    additions: 45, deletions: 9, changedFiles: 2, reviewers: [{ name: 'alex', state: 'APPROVED', canRevoke: true, reviewId: 'demo-review', reviewUrl: `https://github.com/${repo}/pull/246#pullrequestreview-1` }, { name: 'orbit-bot', kind: 'bot', state: 'COMMENTED' }] }),
   make(256, 240, 'Update preview deployment scripts', 180, { status: 'DRAFT', checks: 'PENDING', checkCounts: { passed: 2, total: 5 },
     review: 'NONE', additions: 60, deletions: 44, dependencyParent: { id: 'not-loaded', number: 240, status: 'OPEN' },
     reviewers: [{ name: 'riley', state: 'COMMENTED' }] }),
 ];
 items.forEach((pr, i) => { pr.reviewThreadCounts = { resolved: i % 4, total: i % 4 + 2 }; });
-const list = async () => ({ viewer: 'alex', total: items.length, items, pageInfo: { hasNextPage: false } });
+let visibleItems = items;
+const list = async () => ({ viewer: 'alex', total: visibleItems.length, items: visibleItems, pageInfo: { hasNextPage: false } });
 list.viewer = async () => 'alex';
-list.reviewCounts = async () => ({ items });
+list.reviewerSuggestions = async () => ({ reviewers: [{ name: 'riley', kind: 'user' }, { name: 'sam', kind: 'user' }], limited: false });
+list.reviewCounts = async () => ({ items: visibleItems });
 const viewsDir = await mkdtemp(join(tmpdir(), 'gh-pull-capture-'));
 const savedViews = createSavedViewsStore(join(viewsDir, 'views.json'), () => new Date(now).toISOString());
 await savedViews.change('alex', { action: 'save', name: 'Team reviews', query: 'sort:review-status', group: 'repo' });
@@ -56,6 +63,7 @@ const browser = await chromium.launch({ executablePath: process.env.CHROME_BIN |
 try {
   const context = await browser.newContext({ viewport: { width: 1600, height: 1350 }, deviceScaleFactor: 2, colorScheme: 'dark' });
   const page = await context.newPage();
+  page.setDefaultTimeout(10000);
   await page.clock.install({ time: now });
   const origin = `http://127.0.0.1:${server.address().port}`;
   const errors = [];
@@ -71,16 +79,74 @@ try {
   await page.getByRole('button', { name: 'Team reviews', exact: true }).waitFor();
   await page.waitForFunction(() => document.querySelectorAll('.comment-total').length === 8);
   await page.evaluate(() => document.fonts.ready);
-  await page.waitForFunction(() => Number(document.querySelector('.dependency-connector').getAttribute('height')) === document.querySelector('.has-dependency-lanes').offsetHeight);
+  await page.waitForFunction(() => document.querySelector('.dependency-connector') && Number(document.querySelector('.dependency-connector').getAttribute('height')) === document.querySelector('.has-dependency-lanes').offsetHeight);
   assert.equal(await page.locator('.pr-row').count(), 8);
   assert.equal(await page.locator('.dependency-connector').getAttribute('width'), '92');
   assert.equal(await page.locator('.dependency-chip').innerText(), '↑ #240 · not loaded');
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth && document.documentElement.scrollHeight <= innerHeight), true);
   assert.equal(await page.locator('.saved-views-error:visible, .error-message:visible').count(), 0);
   assert.deepEqual(errors, []);
-  await page.screenshot({ path: new URL('../docs/marketplace-dashboard.png', import.meta.url).pathname });
-  await copyFile(new URL('../docs/marketplace-dashboard.png', import.meta.url), new URL('../docs/demo.png', import.meta.url));
-  console.log('Updated docs/marketplace-dashboard.png and docs/demo.png (3200 × 2700).');
+  if (!readmeOnly) {
+    await page.screenshot({ path: new URL('../docs/marketplace-dashboard.png', import.meta.url).pathname });
+    await copyFile(new URL('../docs/marketplace-dashboard.png', import.meta.url), new URL('../docs/demo.png', import.meta.url));
+    console.log('Updated docs/marketplace-dashboard.png and docs/demo.png (3200 × 2700).');
+  }
+
+  // Crop the real UI without restyling it. A fixed clock, isolated storage, and
+  // local fixtures keep the images repeatable and free of account information.
+  const destination = new URL('../docs/features/', import.meta.url);
+  await mkdir(destination, { recursive: true });
+  async function capture(name, locators, { padding = 0, maxWidth } = {}) {
+    await page.mouse.move(0, 0);
+    const boxes = await Promise.all(locators.map(locator => locator.boundingBox()));
+    assert.ok(boxes.every(Boolean), `${name}: all components must be visible`);
+    const x = Math.max(0, Math.floor(Math.min(...boxes.map(box => box.x)) - padding));
+    const y = Math.max(0, Math.floor(Math.min(...boxes.map(box => box.y)) - padding));
+    const right = Math.min(page.viewportSize().width, Math.ceil(Math.max(...boxes.map(box => box.x + box.width)) + padding));
+    const bottom = Math.min(page.viewportSize().height, Math.ceil(Math.max(...boxes.map(box => box.y + box.height)) + padding));
+    await page.screenshot({ path: new URL(`${name}.png`, destination).pathname,
+      clip: { x, y, width: Math.min(right - x, maxWidth ?? Infinity), height: bottom - y }, animations: 'disabled' });
+  }
+  // A narrower viewport makes the search panel legible at README widths.
+  await page.setViewportSize({ width: 1100, height: 1350 });
+  await page.getByRole('button', { name: 'To review', exact: true }).click();
+  await page.waitForFunction(() => document.querySelector('#results').getAttribute('aria-busy') === 'false' && document.querySelector('.saved-view-pill[aria-pressed="true"]')?.textContent.includes('To review'));
+  await capture('saved-views', [page.locator('#dashboard-controls')]);
+
+  await page.setViewportSize({ width: 1600, height: 1350 });
+  visibleItems = items.slice(0, 4);
+  await page.getByRole('button', { name: 'Team reviews', exact: true }).click();
+  await page.waitForFunction(() => document.querySelector('#results').getAttribute('aria-busy') === 'false');
+  await page.locator('#refresh').click();
+  await page.waitForFunction(() => document.querySelectorAll('.pr-row').length === 4);
+  await page.waitForFunction(() => document.querySelector('.dependency-connector') && Number(document.querySelector('.dependency-connector').getAttribute('height')) === document.querySelector('.has-dependency-lanes').offsetHeight);
+  const stack = page.locator('.pr-group').first();
+  const stackBox = await stack.boundingBox();
+  const contentBox = await page.locator('.pr-title-cell').first().boundingBox();
+  await capture('stacks', [stack], { maxWidth: contentBox.x + contentBox.width - stackBox.x });
+
+  const failed = page.locator('[data-pr-id="demo-253"] .ci-indicator');
+  await failed.focus();
+  const failures = page.getByRole('group', { name: 'Failed checks', exact: true });
+  await failures.waitFor();
+  assert.equal(await failures.getByRole('link').count(), 2);
+  await capture('failed-checks', [failures]);
+  await page.keyboard.press('Escape');
+
+  const own = page.locator('[data-pr-id="demo-248"]');
+  await own.getByRole('button', { name: /Manage reviewers/ }).click();
+  const reviewers = page.getByRole('dialog', { name: 'Manage reviewers', exact: true });
+  await reviewers.getByRole('button', { name: 'Request review from riley', exact: true }).click();
+  await reviewers.getByRole('button', { name: 'Apply changes (1)', exact: true }).waitFor();
+  await capture('reviewers', [reviewers]);
+  await page.keyboard.press('Escape');
+
+  await own.locator('.comment-count').click();
+  const comment = page.getByRole('dialog', { name: 'Quick comment', exact: true });
+  await comment.getByRole('textbox', { name: 'Comment', exact: true }).fill('The session API is ready for another look.\n\n@maya could you check the timeout handling?');
+  await capture('comments', [comment]);
+  assert.deepEqual(errors, []);
+  console.log('Updated five README component screenshots in docs/features/.');
 } finally {
   await browser.close();
   await new Promise(resolve => { server.close(resolve); server.closeAllConnections(); });
