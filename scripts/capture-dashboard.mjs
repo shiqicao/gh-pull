@@ -1,5 +1,6 @@
 // Reproducible documentation screenshots using fictional PRs and local responses.
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { chromium } from 'playwright';
 import { createApp } from '../server.js';
 import { copyFile, mkdir, mkdtemp, rm } from 'node:fs/promises';
@@ -8,6 +9,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createSavedViewsStore } from '../saved-views.js';
 
+const recordTour = process.argv.includes('--video');
 const readmeOnly = process.argv.includes('--readme');
 const now = Date.UTC(2026, 9, 27, 22, 30);
 const repo = 'orbit-demo/web';
@@ -111,9 +113,9 @@ try {
   await page.setViewportSize({ width: 1100, height: 1350 });
   await page.getByRole('button', { name: 'To review', exact: true }).click();
   await page.waitForFunction(() => document.querySelector('#results').getAttribute('aria-busy') === 'false' && document.querySelector('.saved-view-pill[aria-pressed="true"]')?.textContent.includes('To review'));
-  await capture('saved-views', [page.locator('#dashboard-controls')]);
+  await capture('saved-views', [page.locator('#dashboard-controls'), page.locator('.dependency-node').first()]);
 
-  await page.setViewportSize({ width: 1600, height: 1350 });
+  await page.setViewportSize({ width: 1280, height: 1350 });
   visibleItems = items.slice(0, 4);
   await page.getByRole('button', { name: 'Team reviews', exact: true }).click();
   await page.waitForFunction(() => document.querySelector('#results').getAttribute('aria-busy') === 'false');
@@ -121,16 +123,26 @@ try {
   await page.waitForFunction(() => document.querySelectorAll('.pr-row').length === 4);
   await page.waitForFunction(() => document.querySelector('.dependency-connector') && Number(document.querySelector('.dependency-connector').getAttribute('height')) === document.querySelector('.has-dependency-lanes').offsetHeight);
   const stack = page.locator('.pr-group').first();
-  const stackBox = await stack.boundingBox();
-  const contentBox = await page.locator('.pr-title-cell').first().boundingBox();
-  await capture('stacks', [stack], { maxWidth: contentBox.x + contentBox.width - stackBox.x });
+  const tableHeader = page.locator('.pr-column-header');
+  const contextRows = [tableHeader, stack, page.locator('.dashboard-footer')];
+  await capture('stacks', contextRows);
+
+  const feedback = page.locator('[data-pr-id="demo-253"] .comment-count');
+  assert.equal(await feedback.locator('.comment-unresolved').innerText(), '2');
+  assert.equal(await feedback.locator('.comment-total').innerText(), '5');
+  await feedback.focus();
+  await page.clock.runFor(600);
+  const feedbackTip = page.getByRole('tooltip');
+  await feedbackTip.waitFor();
+  await capture('unresolved-feedback', [...contextRows, feedbackTip]);
+  await page.keyboard.press('Escape');
 
   const failed = page.locator('[data-pr-id="demo-253"] .ci-indicator');
   await failed.focus();
   const failures = page.getByRole('group', { name: 'Failed checks', exact: true });
   await failures.waitFor();
   assert.equal(await failures.getByRole('link').count(), 2);
-  await capture('failed-checks', [failures]);
+  await capture('failed-checks', [...contextRows, failures]);
   await page.keyboard.press('Escape');
 
   const own = page.locator('[data-pr-id="demo-248"]');
@@ -138,15 +150,72 @@ try {
   const reviewers = page.getByRole('dialog', { name: 'Manage reviewers', exact: true });
   await reviewers.getByRole('button', { name: 'Request review from riley', exact: true }).click();
   await reviewers.getByRole('button', { name: 'Apply changes (1)', exact: true }).waitFor();
-  await capture('reviewers', [reviewers]);
+  await capture('reviewers', [...contextRows, reviewers]);
   await page.keyboard.press('Escape');
 
   await own.locator('.comment-count').click();
   const comment = page.getByRole('dialog', { name: 'Quick comment', exact: true });
   await comment.getByRole('textbox', { name: 'Comment', exact: true }).fill('The session API is ready for another look.\n\n@maya could you check the timeout handling?');
-  await capture('comments', [comment]);
+  await capture('comments', [...contextRows, comment]);
   assert.deepEqual(errors, []);
-  console.log('Updated five README component screenshots in docs/features/.');
+  if (recordTour) {
+    // Record real interactions at a fixed viewport; retain the PR context throughout.
+    const recordingDir = await mkdtemp(join(tmpdir(), 'gh-pull-video-'));
+    const tourContext = await browser.newContext({ viewport: { width: 1280, height: 900 },
+      colorScheme: 'dark', recordVideo: { dir: recordingDir, size: { width: 1280, height: 900 } } });
+    try {
+      const tour = await tourContext.newPage();
+      tour.on('pageerror', error => errors.push(error.message));
+      await tour.clock.install({ time: now });
+      await tour.route('**/*', route => {
+        const url = new URL(route.request().url());
+        if (url.origin !== origin) return route.abort();
+        if (url.pathname === '/api/updates') return route.fulfill({ json: { update: null } });
+        return route.continue();
+      });
+      const pause = seconds => new Promise(resolve => setTimeout(resolve, seconds * 1000));
+      await tour.goto(`${origin}/?q=sort:review-status`);
+      await tour.locator('.dependency-dot').first().waitFor();
+      await pause(5);
+      await tour.getByRole('button', { name: 'To review', exact: true }).click();
+      await pause(4);
+      await tour.getByRole('button', { name: 'Team reviews', exact: true }).click();
+      await pause(5);
+      await tour.locator('[data-pr-id="demo-253"] .comment-count').hover();
+      await tour.clock.runFor(600);
+      await tour.getByRole('tooltip').waitFor();
+      await pause(6);
+      await tour.keyboard.press('Escape');
+      await tour.locator('[data-pr-id="demo-253"] .ci-indicator').hover();
+      await tour.getByRole('group', { name: 'Failed checks', exact: true }).waitFor();
+      await pause(6);
+      await tour.keyboard.press('Escape');
+      const tourOwn = tour.locator('[data-pr-id="demo-248"]');
+      await tourOwn.getByRole('button', { name: /Manage reviewers/ }).click();
+      const manager = tour.getByRole('dialog', { name: 'Manage reviewers', exact: true });
+      await manager.getByRole('button', { name: 'Request review from riley', exact: true }).click();
+      await pause(6);
+      await tour.keyboard.press('Escape');
+      await tourOwn.locator('.comment-count').click();
+      await tour.getByRole('textbox', { name: 'Comment', exact: true }).pressSequentially(
+        'The session API is ready for another look. @maya could you check the timeout handling?', { delay: 45 });
+      await pause(6);
+      await tour.keyboard.press('Escape');
+      await tour.mouse.move(20, 20);
+      await pause(3);
+      assert.deepEqual(errors, []);
+      const video = tour.video();
+      await tourContext.close();
+      execFileSync('ffmpeg', ['-y', '-i', await video.path(), '-an', '-c:v', 'libx264',
+        '-preset', 'slow', '-crf', '23', '-pix_fmt', 'yuv420p', '-movflags', '+faststart',
+        new URL('../docs/demo.mp4', import.meta.url).pathname], { stdio: 'pipe' });
+      console.log('Updated docs/demo.mp4 with the current dashboard tour.');
+    } finally {
+      await tourContext.close();
+      await rm(recordingDir, { recursive: true, force: true });
+    }
+  }
+  console.log('Updated six README component screenshots in docs/features/.');
 } finally {
   await browser.close();
   await new Promise(resolve => { server.close(resolve); server.closeAllConnections(); });
