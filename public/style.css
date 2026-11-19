@@ -207,7 +207,17 @@ button:hover:not(:disabled), .button-link:hover {
   text-decoration: none;
 }
 
-#settings { gap: 0.375em; }
+#settings {
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: 13px;
+  font-weight: 500;
+}
 
 button:disabled {
   cursor: default;
