@@ -22,7 +22,7 @@ test('Manage keeps the PR document, draft and caret through dirty dialog dismiss
   await modal.getByText('Keep editing',{exact:true}).press('Enter');
   assert.equal(await modal.locator('#pf-label').inputValue(),'Unsaved');
   await page.keyboard.press('Escape');
-  await modal.getByText('Discard and leave',{exact:true}).press('Enter');
+  await modal.getByText('Discard and close',{exact:true}).press('Enter');
   await field.waitFor();
   assert.equal(await field.inputValue(),'Keep this draft');
   assert.ok(await field.evaluate(el=>el===document.activeElement && el.selectionEnd===el.value.length));
