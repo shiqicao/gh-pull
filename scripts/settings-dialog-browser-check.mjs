@@ -1,0 +1,30 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { browserFixture } from './browser-fixture.mjs';
+
+test('Manage keeps the PR document, draft and caret through dirty dialog dismissal', async t => {
+  const pr = { id:'demo', number:7, repo:'maple/api', title:'Review dialog', url:'https://github.com/maple/api/pull/7', author:'sam', status:'OPEN', checks:'NONE', review:'NONE', labels:[], reviewers:[], additions:1, deletions:0, createdAt:'2026-01-01', updatedAt:'2026-01-02', commentCount:0 };
+  const list = Object.assign(async () => ({ viewer:'alex', total:1, items:[pr], pageInfo:{hasNextPage:false} }), {viewer:async ()=>'alex'});
+  const savedViews = { list:async()=>[], quickComments:async()=>[] };
+  const {page, origin} = await browserFixture(t, {list,savedViews});
+  let pullRequests = 0;
+  page.on('request', req => { if (new URL(req.url()).pathname === '/api/pulls') pullRequests++; });
+  await page.goto(origin);
+  await page.locator('.comment-count').first().press('Enter');
+  const field = page.locator('#quick-comment textarea');
+  await field.fill('Keep this draft');
+  const before = pullRequests;
+  await page.locator('#quick-comment').getByText('Manage', {exact:true}).press('Enter');
+  const modal = page.getByRole('dialog', {name:'Settings',exact:true});
+  await modal.getByRole('button',{name:'Create your first preset'}).press('Enter');
+  await modal.locator('#pf-label').fill('Unsaved');
+  await page.keyboard.press('Escape');
+  await modal.getByText('Keep editing',{exact:true}).press('Enter');
+  assert.equal(await modal.locator('#pf-label').inputValue(),'Unsaved');
+  await page.keyboard.press('Escape');
+  await modal.getByText('Discard and leave',{exact:true}).press('Enter');
+  await field.waitFor();
+  assert.equal(await field.inputValue(),'Keep this draft');
+  assert.ok(await field.evaluate(el=>el===document.activeElement && el.selectionEnd===el.value.length));
+  assert.equal(pullRequests,before);
+});

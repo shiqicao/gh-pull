@@ -24,7 +24,6 @@ window.addEventListener('pageshow', e => { if (e.persisted && authMode === 'loca
 observeStickyTop($('sticky-top'));
 function showDashboard(visible) {
   $('settings').hidden = !visible || authMode !== 'local';
-  $('settings').href = '/settings.html' + location.search;
   $('dashboard').hidden = !visible;
   $('dashboard-controls').hidden = !visible;
   $('summary').hidden = !visible;

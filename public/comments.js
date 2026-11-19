@@ -25,7 +25,13 @@ export function createCommentControls({ changes, submit, onClose }) {
     const results=(filter.trim()?all:rest).filter(p=>(p.label+' '+p.body).toLowerCase().includes(filter.trim().toLowerCase()));
     const pick=p=>{if(draft.saving)return;const next=insertPreset(draft.value,p.body);note=next===draft.value?`“${p.label}” is already in the draft. Nothing added.`:next.length>4000?'This preset would exceed the comment length limit.':`Inserted “${p.label}”. Review it, then post.`;if(next.length<=4000)draft.value=next;more=false;filter='';content();const t=popover.panel.querySelector('textarea');t.focus();t.setSelectionRange(t.value.length,t.value.length);};
     const toggle=()=>{more=!more;filter='';content();popover.panel.querySelector(more?'.preset-filter':'.preset-more')?.focus();};
-    const manage=(create=false)=>{popover.close();openSettings(create);};
+    const manage=(create=false)=>{
+      const snapshot=JSON.stringify(presets);popover.close();openSettings(create,pr,()=>{
+        const trigger=document.querySelector(`.pr-row[data-pr-id="${CSS.escape(pr.id)}"] .comment-count`);
+        if(!trigger){document.getElementById('settings').focus();return;}
+        trigger.click();note=(snapshot===JSON.stringify(presets)?'':'Presets updated. ')+'Your draft is as you left it.';content();popover.panel.querySelector('textarea')?.focus();
+      });
+    };
     render(html`<form @submit=${event => {
       event.preventDefault();
       if (!draft.saving && draft.value.trim()) void submit(pr, draft);

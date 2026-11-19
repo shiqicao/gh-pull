@@ -14,7 +14,7 @@ Keep **Every repository** for a general comment. For a command that only some pr
 
 ## 3. Put frequent presets first
 
-Use **↑** and **↓** next to a preset to change its position. The PR composer keeps this order after filtering for the current repo, so put frequently used commands near the top. Choose **Back to dashboard** when done.
+Use **↑** and **↓** next to a preset to change its position. The PR composer keeps this order after filtering for the current repo, so put frequently used commands near the top. Close **Settings** when done. If you opened it from **Manage** in a PR composer, you’ll return to that draft.
 
 ## 4. Insert, review, and post
 
