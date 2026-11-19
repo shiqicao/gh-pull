@@ -46,7 +46,7 @@ Spot unresolved review threads and leave a quick Markdown comment from the dashb
 
 ### Reuse a comment without posting it twice.
 
-Save a bot trigger or review request in **Settings → Quick comment presets**. Open a PR’s Threads cell and pick a matching preset to insert it into your draft. Review the text, then post.
+Save a bot trigger or review request in **Settings → Quick comment presets**. Open a PR’s Threads cell and pick a matching preset to insert it into your draft. Review the text, then post. [Follow the step-by-step quick comment presets guide](docs/quick-comment-presets.md) to create a preset, choose its repositories, reorder it, or undo a deletion.
 
 ![Build image checked in the Quick comment composer after inserting its trigger into a fictional PR draft](docs/features/quick-comment-presets.png)
 

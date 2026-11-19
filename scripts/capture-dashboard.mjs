@@ -166,6 +166,10 @@ try {
   await capture('comments', [...contextRows, comment]);
   await comment.getByRole('button', { name: 'Build image, inserts [docker-build]' }).click();
   await capture('quick-comment-presets', [...contextRows, comment]);
+  await comment.getByRole('button', { name: 'Manage' }).click();
+  const settings = page.locator('#settings-dialog');
+  await settings.getByRole('button', { name: 'Edit', exact: true }).first().click();
+  await capture('preset-settings', [settings]);
   assert.deepEqual(errors, []);
   if (recordTour) {
     // Record real interactions at a fixed viewport; retain the PR context throughout.
