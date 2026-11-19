@@ -23,7 +23,11 @@ test('mobile preset editor validates scope, retries current edits and restores d
   assert.equal(await msg('body'), 'Enter the comment text to insert.');
   await field('label').fill('Build image'); await field('body').fill('[build]');
   await page.getByLabel('Only these repositories and orgs').check();
-  await submit.click(); assert.match(await msg('scope'), /Add a repository or an org/);
+  assert.equal(await submit.isDisabled(), true);
+  assert.equal(await field('scope').getAttribute('data-warning'), 'true');
+  assert.match(await field('scope').innerText(), /Matches no pull requests/);
+  await field('repos').fill('maple/api'); assert.equal(await submit.isEnabled(), true);
+  await field('repos').fill(''); assert.equal(await submit.isDisabled(), true);
   await field('repos').fill('invalid'); await field('repos').press('Enter');
   assert.match(await msg('repos'), /Use owner\/name/);
   await field('repos').fill('maple/api'); await field('repos').press('Enter');
