@@ -1,10 +1,14 @@
-import { html, render, nothing } from './vendor/lit-html.js';
+import { html, render, repeat, nothing } from './vendor/lit-html.js';
 import { actionButton, formField, formError, formActions } from './controls.js';
 import { githubUrl } from './templates.js';
+import { insertPreset } from './preset-model.js';
+import { presets, openSettings } from './quick-presets.js';
+import { matchesQuickComment } from './quick-comment-scope.js';
 import { createPopover } from './popover.js';
 
 export function createCommentControls({ changes, submit, onClose }) {
-  let active;
+  let active, more=false, filter='', note='';
+  const narrow=matchMedia('(max-width: 37.5em)'); narrow.addEventListener('change',()=>content());
   const popover = createPopover({ id: 'quick-comment', className: 'comment-popover', label: 'Quick comment', align: 'end',
     onClose() {
       if (!active) return;
@@ -16,17 +20,25 @@ export function createCommentControls({ changes, submit, onClose }) {
   function content() {
     const pr = active, draft = pr && changes.get(pr.id);
     if (!draft) return;
+    const all=presets.filter(p=>matchesQuickComment(p,pr.repo)), limit=narrow.matches?3:5;
+    const shown=all.length>limit+1?all.slice(0,limit):all, rest=all.slice(shown.length);
+    const results=(filter.trim()?all:rest).filter(p=>(p.label+' '+p.body).toLowerCase().includes(filter.trim().toLowerCase()));
+    const pick=p=>{if(draft.saving)return;const next=insertPreset(draft.value,p.body);note=next===draft.value?`“${p.label}” is already in the draft. Nothing added.`:next.length>4000?'This preset would exceed the comment length limit.':`Inserted “${p.label}”. Review it, then post.`;if(next.length<=4000)draft.value=next;more=false;filter='';content();const t=popover.panel.querySelector('textarea');t.focus();t.setSelectionRange(t.value.length,t.value.length);};
+    const toggle=()=>{more=!more;filter='';content();popover.panel.querySelector(more?'.preset-filter':'.preset-more')?.focus();};
+    const manage=(create=false)=>{popover.close();openSettings(create);};
     render(html`<form @submit=${event => {
       event.preventDefault();
       if (!draft.saving && draft.value.trim()) void submit(pr, draft);
     }} @keydown=${event => {
+      if(event.key==='Escape' && more){event.preventDefault();event.stopPropagation();toggle();return;}
       if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') { event.preventDefault(); event.currentTarget.requestSubmit(); }
     }}>
-      <h2>Quick comment</h2>
+      <button type="button" class="preset-close" aria-label="Close quick comment" @click=${()=>popover.close()}>×</button><h2>Quick comment</h2>
       <p class="form-description">${pr.repo} #${pr.number} · PR conversation</p>
+      ${document.getElementById('settings').hidden?nothing:html`<div class="preset-picker" role="group" aria-label="Presets"><div class="preset-caption">Presets <button type="button" @click=${()=>manage()}>Manage</button></div>${shown.length?html`<div class="preset-chips">${repeat(shown,p=>p.id,p=>html`<button type="button" ?disabled=${draft.saving} class=${draft.value.includes(p.body)?'in-draft':''} aria-label=${p.label+(draft.value.includes(p.body)?', already in draft':', inserts '+p.body)} title=${'Inserts: '+p.body} @click=${()=>pick(p)}>${draft.value.includes(p.body)?'✓ ':''}${p.label}</button>`)}${rest.length?html`<button class="preset-more" type="button" aria-expanded=${more} @click=${toggle}>More (${rest.length}) ▾</button>`:nothing}</div>`:html`<p class="preset-hint">${presets.length?`None of your ${presets.length} presets apply to ${pr.repo}.`:'No presets yet. Save comments you post often, like [docker-build], and they appear here.'} <button type="button" @click=${()=>manage(!presets.length)}>${presets.length?'Edit scopes':'Create a preset'}</button></p>`}${more&&rest.length?html`<div class="preset-overflow"><label>All presets for ${pr.repo}<input class="preset-filter" placeholder="Filter presets…" .value=${filter} @input=${e=>{filter=e.target.value;content();}} @keydown=${e=>{if(e.key==='Enter'){e.preventDefault();if(results[0])pick(results[0]);}}}></label>${repeat(results,p=>p.id,p=>html`<button type="button" @click=${()=>pick(p)}>${p.label} · <code>${p.body}</code></button>`)}${results.length?nothing:`No presets match “${filter}”.`}</div>`:nothing}</div>`}
       ${formField({ label: 'Comment', value: draft.value, multiline: true, maxLength: 4000, disabled: draft.saving,
-        onInput(value) { draft.value = value; content(); } })}
-      <p class="comment-help">Markdown supported · Ctrl/⌘+Enter to post</p>
+        onInput(value) { draft.value = value; note=''; content(); } })}
+      <div class="preset-note" role="status">${note}</div><p class="comment-help">Markdown supported · Ctrl/⌘+Enter to post</p>
       ${formError(draft.error)}
       <a class="comment-conversation" href=${githubUrl(pr.url)} target="_blank" rel="noopener noreferrer">View conversation ↗</a>
       ${formActions({ saving: draft.saving, disabled: !draft.value.trim(), submitLabel: 'Post comment', pendingLabel: 'Posting…', onCancel() {
@@ -49,7 +61,7 @@ export function createCommentControls({ changes, submit, onClose }) {
           if (active && active.id !== pr.id) {
             const previous = changes.get(active.id); if (previous) previous.editing = false;
           }
-          active = pr;
+          active = pr; more=false; filter=''; note='';
           const draft = changes.get(pr.id) ?? { value: '', saving: false, error: '' };
           draft.editing = true; changes.set(pr.id, draft);
           popover.attach(event.currentTarget); content();

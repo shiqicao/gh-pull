@@ -44,6 +44,12 @@ Spot unresolved review threads and leave a quick Markdown comment from the dashb
 
 ![Quick comment composer with a draft asking for a review of timeout handling](docs/features/comments.png)
 
+### Reuse a comment without posting it twice.
+
+Save a bot trigger or review request in **Settings → Quick comment presets**. Open a PR’s Threads cell and pick a matching preset to insert it into your draft. Review the text, then post.
+
+![Build image checked in the Quick comment composer after inserting its trigger into a fictional PR draft](docs/features/quick-comment-presets.png)
+
 Plus automatic refresh, new-update highlights, linked issues, branch copying, and light and dark themes. On your own PRs, edit titles, manage draft status, or merge eligible changes.
 
 Screenshots use fictional PRs. See the [usage guide](docs/usage.md) for shortcuts, permissions, and details.

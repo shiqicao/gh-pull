@@ -74,7 +74,7 @@ export function createApp({ savedViews = createSavedViewsStore(), list = createG
       if (auth && url.pathname.startsWith('/api/') && !session) throw new ApiError('Please sign in with GitHub.', 401);
       const activeList = session ? session.list : list;
       const cache = session ? session.cache : localCache;
-      if (url.pathname === '/api/saved-views') {
+      if (['/api/saved-views', '/api/quick-comments'].includes(url.pathname)) {
         if (auth) return send(404, { error: 'Saved views are available in local mode.' });
         if (!['GET', 'POST'].includes(req.method)) return send(405, { error: 'Method not allowed.' });
         let input;
@@ -84,7 +84,7 @@ export function createApp({ savedViews = createSavedViewsStore(), list = createG
           const chunks = []; let size = 0;
           for await (const chunk of req) {
             size += chunk.length;
-            if (size > 8192) throw new ApiError('Request body is too large.', 413);
+            if (size > (url.pathname === '/api/quick-comments' ? 32768 : 8192)) throw new ApiError('Request body is too large.', 413);
             chunks.push(chunk);
           }
           try { input = JSON.parse(Buffer.concat(chunks).toString('utf8')); }
@@ -93,6 +93,7 @@ export function createApp({ savedViews = createSavedViewsStore(), list = createG
         if (!activeList.viewer) throw new ApiError('Could not identify the GitHub account.', 503);
         const account = await activeList.viewer();
         if (input && input.account !== account) throw new ApiError('GitHub account changed. Reopen Views and try again.', 409);
+        if (url.pathname === '/api/quick-comments') return send(200, { account, presets: req.method === 'GET' ? await savedViews.quickComments(account) : await savedViews.changeQuickComment(account, input) });
         return send(200, { account, views: req.method === 'GET' ? rankSavedViews(await savedViews.list(account)) : await savedViews.change(account, input) });
       }
       const mutation = mutations.get(url.pathname);

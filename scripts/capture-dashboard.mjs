@@ -64,6 +64,8 @@ const savedViews = createSavedViewsStore(join(viewsDir, 'views.json'), () => new
 await savedViews.change('alex', { action: 'save', name: 'Team reviews', query: 'sort:review-status', group: 'repo' });
 await savedViews.change('alex', { action: 'save', name: 'To review', query: 'is:open review-requested:@me', group: 'repo' });
 await savedViews.change('alex', { action: 'save', name: 'My drafts', query: 'is:open is:draft author:@me', group: 'status' });
+await savedViews.changeQuickComment('alex', {action:'save', label:'Build image', body:'[docker-build]', repos:[repo]});
+await savedViews.changeQuickComment('alex', {action:'save', label:'Ask for review', body:'@claude_review'});
 const server = createApp({ list, savedViews });
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
 const browser = await chromium.launch({ executablePath: process.env.CHROME_BIN || undefined });
@@ -162,6 +164,8 @@ try {
   const comment = page.getByRole('dialog', { name: 'Quick comment', exact: true });
   await comment.getByRole('textbox', { name: 'Comment', exact: true }).fill('The session API is ready for another look.\n\n@maya could you check the timeout handling?');
   await capture('comments', [...contextRows, comment]);
+  await comment.getByRole('button', { name: 'Build image, inserts [docker-build]' }).click();
+  await capture('quick-comment-presets', [...contextRows, comment]);
   assert.deepEqual(errors, []);
   if (recordTour) {
     // Record real interactions at a fixed viewport; retain the PR context throughout.
@@ -242,7 +246,7 @@ try {
       await rm(recordingDir, { recursive: true, force: true });
     }
   }
-  console.log('Updated six README component screenshots in docs/features/.');
+  console.log('Updated seven README component screenshots in docs/features/.');
 } finally {
   await browser.close();
   await new Promise(resolve => { server.close(resolve); server.closeAllConnections(); });

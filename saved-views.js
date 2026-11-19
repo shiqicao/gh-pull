@@ -2,6 +2,7 @@ import { mkdir, readFile, writeFile, rename, rm } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { homedir } from 'node:os';
 import { randomUUID } from 'node:crypto';
+import { presetErrors } from './public/preset-model.js';
 import lockfile from 'proper-lockfile';
 import { ApiError } from './github-client.js';
 import { DEFAULT_QUERY, normalizeQuery } from './public/query.js';
@@ -57,6 +58,31 @@ export function createSavedViewsStore(path = defaultSavedViewsPath(), now = () =
     } finally { await rm(temporary, { force: true }); await release(); }
   }
   return {
+    async quickComments(account) { return (await read()).accounts.find(a => a.login === account.toLowerCase())?.presets ?? []; },
+    async changeQuickComment(account, input) {
+      const { action, id, label, body, repos, orgs, delta, position } = input;
+      if (!['save', 'delete', 'move', 'restore'].includes(action)) throw new ApiError('Unknown preset action.', 400);
+      return write(data => {
+        const login = account.toLowerCase();
+        let entry = data.accounts.find(a => a.login === login);
+        if (!entry) { entry = newEntry(login); data.accounts.push(entry); }
+        const presets = entry.presets ??= [], i = presets.findIndex(p => p.id === id);
+        if (action === 'restore' && (typeof id !== 'string' || !id || id.length > 100 || i >= 0 || !Number.isSafeInteger(position) || position < 0)) throw new ApiError('Cannot restore this preset.', 409);
+        if (action !== 'restore' && (id !== undefined || action !== 'save') && i < 0) throw new ApiError('Preset no longer exists.', 404);
+        if (action === 'delete') presets.splice(i, 1);
+        else if (action === 'move') {
+          if (![-1,1].includes(delta) || i + delta < 0 || i + delta >= presets.length) throw new ApiError('Cannot move this preset.', 409);
+          presets.splice(i + delta, 0, ...presets.splice(i, 1));
+        } else {
+          const errors = presetErrors(input, presets);
+          if (action === 'restore') delete errors.scope;
+          if (Object.keys(errors).length) throw new ApiError(Object.values(errors)[0], 400);
+          const p = {id: id ?? randomUUID(), label: label.trim(), body, repos, orgs};
+          presets.splice(i >= 0 ? i : action === 'restore' ? position : presets.length, i >= 0 ? 1 : 0, p);
+        }
+        return presets;
+      });
+    },
     async list(account) {
       const login = account.toLowerCase(), data = await read();
       const entry = data.accounts.find(a => a.login === login);
