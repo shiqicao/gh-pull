@@ -4,11 +4,11 @@ A preset puts reusable text into a pull request’s comment draft. For example, 
 
 ## 1. Create a preset
 
-Open **Settings** in the local dashboard header. Choose **Create your first preset** (or **+ Add preset** if you already have one). Give it a short, distinct **Label** such as `Build image`. In **Comment body**, enter the exact text you want to insert, including any Markdown, mentions, or bot command. Choose **Save preset** when the scope is right.
+Open **Settings** in the local dashboard header. Choose **Create your first preset** (or **+ Add preset** if you already have one). Give it a short, distinct **Label** such as `Build image`. In **Comment text**, enter the exact text you want to insert, including any Markdown, mentions, or bot command. Choose **Add preset** when the scope is right.
 
 ## 2. Choose where it appears
 
-Keep **Every repository** for a general comment. For a command that only some projects understand, choose **Only these repositories or organizations**. Type `maple-labs/seedling` under **Repositories** and press Enter or **Add**. Under **Organizations or users**, add `fern-workshop`. The sentence below the fields previews the result: this preset appears on `maple-labs/seedling` **or** on any repository owned by `fern-workshop`. It won’t appear on `maple-labs/docs`. Names are case-insensitive. Remove a token with its × button.
+Keep **Every repository** for a general comment. For a command that only some projects understand, choose **Only these repositories and orgs**. Type `maple-labs/seedling` under **Repositories** and press Enter or **Add**. Under **Orgs or users (every repo they own)**, add `fern-workshop`. The sentence below the fields previews the result: this preset appears on `maple-labs/seedling` **or** on any repository owned by `fern-workshop`. It won’t appear on `maple-labs/docs`. Names are case-insensitive. Remove a token with its × button.
 
 ![Settings editor for the fictional Build image preset, with its repository scope and preview](features/preset-settings.png)
 
@@ -27,7 +27,7 @@ Use **↑** and **↓** next to a preset to change its position. The PR composer
 
 ## 5. Edit, delete, or undo
 
-Choose **Manage** in the composer or **Settings** in the header. **Edit** changes the label, body, or scope in place. If saving fails, the editor keeps your work; choose **Retry**. **Delete** asks for confirmation in the row. After deletion, **Undo** restores the preset at its former position. Editing or deleting a preset never changes a posted GitHub comment.
+Choose **Manage** in the composer or **Settings** in the header. **Edit** changes the label, body, or scope in place. Choose **Save preset** to keep the edits. If saving fails, the editor keeps your work; choose **Retry**. **Delete** asks for confirmation in the row. After deletion, **Undo** restores the preset at its former position. Editing or deleting a preset never changes a posted GitHub comment.
 
 ## Where presets live
 

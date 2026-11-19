@@ -22,7 +22,7 @@ test('mobile preset editor validates scope, retries current edits and restores d
   assert.equal(await msg('label'), 'Enter a label.');
   assert.equal(await msg('body'), 'Enter the comment text to insert.');
   await field('label').fill('Build image'); await field('body').fill('[build]');
-  await page.getByLabel('Only these repositories or organizations').check();
+  await page.getByLabel('Only these repositories and orgs').check();
   await submit.click(); assert.match(await msg('scope'), /Add a repository or an org/);
   await field('repos').fill('invalid'); await field('repos').press('Enter');
   assert.match(await msg('repos'), /Use owner\/name/);
@@ -43,7 +43,7 @@ test('mobile preset editor validates scope, retries current edits and restores d
   assert.equal(await row.locator('code').innerText(), '[build-new]');
   await page.locator('#new-preset').click(); await field('label').fill('BUILD IMAGE'); await submit.click();
   assert.match(await msg('label'), /already exists/); await page.keyboard.press('Escape');
-  await row.getByText('Edit', {exact:true}).click(); await field('body').fill('updated'); await submit.click();
+  await row.getByText('Edit', {exact:true}).click(); await field('body').fill('updated'); await page.getByRole('button', { name: 'Save preset', exact:true }).click();
   await row.getByText('Delete', {exact:true}).click(); await page.keyboard.press('Escape');
   await row.getByText('Delete', {exact:true}).click(); await page.getByText('Delete preset', {exact:true}).click();
   await page.getByText('Undo', {exact:true}).click(); await row.waitFor(); await page.reload();
