@@ -167,7 +167,7 @@ try {
   await comment.getByRole('button', { name: 'Build image, inserts [docker-build]' }).click();
   await capture('quick-comment-presets', [...contextRows, comment]);
   await comment.getByRole('button', { name: 'Manage' }).click();
-  const settings = page.locator('#settings-dialog');
+  const settings = page.locator('#quick-comment-editor');
   await settings.getByRole('button', { name: 'Edit', exact: true }).first().click();
   await capture('preset-settings', [settings]);
   assert.deepEqual(errors, []);

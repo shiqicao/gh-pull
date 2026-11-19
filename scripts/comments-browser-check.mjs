@@ -7,6 +7,7 @@ test('quick comments preserve drafts, post explicitly, keep thread counts and re
   let pr = { id: 'comment', number: 1, title: 'Quick comment fixture', url: 'https://github.com/example/demo/pull/1', repo: 'example/demo', author: 'bob', status: 'OPEN', checks: 'NONE', review: 'NONE', labels: [], reviewers: [], additions: 1, deletions: 0, createdAt: '2026-01-01', updatedAt: '2026-01-01', commentCount: 3, reviewThreadCounts: { resolved: 1, total: 2 } };
   const list = async () => ({ viewer: 'alice', items: [pr], total: 1, pageInfo: { hasNextPage: false } });
   list.reviewCounts = async () => ({ items: [pr] });
+  list.viewer = async () => 'alice';
   let calls = 0, release;
   list.addComment = async input => {
     calls++; assert.deepEqual(input, { id: 'comment', body: '**Thanks!**' });
@@ -15,13 +16,31 @@ test('quick comments preserve drafts, post explicitly, keep thread counts and re
     pr = { ...pr, commentCount: 4, updatedAt: '2026-10-28' };
     return { id: pr.id, commentCount: pr.commentCount, updatedAt: pr.updatedAt };
   };
-  const { page, origin, errors } = await browserFixture(t, { list });
+  const savedViews = { list: async () => [], quickComments: async () => [{ id: 'review', label: 'Ask for review', body: '@claude_review' }] };
+  const { page, origin, errors } = await browserFixture(t, { list, savedViews });
   await page.goto(origin);
   const trigger = page.locator('.comment-count'), dialog = page.getByRole('dialog', { name: 'Quick comment', exact: true });
   await trigger.click();
   const field = dialog.getByRole('textbox', { name: 'Comment', exact: true });
   const post = dialog.getByRole('button', { name: 'Post comment', exact: true });
   assert.equal(await post.isDisabled(), true);
+  const chip = dialog.getByRole('button', { name: /^Ask for review,/ });
+  await page.evaluate(() => document.fonts.ready);
+  for (const selected of [false, true]) {
+    if (selected) await chip.click();
+    const offsets = await chip.evaluate(button => {
+      const center = rect => rect.top + rect.height / 2;
+      const middle = center(button.getBoundingClientRect());
+      const walker = document.createTreeWalker(button, NodeFilter.SHOW_TEXT);
+      let text;
+      while ((text = walker.nextNode()) && !text.textContent.trim()) {}
+      const range = document.createRange(); range.selectNodeContents(text);
+      const icon = button.querySelector('svg');
+      return { label: center(range.getBoundingClientRect()) - middle, check: icon ? center(icon.getBoundingClientRect()) - middle : null };
+    });
+    assert.ok(Math.abs(offsets.label) <= 1, `label offset ${offsets.label}px (selected=${selected})`);
+    if (selected) assert.ok(offsets.check !== null && Math.abs(offsets.check) <= 1, `check offset ${offsets.check}px`);
+  }
   await field.fill('**Thanks!**'); assert.equal(calls, 0);
   await page.keyboard.press('Escape'); await dialog.waitFor({ state: 'hidden' });
   await trigger.locator('.comment-draft-dot').waitFor();

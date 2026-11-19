@@ -1,4 +1,4 @@
-import { loadPresets, openSettings } from './quick-presets.js';
+import { loadPresets } from './quick-presets.js';
 import { createCommentControls } from './comments.js';
 import { installTooltips } from './tooltip.js';
 import { createReviewerManager } from './reviewer-manager.js';
@@ -20,11 +20,11 @@ import { queryFromParams, queryPresets, setQueryPreset, normalizeQuery, queryErr
 
 const $ = id => document.getElementById(id);
 installTooltips();
-$('settings').addEventListener('click', () => openSettings());
+window.addEventListener('pageshow', e => { if (e.persisted && authMode === 'local') void loadPresets(); });
 observeStickyTop($('sticky-top'));
 function showDashboard(visible) {
   $('settings').hidden = !visible || authMode !== 'local';
-  if (!visible && $('settings-dialog').open) $('settings-dialog').close();
+  $('settings').href = '/settings.html' + location.search;
   $('dashboard').hidden = !visible;
   $('dashboard-controls').hidden = !visible;
   $('summary').hidden = !visible;

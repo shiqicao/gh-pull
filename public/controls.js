@@ -17,9 +17,9 @@ export function iconButton({ icon, copy, ...options }) {
     feedback: copy ? copyFeedback(copy.text, copy.success, options.title) : nothing });
 }
 
-export function formField({ label, value, onInput, disabled = false, multiline = false, maxLength, required = true }) {
+export function formField({ label, value, onInput, disabled = false, multiline = false, rows, placeholder, maxLength, required = true }) {
   return multiline
-    ? html`<textarea class="form-input" aria-label=${label} .value=${live(value)} ?required=${required}
+    ? html`<textarea class="form-input" rows=${rows ?? nothing} placeholder=${placeholder ?? nothing} aria-label=${label} .value=${live(value)} ?required=${required}
         maxlength=${maxLength ?? nothing} ?disabled=${disabled} @input=${event => onInput(event.target.value)}></textarea>`
     : html`<input class="form-input" type="text" aria-label=${label} .value=${live(value)} ?required=${required}
         maxlength=${maxLength ?? nothing} ?disabled=${disabled} @input=${event => onInput(event.target.value)}>`;

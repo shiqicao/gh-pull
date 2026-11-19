@@ -1,5 +1,6 @@
 export const publicAssets = [
   ['index.html', 'text/html'],
+  ['settings.html', 'text/html'],
   ['saved-views.js', 'text/javascript'],
   ['app.js', 'text/javascript'],
   ['row.js', 'text/javascript'],
