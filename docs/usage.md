@@ -28,6 +28,24 @@ Changing Show, State, or Sort rewrites that part of the query and searches immed
 
 Unsubmitted edits stay in the editor while automatic refresh and pagination use the last applied query. Only applied queries are saved in the URL. In local mode, reopening the dashboard restores the last applied query and grouping from this browser’s storage; explicit query/filter links take priority. Group headings also remember their expanded/collapsed state per GitHub account and grouping type in browser storage, across queries, tab closure, and dashboard launches. Open tabs at the same dashboard address also synchronize group changes. New groups start expanded. The selected saved view is also remembered per account, including its edited state when the restored query or grouping differs; only Save changes updates the saved view. This selection is specific to the browser and dashboard address (including port), and does not update a saved view. Qualifiers, exclusions, and quoted phrases are supported; Boolean operators and parenthesized groups are not yet supported. In local mode, saved views appear as pills above the query in one bordered search panel, with save actions below the filters. Pills size to their names and stay on one row; extra views appear under **More (n)**, with the selected view always visible. Selecting one restores its query and **Group by** setting. On dashboard open, the two most-used views get priority; remaining views rank by usage plus temporary boosts for creation (7-day half-life), saved query/grouping edits (3 days), and recent selection (2 days). Order stays stable during the session, with the selected view kept visible as space allows; narrow windows may fit fewer favorites. Counts and timestamps persist locally across sessions. Opening a view menu or refreshing the dashboard does not count as a selection. **Save changes** explicitly updates the selected view; **Save as new view** creates a named view. Both buttons stay in place and are disabled while query text is unapplied: press Search/Enter first. Search never overwrites a saved view, and Save never runs a search. Changing Group by takes effect immediately but is only persisted to a view when you save. Edited views show a dot and a status message with **Revert**; switching away offers **Undo**. Clicking the selected pill’s **▾** opens rename and delete, with Undo after deletion. Failed saves keep edits and offer Retry. Ctrl/⌘+S saves applied changes (or opens the name prompt when no view is selected). Views are stored per GitHub account in `$XDG_CONFIG_HOME/gh-pull/saved-views.json` (default: `~/.config/gh-pull/saved-views.json`) and survive browser cache clearing and extension upgrades. They stay on this machine; hosted mode and cross-machine sync are not supported.
 
+## Predefined quick comments
+
+Use **Settings → Quick comments** to give a reusable comment a label and body. For example, a preset labeled **Build image** could insert `[docker-build]` into the comment draft. Review the draft and choose **Post comment** when ready.
+
+Each GitHub account has a `presets` array next to its saved `views` in the JSON config selected by `--config`. Its order is the chip order. Example array entry:
+
+```json
+{
+  "id": "build-image",
+  "label": "Build image",
+  "body": "[docker-build]",
+  "repos": ["maple-labs/seedling"],
+  "orgs": ["fern-workshop"]
+}
+```
+
+This preset applies to `maple-labs/seedling` **or** any repository owned by `fern-workshop`. Names match exactly, ignoring case. Omit both lists to make a preset available everywhere. Once either list is present, only explicit matches count: `"repos": []` by itself shows the preset nowhere; adding a matching org still enables it there.
+
 ## PR actions
 
 Actions apply to your own PRs and require GitHub write permissions:

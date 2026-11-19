@@ -1,5 +1,6 @@
 export const publicAssets = [
   ['index.html', 'text/html'],
+  ['settings.html', 'text/html'],
   ['saved-views.js', 'text/javascript'],
   ['app.js', 'text/javascript'],
   ['row.js', 'text/javascript'],
@@ -20,6 +21,10 @@ export const publicAssets = [
   ['review-counts.js', 'text/javascript'],
   ['reviewer-manager.js', 'text/javascript'],
   ['reviews.js', 'text/javascript'],
+  ['preset-model.js', 'text/javascript'],
+  ['presets.css', 'text/css'],
+  ['quick-presets.js', 'text/javascript'],
+  ['quick-comment-scope.js', 'text/javascript'],
   ['comments.js', 'text/javascript'],
   ['issues.js', 'text/javascript'],
   ['ui.js', 'text/javascript'],

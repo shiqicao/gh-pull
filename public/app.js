@@ -1,3 +1,4 @@
+import { loadPresets } from './quick-presets.js';
 import { createCommentControls } from './comments.js';
 import { installTooltips } from './tooltip.js';
 import { createReviewerManager } from './reviewer-manager.js';
@@ -19,8 +20,10 @@ import { queryFromParams, queryPresets, setQueryPreset, normalizeQuery, queryErr
 
 const $ = id => document.getElementById(id);
 installTooltips();
+window.addEventListener('pageshow', e => { if (e.persisted && authMode === 'local') void loadPresets(); });
 observeStickyTop($('sticky-top'));
 function showDashboard(visible) {
+  $('settings').hidden = !visible || authMode !== 'local';
   $('dashboard').hidden = !visible;
   $('dashboard-controls').hidden = !visible;
   $('summary').hidden = !visible;
@@ -259,7 +262,7 @@ const commentControls = createCommentControls({
   onClose(id) { renderEditorRow(id); polling.invalidate(); },
   async submit(pr, draft) {
     await changePull(pr, commentChanges, {
-      action: 'comment', input: { body: draft.value.trim() }, message: 'Comment posted',
+      action: 'comment', input: { body: draft.value.trim() }, message: `Comment posted to ${pr.repo} #${pr.number}.`,
       apply(current, data) { if (current) Object.assign(current, data); },
       onSuccess() { commentControls.reset(); focusTitleControl(pr.id, '.comment-count'); },
       onError: commentControls.recover,
@@ -708,6 +711,7 @@ async function initializeSession() {
     if (notice) $('auth-notice').textContent = notice;
     $('session-status').hidden = true;
     if (authenticated) {
+      if (authMode === 'local') await loadPresets();
       await initializeQueryEditor();
       showDashboard(true);
       await load();
