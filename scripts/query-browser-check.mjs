@@ -270,17 +270,8 @@ test('query controls and suggestions have accessible names, roles, contrast and 
   assert.deepEqual(errors, []);
 });
 
-test('hosted login skips the editor bundle and an invalid bookmarked query can be corrected', async t => {
+test('an invalid bookmarked query can be corrected', async t => {
   const f = await fixture(t), { page, origin, editor, calls } = f;
-  const bundles = [];
-  page.on('request', request => { if (/\/(query-editor\.js|vendor\/codemirror\.js)$/.test(request.url())) bundles.push(request.url()); });
-  await page.route(`${origin}/api/session`, route => route.fulfill({ json: { mode: 'github-app', authenticated: false } }));
-  await page.goto(origin);
-  await page.getByRole('link', { name: 'Sign in with GitHub' }).waitFor();
-  assert.deepEqual(bundles, []);
-  assert.equal(await page.locator('#dashboard').isVisible(), false);
-  assert.equal(await page.locator('#dashboard-controls').isVisible(), false);
-  await page.unroute(`${origin}/api/session`);
   await page.goto(`${origin}/?${new URLSearchParams({ q: 'label:"unfinished' })}`);
   await editor.waitFor();
   assert.equal(calls.length, 0);

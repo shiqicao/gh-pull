@@ -23,9 +23,9 @@ test('conflict state distinguishes conflicts from other merge blockers', () => {
   }
 });
 
-function client(pr = ready, result = { id: ready.id, state: 'MERGED', updatedAt: '2026-10-08T00:00:00Z' }, getMergeAccess) {
+function client(pr = ready, result = { id: ready.id, state: 'MERGED', updatedAt: '2026-10-08T00:00:00Z' }) {
   const calls = [];
-  const github = createGitHub({ getMergeAccess, getToken: async () => 'mock', fetchImpl: async (url, options) => {
+  const github = createGitHub({ getToken: async () => 'mock', fetchImpl: async (url, options) => {
     const body = JSON.parse(options.body); calls.push(body);
     return Response.json({ data: calls.length === 1 ? { node: pr, viewer: { login: 'alice' } } : { mergePullRequest: { pullRequest: result } } });
   } });
@@ -172,26 +172,10 @@ test('readiness endpoint validates IDs and shares its own short-lived cache', as
 });
 
 
-test('hosted merge rechecks installation access before mutation; local mode needs no installation API', async () => {
-  let allowed = false, checks = 0;
-  const access = async repos => { checks++; assert.deepEqual(repos, ['team/repo']); return new Map([['team/repo', { allowed, message: 'Install the GitHub App for this repository.' }]]); };
-  const denied = client(ready, undefined, access);
-  await assert.rejects(denied.github.merge(input), /Install the GitHub App/);
-  assert.equal(denied.calls.length, 1);
-  allowed = true;
-  assert.equal((await client(ready, undefined, access).github.merge(input)).status, 'MERGED');
-  assert.equal(checks, 2);
+test('local merge needs no installation API', async () => {
   const local = client();
   assert.equal((await local.github.merge(input)).status, 'MERGED');
   assert.equal(local.calls.length, 2);
-});
-
-test('readiness preserves mergeability while separately reporting missing hosted app access', async () => {
-  const list = createGitHub({ getToken: async () => 'mock', getMergeAccess: async () => new Map([['team/repo', { allowed: false, reason: 'not_installed' }]]),
-    fetchImpl: async () => Response.json({ data: { viewer: { login: 'alice' }, nodes: [ready] } }) });
-  const result = (await list.mergeReadiness(['PR_1'])).items[0];
-  assert.equal(result.canMerge, true);
-  assert.equal(result.mergeAccess.allowed, false);
 });
 
 test('review badges distinguish bypass permission without relaxing merge safety', async () => {

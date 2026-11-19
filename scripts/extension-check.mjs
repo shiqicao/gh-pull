@@ -15,7 +15,7 @@ const binary = resolve(process.env.GH_PULL_BINARY || `dist/gh-pull-${os}-${arch}
 test('standalone extension launches, embeds assets, reuses, stops, and recovers stale state', async t => {
   const dir = await mkdtemp(join(tmpdir(), 'gh-pull-binary-'));
   // No real credentials, GitHub requests, Node installation, or source tree required.
-  const env = { ...process.env, GH_PULL_STATE_DIR: dir, GH_TOKEN: 'fixture-unused-token', GITHUB_TOKEN: '', AUTH_MODE: 'github-app' };
+  const env = { ...process.env, GH_PULL_STATE_DIR: dir, GH_TOKEN: 'fixture-unused-token', GITHUB_TOKEN: '', AUTH_MODE: 'local' };
   const command = (...args) => exec(binary, args, { env, cwd: tmpdir(), timeout: 25_000, maxBuffer: 2_000_000 });
   t.after(async () => { await command('stop').catch(() => {}); await rm(dir, { recursive: true, force: true }); });
   assert.match((await command('--version')).stdout, /gh-pull/);

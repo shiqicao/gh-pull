@@ -52,12 +52,12 @@ test('title and filters stay pinned; group headings hand off below the responsiv
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.evaluate(() => { document.documentElement.style.zoom = 1; });
   // A notice can appear after scrolling; the group offset must follow its new height.
-  await page.evaluate(() => { const notice = document.querySelector('#auth-notice'); notice.textContent = 'Connection notice'; notice.hidden = false; });
+  await page.evaluate(() => { const notice = document.querySelector('#session-status'); notice.textContent = 'Connection notice'; notice.hidden = false; });
   await page.waitForFunction(() => Math.abs(document.querySelectorAll('.pr-group > summary')[1].getBoundingClientRect().top - document.querySelector('#sticky-top').getBoundingClientRect().bottom) < 2);
   await page.locator('.pr-group > summary').nth(1).click();
   assert.equal(await page.locator('.pr-group').nth(1).getAttribute('open'), null);
   await page.locator('.pr-group > summary').nth(1).click();
-  await page.evaluate(() => { document.querySelector('#auth-notice').hidden = true; });
+  await page.evaluate(() => { document.querySelector('#session-status').hidden = true; });
   await page.locator('.pr-group').first().evaluate(group => window.scrollTo(0, window.scrollY + group.getBoundingClientRect().top + 160));
   if (process.env.GH_PULL_SCREENSHOTS) await page.screenshot({ path: '/tmp/gh-pull-sticky-preview.png' });
   await page.locator('#group').selectOption('none');
