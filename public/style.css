@@ -70,83 +70,6 @@ header button {
   display: none !important;
 }
 
-/* Sign-in */
-.signin-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 44px;
-  padding: 10px 16px;
-  border-radius: var(--radius-control);
-  background: var(--color-accent);
-  color: var(--color-on-accent);
-  font-weight: 600;
-  text-decoration: none;
-}
-
-.signin-button:hover {
-  background: var(--color-accent-strong);
-}
-
-#signin {
-  max-width: 480px;
-  margin: 0 auto 24px;
-  padding: 32px;
-  border: 1px solid var(--color-border);
-  border-radius: 12px;
-  background: var(--color-surface);
-}
-
-#signin .signin-button {
-  width: 100%;
-}
-
-.signin-access {
-  margin-top: 24px;
-  padding-top: 20px;
-  border-top: 1px solid var(--color-border);
-  color: var(--color-muted);
-  font-size: var(--font-size-body);
-}
-
-.signin-access h3 {
-  margin: 0 0 6px;
-  font-size: inherit;
-  font-weight: 600;
-  color: var(--color-neutral-text);
-}
-
-.signin-access p {
-  margin: 0 0 12px;
-}
-
-.signin-access p:last-child {
-  margin-bottom: 0;
-}
-
-.signin-access a {
-  color: inherit;
-  text-underline-offset: 3px;
-}
-
-.signin-access a:hover {
-  color: var(--color-accent);
-}
-
-body:has(#signin:not([hidden])) {
-  max-width: 528px;
-  padding-top: clamp(32px, 8vh, 72px);
-}
-
-body:has(#signin:not([hidden])) .dashboard-footer {
-  max-width: 480px;
-  margin: 0 auto;
-}
-
-body:has(#signin:not([hidden])) #links-hint {
-  display: none;
-}
-
 /* Shared controls and field text */
 #filters, .title-editor {
   display: flex;
@@ -548,25 +471,6 @@ button, .pr-group > summary {
   opacity: 0.7;
 }
 
-.merge-access-blocked {
-  display: inline-flex;
-  cursor: not-allowed;
-}
-
-.merge-access-blocked .merge-action {
-  pointer-events: none;
-}
-
-.merge-access-link {
-  font-size: var(--font-size-small);
-  color: var(--color-muted);
-  text-underline-offset: 3px;
-}
-
-.merge-access-link:hover {
-  color: var(--color-accent);
-}
-
 .sr-only {
   position: absolute;
   width: 1px;
@@ -761,10 +665,6 @@ input:focus, select:focus, textarea:focus {
   .pr-row {
     grid-template-columns: minmax(0, 1fr);
     gap: 10px;
-  }
-  #signin {
-    margin: 0 auto 16px;
-    padding: 24px;
   }
 }
 

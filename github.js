@@ -109,7 +109,6 @@ function dependencyQuery(batch) {
 }
 
 export function createGitHub(options = {}) {
-  const { getMergeAccess } = options;
   const request = createGitHubTransport(options);
   const graphql = createGraphQLClient({ ...options, request });
   const withReviewThreadCounts = createReviewThreadCounts(graphql);
@@ -127,19 +126,13 @@ export function createGitHub(options = {}) {
     return { pr, viewer: data.viewer.login };
   }
 
-  async function withMergeAccess(items) {
-    if (!getMergeAccess) return items;
-    const repos = [...new Set(items.filter(pr => pr.canMerge || pr.mergePending).map(pr => pr.repo))];
-    const access = await getMergeAccess(repos);
-    return items.map(pr => access.has(pr.repo) ? { ...pr, mergeAccess: access.get(pr.repo) } : pr);
-  }
   const dependencyCache = new Map();
   function cacheDependency(key, parent, prune = false) {
     if (prune && dependencyCache.size >= 256) dependencyCache.clear();
     dependencyCache.set(key, { until: Date.now() + 60_000, parent });
   }
   async function normalizeAll(nodes, viewer) {
-    return withDependencyParents(await withMergeAccess(nodes.filter(pr => pr?.id).map(pr => normalizePullRequest(pr, viewer))));
+    return withDependencyParents(nodes.filter(pr => pr?.id).map(pr => normalizePullRequest(pr, viewer)));
   }
   async function withDependencyParents(items) {
     const candidates = new Map();
@@ -277,7 +270,7 @@ export function createGitHub(options = {}) {
         commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }
       } }
     }`, { ids });
-    return { items: await withMergeAccess(data.nodes.filter(pr => pr?.id).map(pr => ({ id: pr.id, repo: pr.repository?.nameWithOwner, ...mergeOptions(pr, data.viewer.login), review: reviewState(pr) }))) };
+    return { items: data.nodes.filter(pr => pr?.id).map(pr => ({ id: pr.id, repo: pr.repository?.nameWithOwner, ...mergeOptions(pr, data.viewer.login), review: reviewState(pr) })) };
   };
 
   list.merge = async input => {
@@ -288,10 +281,6 @@ export function createGitHub(options = {}) {
     if (!readiness.canMerge) throw new ApiError('This PR is no longer ready to merge. Refresh to see its current status.', 409);
     if (pr.headRefOid !== headOid) throw new ApiError('New commits were pushed. Refresh and review the changes before merging.', 409);
     if (!readiness.mergeMethods.includes(mergeMethod)) throw new ApiError('This merge method is no longer enabled for the repository. Refresh and choose another method.', 409);
-    if (getMergeAccess) {
-      const access = (await getMergeAccess([pr.repository.nameWithOwner])).get(pr.repository.nameWithOwner);
-      if (!access?.allowed) throw new ApiError(access?.message || 'Could not verify app access. Refresh to try again.', 403);
-    }
     const data = await graphql(`mutation($input: MergePullRequestInput!) {
       mergePullRequest(input: $input) { pullRequest { id state updatedAt } }
     }`, { input: { pullRequestId: id, expectedHeadOid: headOid, mergeMethod } });

@@ -109,6 +109,8 @@ Open <http://localhost:3000>. Local mode is the default (`AUTH_MODE=local`). The
 
 ## Local configuration
 
+This version runs only on the loopback interface. The hosted GitHub App login, installation checks, and Marketplace webhook are no longer included. Old deployments configured with `AUTH_MODE=github-app` fail at startup rather than falling back to the machine owner's GitHub credentials. To use the dashboard, run `gh pull` on your own machine.
+
 | Setting | Applies to | Description |
 | --- | --- | --- |
 | `GH_TOKEN` / `GITHUB_TOKEN` | Both | Optional token; takes precedence over your GitHub CLI login |

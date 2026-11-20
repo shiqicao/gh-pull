@@ -10,8 +10,6 @@ import { randomBytes } from 'node:crypto';
 import { toGitHubQuery, repositoryScope } from './public/query.js';
 import { createGitHub, ApiError, validateTitleUpdate, validateDraftUpdate, validateMerge, validateReviewDismissal, validateClose, validateComment } from './github.js';
 import { cachedRequest } from './request-cache.js';
-import { authConfig, createAuth } from './auth.js';
-import { createMarketplaceWebhook } from './marketplace.js';
 import { createUpdateCheck } from './extension-updates.js';
 
 const assets = new Map(publicAssets.filter(([, type]) => type).map(([file, type]) =>
@@ -29,14 +27,13 @@ const mutations = new Map([
   ['/api/pulls/merge', { method: 'merge', validate: validateMerge, unavailable: 'Status changes are unavailable.' }],
 ]);
 
-export function createApp({ savedViews = createSavedViewsStore(), list = createGitHub(), updateTitle = list.updateTitle, convertToDraft = list.convertToDraft, markReadyForReview = list.markReadyForReview, merge = list.merge, dismissReview = list.dismissReview, closePull = list.closePull, reopenPull = list.reopenPull, changeReviewer = list.changeReviewer, addComment = list.addComment, config = { mode: 'local' }, localControl, authOptions, deploymentEnv = process.env } = {}) {
-  const build = config.mode === 'local' ? localControl?.version : null;
+export function createApp({ savedViews = createSavedViewsStore(), list = createGitHub(), updateTitle = list.updateTitle, convertToDraft = list.convertToDraft, markReadyForReview = list.markReadyForReview, merge = list.merge, dismissReview = list.dismissReview, closePull = list.closePull, reopenPull = list.reopenPull, changeReviewer = list.changeReviewer, addComment = list.addComment, config = { mode: 'local' }, localControl } = {}) {
+  if (config.mode !== 'local' || (process.env.AUTH_MODE && process.env.AUTH_MODE !== 'local')) throw new Error('Hosted authentication is no longer supported. Run gh pull locally.');
+  const build = localControl?.version;
   const checkUpdate = createUpdateCheck(build);
-  const version = deploymentVersion(deploymentEnv, build);
+  const version = build ? { label: build, url: build.startsWith('v') ? `https://github.com/shiqicao/gh-pull/releases/tag/${encodeURIComponent(build)}` : null } : null;
   const localCache = new Map();
   const subscribers = new Map();
-  const auth = config.mode === 'github-app' ? createAuth(config, authOptions) : null;
-  const marketplace = auth ? createMarketplaceWebhook({ secret: config.marketplaceWebhookSecret, cancel: auth.cancelMarketplace }) : null;
   return createServer(async (req, res) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'no-referrer');
@@ -44,21 +41,14 @@ export function createApp({ savedViews = createSavedViewsStore(), list = createG
     res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'none'");
     const send = (status, body) => { res.writeHead(status, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(body)); };
     const host = req.headers.host ?? '';
-    const origin = auth ? config.origin : `http://${host}`;
-    if (auth ? host !== new URL(origin).host : !/^(localhost|127\.0\.0\.1)(:\d+)?$/.test(host)) return send(403, { error: 'Invalid request host.' });
+    const origin = `http://${host}`;
+    if (!/^(localhost|127\.0\.0\.1)(:\d+)?$/.test(host)) return send(403, { error: 'Invalid request host.' });
     let url;
     try { url = new URL(req.url, origin); }
     catch { return send(400, { error: 'Invalid request URL.' }); }
     if (url.origin !== origin) return send(403, { error: 'Invalid request origin.' });
-    if (url.pathname === '/webhooks/marketplace') {
-      if (!marketplace) return send(404, { error: 'Not found.' });
-      try { return send(200, await marketplace(req)); }
-      catch (error) { return send(error instanceof ApiError ? error.status : 500, { error: error instanceof ApiError ? error.message : 'Webhook processing failed. Redeliver to retry.' }); }
-    }
-    const navigation = auth && req.method === 'GET' && ['/', '/auth/login', '/auth/callback'].includes(url.pathname);
-    if ((req.headers.origin && req.headers.origin !== origin && !navigation) ||
-        (req.headers['sec-fetch-site'] === 'cross-site' && !navigation)) return send(403, { error: 'Same-origin requests only.' });
-    if (!auth && localControl && url.pathname === '/api/cli') {
+    if ((req.headers.origin && req.headers.origin !== origin) || req.headers['sec-fetch-site'] === 'cross-site') return send(403, { error: 'Same-origin requests only.' });
+    if (localControl && url.pathname === '/api/cli') {
       if (req.headers.authorization !== `Bearer ${localControl.token}`) return send(403, { error: 'Invalid control token.' });
       if (!['GET', 'POST'].includes(req.method)) return send(405, { error: 'Method not allowed.' });
       send(200, { app: 'gh-pull', version: localControl.version });
@@ -66,16 +56,11 @@ export function createApp({ savedViews = createSavedViewsStore(), list = createG
       return;
     }
     try {
-      if (!auth && build && req.method === 'GET' && url.pathname === '/api/updates') return send(200, { update: await checkUpdate() });
-      const sessionSend = (status, body) => send(status, url.pathname === '/api/session' && status === 200 && version ? { ...body, version } : body);
-      if (auth && await auth.handle(req, res, url, sessionSend)) return;
-      if (!auth && req.method === 'GET' && url.pathname === '/api/session') return sessionSend(200, { mode: 'local', authenticated: true });
-      const session = auth && url.pathname.startsWith('/api/') ? auth.session(req) : null;
-      if (auth && url.pathname.startsWith('/api/') && !session) throw new ApiError('Please sign in with GitHub.', 401);
-      const activeList = session ? session.list : list;
-      const cache = session ? session.cache : localCache;
+      if (build && req.method === 'GET' && url.pathname === '/api/updates') return send(200, { update: await checkUpdate() });
+      if (req.method === 'GET' && url.pathname === '/api/session') return send(200, { mode: 'local', authenticated: true, ...(version && { version }) });
+      const activeList = list;
+      const cache = localCache;
       if (['/api/saved-views', '/api/quick-comments'].includes(url.pathname)) {
-        if (auth) return send(404, { error: 'Saved views are available in local mode.' });
         if (!['GET', 'POST'].includes(req.method)) return send(405, { error: 'Method not allowed.' });
         let input;
         if (req.method === 'POST') {
@@ -110,7 +95,7 @@ export function createApp({ savedViews = createSavedViewsStore(), list = createG
         let input;
         try { input = JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { throw new ApiError('Invalid JSON body.', 400); }
         input = mutation.validate(input);
-        const actions = session ? session.list : { merge, convertToDraft, markReadyForReview, updateTitle, dismissReview, closePull, reopenPull, changeReviewer, addComment };
+        const actions = { merge, convertToDraft, markReadyForReview, updateTitle, dismissReview, closePull, reopenPull, changeReviewer, addComment };
         return await handleMutation(input, mutation, actions, cache, subscribers, send);
       }
       if (req.method !== 'GET') return send(405, { error: 'Method not allowed.' });
@@ -137,20 +122,10 @@ export function createApp({ savedViews = createSavedViewsStore(), list = createG
       }
       return await serveAsset(url, res, send);
     } catch (error) {
-      if (auth && error.status === 401) auth.invalidate(req, res);
       if (error.retryAfter) res.setHeader('Retry-After', String(error.retryAfter));
       send(error instanceof ApiError ? error.status : 500, { error: error instanceof ApiError ? error.message : 'Something went wrong. Please retry.' });
     }
   });
-}
-
-function deploymentVersion(env, build) {
-  if (build) return { label: build,
-    url: build.startsWith('v') ? `https://github.com/shiqicao/gh-pull/releases/tag/${encodeURIComponent(build)}` : null };
-  const sha = env.RAILWAY_GIT_COMMIT_SHA, owner = env.RAILWAY_GIT_REPO_OWNER, repo = env.RAILWAY_GIT_REPO_NAME;
-  if (!/^[a-f0-9]{40}$/i.test(sha ?? '')) return null;
-  return { sha, url: /^[a-z0-9-]+$/i.test(owner ?? '') && /^[a-z0-9_.-]+$/i.test(repo ?? '')
-    ? `https://github.com/${owner}/${repo}/commit/${sha}` : null };
 }
 
 async function handleMutation(input, mutation, actions, cache, subscribers, send) {
@@ -228,8 +203,7 @@ async function serveAsset(url, res, send) {
 
 if (!isSea() && process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const port = Number(process.env.PORT || 3000);
-  const config = authConfig();
-  const app = createApp({ config });
+  const app = createApp();
   app.on('error', error => { console.error(`Could not start gh-pull: ${error.message}`); process.exitCode = 1; });
-  app.listen(port, config.mode === 'local' ? '127.0.0.1' : (process.env.HOST || '127.0.0.1'), () => console.log(`gh-pull (${config.mode}) → ${config.origin || `http://localhost:${app.address().port}`}`));
+  app.listen(port, '127.0.0.1', () => console.log(`gh-pull → http://127.0.0.1:${app.address().port}`));
 }

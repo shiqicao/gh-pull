@@ -1,8 +1,0 @@
-test/
-scripts/
-node_modules/
-coverage/
-.build/
-dist/
-cli/
-.github/

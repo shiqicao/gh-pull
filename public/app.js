@@ -20,10 +20,10 @@ import { queryFromParams, queryPresets, setQueryPreset, normalizeQuery, queryErr
 
 const $ = id => document.getElementById(id);
 installTooltips();
-window.addEventListener('pageshow', e => { if (e.persisted && authMode === 'local') void loadPresets(); });
+window.addEventListener('pageshow', e => { if (e.persisted) void loadPresets(); });
 observeStickyTop($('sticky-top'));
 function showDashboard(visible) {
-  $('settings').hidden = !visible || authMode !== 'local';
+  $('settings').hidden = !visible;
   $('dashboard').hidden = !visible;
   $('dashboard-controls').hidden = !visible;
   $('summary').hidden = !visible;
@@ -46,7 +46,7 @@ const mergeSelections = new Map();
 const polling = createPollingSchedule();
 const issuePopover = createIssuePopover({ onClose: () => polling.invalidate() });
 let loadedPages = 1;
-let authMode = 'local', authenticated = false;
+let authenticated = false;
 const backgroundRefresh = createBackgroundRefresh({
   state: {
     get items() { return items; }, set items(value) { items = value; },
@@ -74,17 +74,7 @@ const reviewCountsLoader = createReviewCountsLoader({
   },
 });
 
-async function apiFetch(url, options) {
-  const response = await fetch(url, options);
-  if (response.status === 401 && authMode === 'github-app') {
-    authenticated = false; reviewCountsLoader.clear(); savedViews?.reset();
-    items = []; pendingChanges.clear(); mergeSelections.clear();
-    $('results').replaceChildren();
-    showDashboard(false);
-    location.replace('/?auth_error=expired');
-  }
-  return response;
-}
+function apiFetch(url, options) { return fetch(url, options); }
 
 function updateRefreshButton() {
   const busy = loading || backgroundRefresh.statusLoading;
@@ -144,8 +134,7 @@ function createMergeAction(pr, prUrl) {
   if (!methods.length) return nothing;
   if (!methods.includes(mergeSelections.get(pr.id))) mergeSelections.delete(pr.id);
   const selected = mergeSelections.get(pr.id) ?? (methods.includes(pr.mergeMethod) ? pr.mergeMethod : methods[0]);
-  const blocked = authMode === 'github-app' && !pr.mergeAccess?.allowed;
-  const disabled = blocked || Boolean(pendingChanges.isMergeBusy(pr.id));
+  const disabled = Boolean(pendingChanges.isMergeBusy(pr.id));
   const controls = html`<span class=${`merge-controls${methods.length > 1 ? ' merge-split' : ''}`}>
     ${actionButton({ className: 'badge open merge-action', label: `${mergeLabels[selected]} ${pr.repo} #${pr.number}`, disabled,
       onClick: () => mergePull(pr, selected), content: merges.get(pr.id)?.saving ? 'Merging…' : mergeLabels[selected] })}
@@ -155,10 +144,7 @@ function createMergeAction(pr, prUrl) {
       ${methods.map(method => html`<option value=${method} .selected=${method === selected}>${mergeMethodLabels[method]}</option>`)}
     </select></span>` : nothing}
   </span>`;
-  const message = pr.mergeAccess?.message || 'Could not verify app access. Refresh to try again.';
-  return blocked ? html`<span class="merge-access-blocked" role="group" data-tooltip=${message} tabindex="0" aria-label=${`${mergeLabels[selected]} unavailable. ${message}`}>${controls}</span>
-    ${pr.mergeAccess?.url ? html`<a class="merge-access-link" href=${pr.mergeAccess.url} target="_blank" rel="noopener noreferrer"
-      data-tooltip="Complete setup on GitHub, then refresh this page. Organization access may require owner approval.">${pr.mergeAccess.action}</a>` : nothing}` : controls;
+  return controls;
 }
 
 const changeMessages = {
@@ -207,7 +193,6 @@ async function changePull(pr, changes, { action, input = {}, apply, message, onS
 }
 
 async function mergePull(pr, mergeMethod) {
-  if (authMode === 'github-app' && !pr.mergeAccess?.allowed) return;
   await changePull(pr, merges, {
     action: 'merge', input: { headOid: pr.headOid, mergeMethod },
     message: `Merged ${pr.repo} #${pr.number}`,
@@ -554,7 +539,7 @@ async function load({ append = false, refresh = false, background = false } = {}
 
 const lastQueryKey = 'gh-pull:last-query';
 function restoreFilters() {
-  if (authMode !== 'local' || ['q', 'group', 'scope', 'state', 'sort', 'search'].some(key => params.has(key))) return;
+  if (['q', 'group', 'scope', 'state', 'sort', 'search'].some(key => params.has(key))) return;
   try {
     const stored = JSON.parse(localStorage.getItem(lastQueryKey));
     if (!stored || queryError(stored.query) || ![...$('group').options].some(option => option.value === stored.group)) return;
@@ -565,7 +550,7 @@ function restoreFilters() {
 function saveFilters() {
   const query = new URLSearchParams({ q: appliedQuery, group: $('group').value });
   history.replaceState(null, '', `?${query}`);
-  if (authMode === 'local' && !queryError(appliedQuery)) {
+  if (!queryError(appliedQuery)) {
     try { localStorage.setItem(lastQueryKey, JSON.stringify({ query: appliedQuery, group: $('group').value })); }
     catch { /* Searching still works when browser storage is unavailable. */ }
   }
@@ -573,7 +558,7 @@ function saveFilters() {
 async function initializeQueryEditor() {
   if (queryEditor) return;
   restoreFilters();
-  if (authMode === 'local' && !queryError(appliedQuery)) saveFilters();
+  if (!queryError(appliedQuery)) saveFilters();
   const { createQueryEditor } = await import('./query-editor.js');
   queryEditor = createQueryEditor({
     parent: $('query-editor'), value: appliedQuery, getItems: () => items,
@@ -585,7 +570,7 @@ async function initializeQueryEditor() {
     },
     onChange: updateQueryControls, onSubmit: applyQuery,
   });
-  savedViews = createSavedViews({ enabled: authMode === 'local', getQuery: () => queryEditor.value, getAppliedQuery: () => appliedQuery, getGroup: () => $('group').value, onOpen: () => queryEditor.closeSuggestions(),
+  savedViews = createSavedViews({ enabled: true, getQuery: () => queryEditor.value, getAppliedQuery: () => appliedQuery, getGroup: () => $('group').value, onOpen: () => queryEditor.closeSuggestions(),
     apply: (query, group, draft = query) => { $('group').value = group; queryEditor.setValue(query); applyQuery(); queryEditor.setValue(draft); updateQueryControls(); render(); },
     request: async input => {
       const response = await apiFetch('/api/saved-views', input ? { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input), signal: AbortSignal.timeout(35_000) } : { signal: AbortSignal.timeout(35_000) });
@@ -696,22 +681,13 @@ async function initializeSession() {
       separator.setAttribute('aria-hidden', 'true');
       version.append('version ', commit, separator);
     }
-    authMode = session.mode;
     authenticated = session.authenticated;
-    $('signin').hidden = authenticated;
     showDashboard(false);
     $('links-hint').hidden = !authenticated;
     $('refresh').hidden = !authenticated;
-    $('logout').hidden = authMode !== 'github-app' || !authenticated;
-    $('install').hidden = authMode !== 'github-app' || !authenticated || !session.installUrl;
-    if (session.installUrl) $('install').href = session.installUrl;
-    const notices = { state: 'Sign-in expired or could not be verified. Please try again.', denied: 'GitHub authorization was cancelled. Sign in when you are ready.', exchange: 'Could not complete GitHub sign-in. Please try again.', expired: 'Your session expired or authorization was revoked. Please sign in again.' };
-    const notice = notices[params.get('auth_error')];
-    $('auth-notice').hidden = !notice;
-    if (notice) $('auth-notice').textContent = notice;
     $('session-status').hidden = true;
     if (authenticated) {
-      if (authMode === 'local') await loadPresets();
+      await loadPresets();
       await initializeQueryEditor();
       showDashboard(true);
       await load();
@@ -727,18 +703,4 @@ async function initializeSession() {
   }
 }
 $('session-retry').addEventListener('click', initializeSession);
-$('logout').addEventListener('click', async () => {
-  $('logout').disabled = true;
-  try {
-    const response = await fetch('/auth/logout', { method: 'POST' });
-    if (!response.ok) throw new Error();
-    authenticated = false; reviewCountsLoader.clear(); savedViews?.reset();
-    loads.cancel();
-    location.replace('/');
-  } catch {
-    $('auth-notice').textContent = 'Could not sign out. Please retry.';
-    $('auth-notice').hidden = false;
-    $('logout').disabled = false;
-  }
-});
 initializeSession();
