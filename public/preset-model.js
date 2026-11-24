@@ -13,4 +13,6 @@ export function presetErrors(p, others) {
   if ((p.repos !== undefined || p.orgs !== undefined) && !p.repos?.length && !p.orgs?.length) errors.scope = 'Add a repository or an org, or choose Every repository.';
   return errors;
 }
-export function insertPreset(draft, body) { return draft.includes(body) ? draft : draft.trim() ? `${draft.trimEnd()}\n${body}` : body; }
+// Appending another preset trims the previous draft's trailing whitespace.
+export function hasPreset(draft, body) { return draft.includes(body.trimEnd()); }
+export function insertPreset(draft, body) { return hasPreset(draft, body) ? draft : draft.trim() ? `${draft.trimEnd()}\n${body}` : body; }
