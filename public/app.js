@@ -374,7 +374,7 @@ function render() {
   const focused = document.activeElement;
   const selection = typeof focused?.selectionStart === 'number' ? [focused.selectionStart, focused.selectionEnd, focused.selectionDirection] : null;
   const results = $('results'), activeGroups = new Set(), activeRows = new Set();
-  let nextSection = results.firstElementChild;
+  let nextSection = results.firstElementChild, widestGutter = 0;
   const ctx = rowContext();
   for (const [name, prs] of groups) {
     const key = `${$('group').value}:${name}`;
@@ -397,6 +397,7 @@ function render() {
     renderTemplate(html`${$('group').value === 'repo' ? repositoryLink(name)
       : $('group').value === 'author' ? usernameLink(name, 'group-author', nameColors[name.toLowerCase()] * 360 / NAME_COLOR_COUNT) : labels[name] ?? name} (${prs.length})`, heading);
     const graph = dependencyLanes(prs, { allItems: items, sort: queryPresets(appliedQuery).sort });
+    widestGutter = Math.max(widestGutter, graph.gutter);
     list.classList.toggle('has-dependency-lanes', Boolean(graph.gutter));
     if (graph.gutter) list.style.setProperty('--lane-gutter', `${graph.gutter}px`);
     else list.style.removeProperty('--lane-gutter');
@@ -418,6 +419,7 @@ function render() {
       group.graphKey = graphKey;
     }
   }
+  document.documentElement.style.setProperty('--widest-lane-gutter', `${widestGutter}px`);
   for (const [id, { entry }] of rowElements) if (!activeRows.has(id)) {
     renderTemplate(nothing, entry); entry.remove(); rowElements.delete(id);
   }

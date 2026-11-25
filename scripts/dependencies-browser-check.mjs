@@ -50,6 +50,20 @@ for (const [name, items, width, nodes] of [['3a', scenario3a, 92, 8], ['3b', sce
   });
 }
 
+test('desktop State column aligns across groups with and without dependency lanes', async t => {
+  const standalone = { ...scenario3a[0], id: 'solo', repo: 'example/solo' };
+  const items = [...scenario3a, standalone];
+  const { page, origin } = await browserFixture(t, { list: async () => ({ viewer: 'viewer', total: items.length, items, pageInfo: { hasNextPage: false } }) });
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto(origin);
+  await page.locator('.dependency-dot').first().waitFor();
+  await page.locator('#group').selectOption('repo');
+  await page.locator('.pr-list:not(.has-dependency-lanes) .pr-row').first().waitFor();
+  const edges = await page.locator('.pr-column-header > :first-child, .title-line > .badge').evaluateAll(nodes => nodes.map(n => n.getBoundingClientRect().left));
+  assert.equal(edges.length, items.length + 1);
+  assert.ok(Math.max(...edges) - Math.min(...edges) <= 1, `State column left edges: ${edges}`);
+});
+
 test('wide trees fall back to parent chips and a retargeted standalone group drops its gutter', async t => {
   const root = scenario3a[0];
   let items = [root, ...Array.from({ length: 6 }, (_, i) => ({ ...scenario3a[1], id: `wide-${i}`, number: 600 + i, branch: `wide-${i}` }))];

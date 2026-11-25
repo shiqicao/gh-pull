@@ -973,6 +973,11 @@ select:not([multiple]):not([size]) {
 .reviewers-more { flex: none; }
 .empty-value { color: var(--color-muted); }
 .pr-row .draft-error, .pr-row .title-editor { grid-column: 1 / -1; }
+/* Desktop rows share columns, even when only some groups draw dependency lanes. */
+@media (width > 62.5em) {
+  .pr-list .pr-row { padding-inline-start: calc(max(16px, var(--widest-lane-gutter, 0px)) - var(--lane-gutter, 0px)); }
+  .pr-column-header { padding-inline-start: calc(1px + max(16px, var(--widest-lane-gutter, 0px))); }
+}
 @media (max-width: 75em) {
   :root { --pr-columns: 4.75rem 6.25rem minmax(0, 1fr) 1.5rem 7rem 2.875rem 3.125rem 2.75rem 8.75rem; --pr-column-gap: 10px; }
 }
