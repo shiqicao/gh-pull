@@ -16,7 +16,7 @@ test('quick comments preserve drafts, post explicitly, keep thread counts and re
     pr = { ...pr, commentCount: 4, updatedAt: '2026-10-28' };
     return { id: pr.id, commentCount: pr.commentCount, updatedAt: pr.updatedAt };
   };
-  const savedViews = { list: async () => [], quickComments: async () => [{ id: 'review', label: 'Ask for review', body: '@claude_review' }] };
+  const savedViews = { list: async () => [], quickComments: async () => [{ id: 'review', label: 'Ask for review', body: '@claude_review\n\n' }, { id: 'build', label: 'Build', body: '[build]' }] };
   const { page, origin, errors } = await browserFixture(t, { list, savedViews });
   await page.goto(origin);
   const trigger = page.locator('.comment-count'), dialog = page.getByRole('dialog', { name: 'Quick comment', exact: true });
@@ -41,6 +41,13 @@ test('quick comments preserve drafts, post explicitly, keep thread counts and re
     assert.ok(Math.abs(offsets.label) <= 1, `label offset ${offsets.label}px (selected=${selected})`);
     if (selected) assert.ok(offsets.check !== null && Math.abs(offsets.check) <= 1, `check offset ${offsets.check}px`);
   }
+  await dialog.getByRole('button', { name: /^Build,/ }).click();
+  assert.equal(await dialog.locator('.in-draft svg').count(), 2);
+  assert.equal(await chip.getAttribute('aria-label'), 'Ask for review, already in draft');
+  await chip.click();
+  assert.equal(await field.inputValue(), '@claude_review\n[build]');
+  await field.fill('[build]');
+  assert.equal(await dialog.locator('.in-draft').count(), 1);
   await field.fill('**Thanks!**'); assert.equal(calls, 0);
   await page.keyboard.press('Escape'); await dialog.waitFor({ state: 'hidden' });
   await trigger.locator('.comment-draft-dot').waitFor();
