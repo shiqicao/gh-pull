@@ -52,7 +52,7 @@ export function validateMerge(input) {
   if (!/^[a-f0-9]{40}$/i.test(input.headOid ?? '') || !['MERGE', 'SQUASH', 'REBASE'].includes(input.mergeMethod)) {
     throw new ApiError('Provide the displayed commit and merge method.', 400);
   }
-  return { id, headOid: input.headOid, mergeMethod: input.mergeMethod };
+  return { id, headOid: input.headOid, mergeMethod: input.mergeMethod, ...(input.allowUnstable === true && { allowUnstable: true }) };
 }
 
 export function validateClose(input) {
@@ -274,10 +274,11 @@ export function createGitHub(options = {}) {
   };
 
   list.merge = async input => {
-    const { id, headOid, mergeMethod } = validateMerge(input);
+    const { id, headOid, mergeMethod, allowUnstable } = validateMerge(input);
     const { pr, viewer } = await ownedPullRequest(id, `id state isDraft author { login } ${mergeFields}
       commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }`, 'You can only merge your own pull requests.');
     const readiness = mergeOptions(pr, viewer);
+    if (readiness.mergeUnstable && !allowUnstable) throw new ApiError('Checks are no longer green. Refresh and review the warning before merging.', 409);
     if (!readiness.canMerge) throw new ApiError('This PR is no longer ready to merge. Refresh to see its current status.', 409);
     if (pr.headRefOid !== headOid) throw new ApiError('New commits were pushed. Refresh and review the changes before merging.', 409);
     if (!readiness.mergeMethods.includes(mergeMethod)) throw new ApiError('This merge method is no longer enabled for the repository. Refresh and choose another method.', 409);

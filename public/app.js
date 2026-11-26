@@ -135,10 +135,12 @@ function createMergeAction(pr, prUrl) {
   if (!methods.includes(mergeSelections.get(pr.id))) mergeSelections.delete(pr.id);
   const selected = mergeSelections.get(pr.id) ?? (methods.includes(pr.mergeMethod) ? pr.mergeMethod : methods[0]);
   const disabled = Boolean(pendingChanges.isMergeBusy(pr.id));
-  const controls = html`<span class=${`merge-controls${methods.length > 1 ? ' merge-split' : ''}`}>
-    ${actionButton({ className: 'badge open merge-action', label: `${mergeLabels[selected]} ${pr.repo} #${pr.number}`, disabled,
-      onClick: () => mergePull(pr, selected), content: merges.get(pr.id)?.saving ? 'Merging…' : mergeLabels[selected] })}
-    ${methods.length > 1 ? html`<span class="merge-method-trigger open"><select class="merge-method" data-tooltip="Merge method"
+  const tone = pr.mergeUnstable ? 'pending' : 'open';
+  const warning = pr.mergeUnstable ? 'Checks are not all passing' : '';
+  const controls = html`<span class=${`merge-controls${methods.length > 1 ? ' merge-split' : ''} ${tone}`}>
+    ${actionButton({ className: `badge ${tone} merge-action`, label: `${mergeLabels[selected]} ${pr.repo} #${pr.number}${warning ? ': ' + warning : ''}`, title: warning || undefined, disabled,
+      onClick: () => mergePull(pr, selected), content: merges.get(pr.id)?.saving ? 'Merging…' : `${warning ? '⚠ ' : ''}${mergeLabels[selected]}` })}
+    ${methods.length > 1 ? html`<span class=${`merge-method-trigger ${tone}`}><select class="merge-method" data-tooltip="Merge method"
       aria-label=${`Merge method for ${pr.repo} #${pr.number}`} ?disabled=${disabled}
       @change=${event => { mergeSelections.set(pr.id, event.target.value); render(); }}>
       ${methods.map(method => html`<option value=${method} .selected=${method === selected}>${mergeMethodLabels[method]}</option>`)}
@@ -194,7 +196,7 @@ async function changePull(pr, changes, { action, input = {}, apply, message, onS
 
 async function mergePull(pr, mergeMethod) {
   await changePull(pr, merges, {
-    action: 'merge', input: { headOid: pr.headOid, mergeMethod },
+    action: 'merge', input: { headOid: pr.headOid, mergeMethod, ...(pr.mergeUnstable && { allowUnstable: true }) },
     message: `Merged ${pr.repo} #${pr.number}`,
     onSuccess: () => { void load({ refresh: true, background: true }); },
     apply(current, data) {

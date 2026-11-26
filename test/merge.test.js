@@ -36,7 +36,7 @@ test('merge readiness excludes blocked, draft, queued, stacked and unauthorized 
   assert.equal(mergeOptions(ready, 'alice').canMerge, true);
   for (const overrides of [
     { state: 'MERGED' }, { isDraft: true }, { mergeable: 'CONFLICTING' }, { mergeable: 'UNKNOWN' },
-    ...['BLOCKED', 'BEHIND', 'DIRTY', 'DRAFT', 'UNKNOWN', 'UNSTABLE'].map(mergeStateStatus => ({ mergeStateStatus })),
+    ...['BLOCKED', 'BEHIND', 'DIRTY', 'DRAFT', 'UNKNOWN'].map(mergeStateStatus => ({ mergeStateStatus })),
     { reviewDecision: 'REVIEW_REQUIRED', mergeStateStatus: 'BLOCKED' }, { reviewDecision: 'CHANGES_REQUESTED', mergeStateStatus: 'BLOCKED' },
     { mergeQueue: { id: 'q' } }, { stackEntry: { id: 's' } },
     { repository: { ...ready.repository, viewerPermission: 'READ' } },
@@ -44,6 +44,18 @@ test('merge readiness excludes blocked, draft, queued, stacked and unauthorized 
     { commits: { nodes: [{ commit: { statusCheckRollup: { state: 'PENDING' } } }] } },
   ]) assert.equal(mergeOptions({ ...ready, ...overrides }, 'alice').canMerge, false, JSON.stringify(overrides));
   assert.equal(mergeOptions({ ...ready, repository: { ...ready.repository, squashMergeAllowed: false } }, 'alice').mergeMethod, 'MERGE');
+});
+
+test('unstable merges require the warning action and still obey normal blockers', async () => {
+  for (const state of ['PENDING', 'FAILURE']) {
+    const pr = { ...ready, mergeStateStatus: 'UNSTABLE', commits: { nodes: [{ commit: { statusCheckRollup: { state } } }] } };
+    assert.equal(mergeOptions(pr, 'alice').mergeUnstable, true);
+    const stale = client(pr);
+    await assert.rejects(stale.github.merge(input), /review the warning/);
+    assert.equal(stale.calls.length, 1);
+    assert.equal((await client(pr).github.merge({ ...input, allowUnstable: true })).status, 'MERGED');
+    await assert.rejects(client({ ...pr, mergeStateStatus: 'BLOCKED' }).github.merge({ ...input, allowUnstable: true }), /no longer ready/);
+  }
 });
 
 test('merge rechecks GitHub and pins mutation to displayed head and method', async () => {

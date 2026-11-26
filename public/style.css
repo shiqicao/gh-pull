@@ -737,8 +737,6 @@ input:focus, select:focus, textarea:focus {
 .merge-split {
   border: 1px solid transparent;
   border-radius: var(--radius-small);
-  background: var(--color-success-bg);
-  color: var(--color-success-text);
 }
 
 .merge-split > .merge-action {
@@ -788,11 +786,11 @@ input:focus, select:focus, textarea:focus {
 
 .merge-split:has(.merge-action:hover:not(:disabled)),
 .merge-split:has(.merge-method:hover:not(:disabled)) {
-  border-color: var(--color-success-text);
+  border-color: currentColor;
 }
 
 .merge-split:has(:focus-visible) {
-  border-color: var(--color-success-text);
+  border-color: currentColor;
 }
 
 .merge-method-trigger:has(select:disabled) {
