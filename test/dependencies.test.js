@@ -64,6 +64,8 @@ test('node readiness colours prioritize failed and running checks over approval'
   assert.equal(dependencyStatus({ checks: 'FAILURE', review: 'APPROVED' }), 'failed');
   assert.equal(dependencyStatus({ checks: 'PENDING', canMerge: true }), 'running');
   assert.equal(dependencyStatus({ checks: 'SUCCESS', review: 'APPROVED' }), 'ready');
+  assert.equal(dependencyStatus({ canMerge: true, mergeUnstable: true }), 'review');
+  assert.equal(dependencyStatus({ canMerge: true, mergeUnstable: true, review: 'APPROVED' }), 'ready');
   assert.equal(dependencyStatus({ status: 'DRAFT', review: 'APPROVED' }), 'review');
 });
 

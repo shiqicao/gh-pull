@@ -5,15 +5,17 @@ export function mergeOptions(pr, viewerLogin) {
   const checks = pr.commits?.nodes[0]?.commit.statusCheckRollup?.state;
   // Review decisions can remain REVIEW_REQUIRED on a CLEAN PR; GitHub's merge
   // status determines whether reviews actually block the merge.
+  const unstable = pr.mergeStateStatus === 'UNSTABLE';
+  const checksAllowMerge = unstable || (['CLEAN', 'HAS_HOOKS'].includes(pr.mergeStateStatus) && (!checks || checks === 'SUCCESS'));
   const canMerge = Boolean(viewerLogin && pr.author?.login && pr.author.login.toLowerCase() === viewerLogin.toLowerCase()) && pr.state === 'OPEN' && pr.isDraft === false && pr.mergeable === 'MERGEABLE' &&
-    ['CLEAN', 'HAS_HOOKS'].includes(pr.mergeStateStatus) && !pr.mergeQueue && !pr.stackEntry &&
+    checksAllowMerge && !pr.mergeQueue && !pr.stackEntry &&
     ['WRITE', 'MAINTAIN', 'ADMIN'].includes(repo.viewerPermission) &&
-    (!checks || checks === 'SUCCESS') && Boolean(pr.headRefOid) && methods.length > 0;
+    Boolean(pr.headRefOid) && methods.length > 0;
   const mergePending = Boolean(viewerLogin && pr.author?.login?.toLowerCase() === viewerLogin.toLowerCase() && pr.state === 'OPEN' && !pr.isDraft &&
     !pr.mergeQueue && !pr.stackEntry && ['WRITE', 'MAINTAIN', 'ADMIN'].includes(repo.viewerPermission) && methods.length &&
     (pr.mergeable === 'UNKNOWN' || pr.mergeStateStatus === 'UNKNOWN'));
   const hasConflicts = pr.state === 'OPEN' && (pr.mergeable === 'CONFLICTING' || pr.mergeStateStatus === 'DIRTY');
-  return { canMerge, mergePending, hasConflicts, mergeMethods: methods, headOid: pr.headRefOid, mergeMethod: methods.includes(repo.viewerDefaultMergeMethod) ? repo.viewerDefaultMergeMethod : methods[0] };
+  return { canMerge, mergeUnstable: canMerge && unstable, mergePending, hasConflicts, mergeMethods: methods, headOid: pr.headRefOid, mergeMethod: methods.includes(repo.viewerDefaultMergeMethod) ? repo.viewerDefaultMergeMethod : methods[0] };
 }
 
 function checkCountsFor(pr) {
