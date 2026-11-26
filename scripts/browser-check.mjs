@@ -62,9 +62,11 @@ async function fixture(t, overrides = {}) {
 }
 
 test('commit link highlights only head changes after a visit', async t => {
-  const f = await fixture(t, { commitCount: 2 }); await f.open();
+  const f = await fixture(t, { commitCount: 2, branch: `feature/${'long-branch-'.repeat(12)}` }); await f.open();
   const link = f.page.locator('.pr-commits');
   assert.equal(await link.textContent(), '2 commits');
+  const filesBox = await f.page.locator('.pr-files').boundingBox(), commitsBox = await link.boundingBox();
+  assert.ok(Math.abs(filesBox.y + filesBox.height / 2 - commitsBox.y - commitsBox.height / 2) <= 1, 'counts share a line even with a long branch');
   assert.match(await link.getAttribute('href'), /\/pull\/1\/commits$/);
   await link.evaluate(el => { el.addEventListener('click', e => e.preventDefault(), { once: true }); el.click(); });
   f.laterUpdate({ headOid: 'b'.repeat(40), commitCount: 4 }); await f.refresh();

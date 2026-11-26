@@ -937,7 +937,8 @@ select:not([multiple]):not([size]) {
 .pr-branch-line .branch-copy { padding: 0; background: transparent; font-size: inherit; min-width: 0; }
 .pr-branch-line .branch-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .pr-branch-line :is(.pr-files, .pr-commits) { flex: none; font: inherit; color: inherit; text-decoration: none; white-space: nowrap; }
-.pr-branch-line :is(.pr-files, .pr-commits)::before { content: '· '; }
+.pr-change-links { display: inline-flex; align-items: center; gap: 0.7em; max-inline-size: 100%; flex-wrap: wrap; }
+.pr-change-links:empty { display: none; }
 .pr-branch-line .pr-commits.changed { color: var(--color-accent); font-weight: 600; }
 .pr-branch-line:has(.pr-commits) { flex-wrap: wrap; }
 .pr-author { font-size: 0.6875rem; }
