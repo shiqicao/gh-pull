@@ -215,6 +215,7 @@ test('merge choices follow live repository options and preserve a valid selectio
   await f.refresh();
   assert.deepEqual(await select.locator('option').evaluateAll(options => options.map(o => o.value)), ['MERGE', 'SQUASH']);
   assert.equal(await select.inputValue(), 'SQUASH');
+  assert.equal(await f.page.locator('.merge-split.pending .merge-action.pending').count(), 1);
   assert.match(await f.page.locator('.merge-action').innerText(), /⚠/);
   assert.match(await f.page.locator('.merge-action').getAttribute('aria-label'), /Checks are not all passing/);
   await select.selectOption('MERGE');

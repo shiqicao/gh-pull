@@ -154,7 +154,7 @@ export function dependencyForest(items, { allItems = items, sort = 'query' } = {
 export function dependencyStatus(pr) {
   if (['FAILURE', 'ERROR'].includes(pr.checks)) return 'failed';
   if (['PENDING', 'EXPECTED'].includes(pr.checks)) return 'running';
-  if (pr.status !== 'DRAFT' && (pr.canMerge || pr.review === 'APPROVED')) return 'ready';
+  if (pr.status !== 'DRAFT' && ((pr.canMerge && !pr.mergeUnstable) || pr.review === 'APPROVED')) return 'ready';
   return 'review';
 }
 
