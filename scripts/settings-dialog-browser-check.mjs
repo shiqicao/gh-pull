@@ -7,17 +7,20 @@ test('Manage keeps the PR document, draft and caret through dirty dialog dismiss
   const list = Object.assign(async () => ({ viewer:'alex', total:1, items:[pr], pageInfo:{hasNextPage:false} }), {viewer:async ()=>'alex'});
   const savedViews = { list:async()=>[], quickComments:async()=>[] };
   const {page, origin} = await browserFixture(t, {list,savedViews});
-  let pullRequests = 0;
-  page.on('request', req => { if (new URL(req.url()).pathname === '/api/pulls') pullRequests++; });
   await page.goto(origin);
+  const originalDocument = await page.evaluateHandle(() => document);
   await page.locator('.comment-count').first().press('Enter');
   const field = page.locator('#quick-comment textarea');
   await field.fill('Keep this draft');
-  const before = pullRequests;
+  await page.waitForFunction(() => !document.querySelector('#refresh').disabled);
+  // Closing Quick comment invalidates the list. Let a real polling tick finish
+  // while Settings is open; a background fetch is not a document navigation.
+  const refreshed = page.waitForResponse(res => new URL(res.url()).pathname === '/api/pulls' && res.ok());
   await page.locator('#quick-comment').getByText('Manage', {exact:true}).press('Enter');
   const modal = page.getByRole('dialog', {name:'Settings',exact:true});
   await modal.getByRole('button',{name:'Create your first preset'}).press('Enter');
   await modal.locator('#pf-label').fill('Unsaved');
+  await refreshed;
   await page.keyboard.press('Escape');
   await modal.getByText('Keep editing',{exact:true}).press('Enter');
   assert.equal(await modal.locator('#pf-label').inputValue(),'Unsaved');
@@ -26,5 +29,5 @@ test('Manage keeps the PR document, draft and caret through dirty dialog dismiss
   await field.waitFor();
   assert.equal(await field.inputValue(),'Keep this draft');
   assert.ok(await field.evaluate(el=>el===document.activeElement && el.selectionEnd===el.value.length));
-  assert.equal(pullRequests,before);
+  assert.ok(await originalDocument.evaluate(original => original === document), 'Manage kept the original PR document');
 });
