@@ -422,7 +422,7 @@ button, .pr-group > summary {
   height: 14px;
 }
 
-.icon-button:hover {
+.icon-button:hover:not(:disabled) {
   color: var(--color-icon-hover);
   background: var(--color-hover);
 }

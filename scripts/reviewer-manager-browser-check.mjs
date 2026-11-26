@@ -26,7 +26,14 @@ test('manage own reviewers: lazy search, errors, re-request, team, remove, dismi
   }));
   assert.deepEqual(offsets[0], offsets[1]);
   assert.equal(await page.locator('[data-pr-id=P2]').getByRole('button', { name: /Manage reviewers/ }).count(), 0);
-  assert.equal(await page.locator('[data-pr-id=P3]').getByRole('button', { name: /Manage reviewers/ }).isDisabled(), true);
+  const disabledManage = page.locator('[data-pr-id=P3]').getByRole('button', { name: /Manage reviewers/ });
+  assert.equal(await disabledManage.isDisabled(), true);
+  const colors = button => button.evaluate(el => [getComputedStyle(el).color, getComputedStyle(el).backgroundColor]);
+  const idle = await colors(disabledManage);
+  await disabledManage.hover();
+  assert.deepEqual(await colors(disabledManage), idle, 'disabled reviewer manager does not highlight on hover');
+  assert.equal(idle[1], 'rgba(0, 0, 0, 0)');
+  assert.equal(await disabledManage.evaluate(el => getComputedStyle(el).cursor), 'default');
   await trigger.click();
   const panel = page.getByRole('dialog', { name: 'Manage reviewers', exact: true });
   await panel.getByRole('textbox').click();
