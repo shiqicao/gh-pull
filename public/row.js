@@ -92,6 +92,9 @@ export function renderRow(node, gutter, ctx) {
     if (!titleEdits.has(pr.id)) titleEdits.set(pr.id, { value: pr.title, expectedTitle: pr.title, saving: false, error: '' });
     render(); focusTitleControl(pr.id, '.title-editor input');
   };
+  const commitChange = viewedStore.commitChange(pr);
+  const commitLabel = `${pr.commitCount} ${pr.commitCount === 1 ? 'commit' : 'commits'}`;
+  const commitHint = commitChange === null ? 'View commits' : commitChange > 0 ? `Commit count increased by ${commitChange} since last viewed` : 'Head commit changed since last viewed';
   const filesKnown = Number.isInteger(pr.changedFiles) && pr.changedFiles >= 0;
   return html`${gutter ? html`<div class="dependency-gutter" aria-hidden="true"></div>` : nothing}
     <div class=${`pr-row${hasUpdates ? ' has-updates' : ''}`} data-pr-id=${pr.id} @click=${onOpen} @auxclick=${onOpen}>
@@ -110,6 +113,7 @@ export function renderRow(node, gutter, ctx) {
             ${pr.branch ? html`<button class="branch-copy" type="button" data-tooltip=${`Copy branch name: ${pr.branch}`} aria-label=${`Copy branch name: ${pr.branch}`}
               ${copyFeedback(pr.branch, 'Branch name copied', `Copy branch name: ${pr.branch}`)}><span class="branch-name">${pr.branch}</span><span class="branch-copy-symbol" aria-hidden="true"><span class="copy-symbol">${icon('copy', 12)}</span><span class="copy-feedback-symbol" hidden></span></span></button>` : nothing}
             ${hasUrl ? html`<a class="pr-files" href=${githubUrl(pr.url, 'files')} target="_blank" rel="noopener noreferrer" data-view-pr data-tooltip="View code changes (opens in a new tab)" aria-label=${`View code changes for ${pr.title}${filesKnown ? `, ${pr.changedFiles} ${pr.changedFiles === 1 ? 'file' : 'files'} changed` : ''} (opens in a new tab)`}>${filesKnown ? html`<span class="file-count">${pr.changedFiles}</span> ${pr.changedFiles === 1 ? 'file' : 'files'}` : 'files'}</a>` : nothing}
+            ${hasUrl && Number.isInteger(pr.commitCount) ? html`<a class=${`pr-commits${commitChange !== null ? ' changed' : ''}`} href=${githubUrl(pr.url, 'commits')} target="_blank" rel="noopener noreferrer" data-view-pr data-tooltip=${commitHint} aria-label=${`${commitLabel}: ${commitHint} (opens in a new tab)`}>${commitLabel}${commitChange === null ? '' : commitChange > 0 ? ` (+${commitChange})` : ' ↻'}</a>` : nothing}
           </div>
           ${ctx.groupBy !== 'author' ? html`<div class="pr-author">${author(pr.author)}</div>` : nothing}
           <div class="pr-extras">${dependency(node)}${createMergeAction(pr, hasUrl ? url : null)}${issuePopover.button(pr)}${pr.labels.map(label => badge(label, 'label'))}</div>

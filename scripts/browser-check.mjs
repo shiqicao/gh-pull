@@ -61,6 +61,18 @@ async function fixture(t, overrides = {}) {
   };
 }
 
+test('commit link highlights only head changes after a visit', async t => {
+  const f = await fixture(t, { commitCount: 2 }); await f.open();
+  const link = f.page.locator('.pr-commits');
+  assert.equal(await link.textContent(), '2 commits');
+  assert.match(await link.getAttribute('href'), /\/pull\/1\/commits$/);
+  await link.evaluate(el => { el.addEventListener('click', e => e.preventDefault(), { once: true }); el.click(); });
+  f.laterUpdate({ headOid: 'b'.repeat(40), commitCount: 4 }); await f.refresh();
+  assert.equal(await f.page.locator('.pr-commits.changed').textContent(), '4 commits (+2)');
+  await link.evaluate(el => { el.addEventListener('click', e => e.preventDefault(), { once: true }); el.click(); });
+  assert.equal(await link.textContent(), '4 commits');
+});
+
 test('conflicting PRs link to resolution in place of merge and update after refresh', async t => {
   const f = await fixture(t, { hasConflicts: true, canMerge: false });
   await f.open();

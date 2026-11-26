@@ -33,7 +33,7 @@ const fields = `viewerCanClose viewerCanReopen id number title url state isDraft
     nodes { id url author { login __typename } state }
   }
   labels(first: 10) { nodes { name } }
-  commits(last: 1) { nodes { commit { statusCheckRollup {
+  commits(last: 1) { totalCount nodes { commit { statusCheckRollup {
     state
     contexts(first: 100) {
       nodes {
