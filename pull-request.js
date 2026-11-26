@@ -80,6 +80,7 @@ export function normalizePullRequest(pr, viewerLogin) {
     createdAt: pr.createdAt, updatedAt: pr.updatedAt,
     additions: pr.additions, deletions: pr.deletions,
     changedFiles: pr.changedFiles ?? null,
+    commitCount: pr.commits?.totalCount ?? null,
     commentCount: pr.totalCommentsCount ?? null,
     closingIssues: (pr.closingIssuesReferences?.nodes ?? []).filter(Boolean).map(issue => ({
       number: issue.number, title: issue.title, url: issue.url, state: issue.state, repo: issue.repository.nameWithOwner,

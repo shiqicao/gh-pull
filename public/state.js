@@ -1,4 +1,4 @@
-import { normalizeViewedUpdates, hasUnviewedUpdate } from './model.js';
+import { normalizeViewedUpdates, hasUnviewedUpdate, viewedTime } from './model.js';
 
 // Storage is injected so browser persistence is optional and logic stays testable.
 export function createViewedStore(storage) {
@@ -8,8 +8,8 @@ export function createViewedStore(storage) {
     catch { return viewed; }
   }
   function sync() {
-    for (const [id, timestamp] of Object.entries(read())) {
-      viewed[id] = Math.max(viewed[id] ?? 0, timestamp);
+    for (const [id, entry] of Object.entries(read())) {
+      if (viewedTime(entry) >= (viewedTime(viewed[id]) ?? 0)) viewed[id] = entry;
     }
   }
   return {
@@ -21,12 +21,22 @@ export function createViewedStore(storage) {
       return changed;
     },
     hasUpdates(pr) { return hasUnviewedUpdate(pr, viewed); },
+    commitChange(pr) {
+      const last = viewed[pr.id];
+      if (!last?.headOid || !pr.headOid || last.headOid === pr.headOid || !Number.isInteger(pr.commitCount) || Date.parse(pr.updatedAt) < last.timestamp) return null;
+      return Math.max(0, pr.commitCount - last.commitCount);
+    },
     mark(pr) {
       const timestamp = Date.parse(pr.updatedAt);
       if (!key || !Number.isFinite(timestamp)) return false;
       sync();
       // Record the confirmed version, never wall-clock time or a future update.
-      viewed[pr.id] = Math.max(viewed[pr.id] ?? 0, timestamp);
+      const previous = viewed[pr.id];
+      if (timestamp >= (viewedTime(previous) ?? 0)) {
+        viewed[pr.id] = pr.headOid && Number.isInteger(pr.commitCount)
+          ? { timestamp, headOid: pr.headOid, commitCount: pr.commitCount }
+          : previous?.headOid ? { ...previous, timestamp } : timestamp;
+      }
       try { storage.setItem(key, JSON.stringify(viewed)); } catch { /* Keep session-only tracking. */ }
       return true;
     },

@@ -23,6 +23,21 @@ test('read history is account-scoped and marks confirmed versions without hiding
   assert.equal(reloaded.hasUpdates(pr(2)), false);
 });
 
+test('commit baselines support old timestamp entries, newer heads and rewrites', () => {
+  const storage = memoryStorage(), store = createViewedStore(storage);
+  storage.setItem('gh-pull.viewed.v1:alice', JSON.stringify({ one: Date.parse(pr(1).updatedAt) }));
+  store.selectAccount('alice');
+  const first = { ...pr(1), headOid: 'a', commitCount: 2 };
+  assert.equal(store.commitChange(first), null);
+  store.mark(first);
+  const changed = { ...pr(2), headOid: 'b', commitCount: 5 };
+  const tab = createViewedStore(storage); tab.selectAccount('alice');
+  assert.equal(tab.commitChange(changed), 3);
+  assert.equal(tab.commitChange({ ...changed, commitCount: 2 }), 0);
+  tab.mark(changed); tab.mark(first);
+  assert.equal(tab.commitChange(changed), null);
+});
+
 test('storage failures and malformed data retain session-only read history', () => {
   const store = createViewedStore({ getItem() { throw new Error('Blocked'); }, setItem() { throw new Error('Quota'); } });
   store.selectAccount('alice'); store.mark(pr(2)); store.selectAccount('alice');

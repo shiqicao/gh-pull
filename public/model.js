@@ -16,11 +16,13 @@ export const NAME_COLOR_COUNT = 12;
 
 export function normalizeViewedUpdates(value) {
   return Object.fromEntries(Object.entries(value && typeof value === 'object' ? value : {})
-    .filter(([, timestamp]) => Number.isFinite(timestamp) && timestamp >= 0));
+    .filter(([, entry]) => Number.isFinite(viewedTime(entry)) && viewedTime(entry) >= 0));
 }
 
+export const viewedTime = entry => entry?.timestamp ?? entry;
+
 export function hasUnviewedUpdate(pr, viewed) {
-  return !Object.hasOwn(viewed, pr.id) || Date.parse(pr.updatedAt) > viewed[pr.id];
+  return !Object.hasOwn(viewed, pr.id) || Date.parse(pr.updatedAt) > viewedTime(viewed[pr.id]);
 }
 
 function nameHash(username) {
